@@ -144,6 +144,7 @@ public class AcSync
         Slot = slot; Status = "";
         long seq = 0, nextW = 0, nextR = 0;
         var missing = new Dictionary<int, long>();
+        var staleSeq = new Dictionary<int, long>();   // 멈춘 채 남아 있는 슬롯 (꺼진 사람) — 같은 seq면 무시
         var local = new Dictionary<int, Peer>();
         var sw = new Stopwatch();
         while (running)
@@ -166,9 +167,10 @@ public class AcSync
                     if (r == 1) { local.Remove(i); missing[i] = now; continue; }
                     if (r == 2) continue;
                     if (d.empty || d.left || d.id == myId) { local.Remove(i); missing[i] = now; continue; }
+                    if (staleSeq.TryGetValue(i, out var ss)) { if (ss == d.seq) { missing[i] = now; continue; } staleSeq.Remove(i); }
                     if (!local.TryGetValue(i, out var p)) { p = new Peer { seqAt = now }; local[i] = p; }
                     if (d.seq != p.seq) { p.seq = d.seq; p.seqAt = now; p.data = d; }
-                    else if (now - p.seqAt > 6000) { local.Remove(i); missing[i] = now; }   // 6초 멈춤 = 꺼짐
+                    else if (now - p.seqAt > 6000) { local.Remove(i); missing[i] = now; staleSeq[i] = d.seq; }   // 6초 멈춤 = 꺼짐
                 }
                 lock (lk) { peers = new Dictionary<int, Peer>(local); }
             }
