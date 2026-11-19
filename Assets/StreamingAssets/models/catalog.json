@@ -1,0 +1,3479 @@
+{
+ "items": [
+  {
+   "name": "armchair",
+   "cat": "furniture",
+   "desc": "1인 안락의자 (등받이 둥근)",
+   "groups": [
+    "fabric",
+    "fabric2",
+    "wood"
+   ],
+   "size": [
+    1.2,
+    1.07,
+    1.0
+   ],
+   "footprint": [
+    1.0,
+    0.9
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "rug_round",
+   "cat": "furniture",
+   "desc": "둥근 러그",
+   "groups": [
+    "fabric"
+   ],
+   "size": [
+    3.3,
+    0.08,
+    3.3
+   ],
+   "footprint": [
+    3.2,
+    3.2
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "rug_rect",
+   "cat": "furniture",
+   "desc": "네모 러그 (체크무늬)",
+   "groups": [
+    "fabric"
+   ],
+   "size": [
+    3.2,
+    0.08,
+    2.2
+   ],
+   "footprint": [
+    3.0,
+    2.0
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sofa",
+   "cat": "furniture",
+   "desc": "3인용 푹신 소파",
+   "groups": [
+    "fabric",
+    "fabric2",
+    "wood"
+   ],
+   "size": [
+    2.1,
+    0.97,
+    1.0
+   ],
+   "footprint": [
+    2.0,
+    0.9
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "side_table",
+   "cat": "furniture",
+   "desc": "둥근 협탁",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    0.64,
+    0.64,
+    0.64
+   ],
+   "footprint": [
+    0.6,
+    0.6
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "coffee_table",
+   "cat": "furniture",
+   "desc": "둥근 모서리 낮은 탁자",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.5,
+    0.52,
+    1.0
+   ],
+   "footprint": [
+    1.4,
+    0.9
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "floor_lamp",
+   "cat": "furniture",
+   "desc": "스탠드 조명",
+   "groups": [
+    "metal",
+    "shade"
+   ],
+   "size": [
+    0.7,
+    1.77,
+    0.7
+   ],
+   "footprint": [
+    0.5,
+    0.5
+   ],
+   "hang": [],
+   "light": [
+    0,
+    1.45,
+    0
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "bulb",
+    "shade"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "table_lamp",
+   "cat": "furniture",
+   "desc": "탁상 조명",
+   "groups": [
+    "base",
+    "shade"
+   ],
+   "size": [
+    0.44,
+    0.57,
+    0.44
+   ],
+   "footprint": [
+    0.3,
+    0.3
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "fireplace",
+   "cat": "furniture",
+   "desc": "벽난로 (벽돌, 장작불)",
+   "groups": [
+    "brick",
+    "wood"
+   ],
+   "size": [
+    2.1,
+    2.42,
+    1.05
+   ],
+   "footprint": [
+    2.0,
+    0.8
+   ],
+   "hang": [],
+   "light": [
+    0,
+    0.35,
+    0.15
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "fire"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "bookshelf",
+   "cat": "furniture",
+   "desc": "책장 (책 꽂힘)",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.4,
+    1.97,
+    0.5
+   ],
+   "footprint": [
+    1.3,
+    0.4
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wall_clock",
+   "cat": "furniture",
+   "desc": "괘종시계",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    0.9,
+    1.97,
+    0.4
+   ],
+   "footprint": [
+    0.6,
+    0.4
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tv_retro",
+   "cat": "furniture",
+   "desc": "레트로 TV",
+   "groups": [
+    "body"
+   ],
+   "size": [
+    1.1,
+    1.07,
+    0.85
+   ],
+   "footprint": [
+    1.0,
+    0.7
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "piano",
+   "cat": "furniture",
+   "desc": "업라이트 피아노",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.7,
+    1.42,
+    1.0
+   ],
+   "footprint": [
+    1.6,
+    0.7
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "curtain",
+   "cat": "furniture",
+   "desc": "커튼 한 쌍 + 봉",
+   "groups": [
+    "fabric",
+    "wood"
+   ],
+   "size": [
+    1.9,
+    2.12,
+    0.32
+   ],
+   "footprint": [
+    1.8,
+    0.2
+   ],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "window",
+   "cat": "furniture",
+   "desc": "격자 창문 (벽에 붙임, 원점=창 아래 중심)",
+   "groups": [
+    "frame"
+   ],
+   "size": [
+    1.5,
+    1.67,
+    0.28
+   ],
+   "footprint": [
+    1.4,
+    0.2
+   ],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [
+    "glass"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "picture_frame",
+   "cat": "furniture",
+   "desc": "액자 (벽걸이, 눈 풍경)",
+   "groups": [
+    "frame"
+   ],
+   "size": [
+    0.76,
+    0.62,
+    0.13
+   ],
+   "footprint": [
+    0.7,
+    0.1
+   ],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "cushion",
+   "cat": "furniture",
+   "desc": "방석 쿠션",
+   "groups": [
+    "fabric"
+   ],
+   "size": [
+    0.6,
+    0.32,
+    0.6
+   ],
+   "footprint": [
+    0.5,
+    0.5
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "ottoman",
+   "cat": "furniture",
+   "desc": "둥근 발받침 스툴",
+   "groups": [
+    "fabric",
+    "wood"
+   ],
+   "size": [
+    0.7,
+    0.52,
+    0.7
+   ],
+   "footprint": [
+    0.6,
+    0.6
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "chair",
+   "cat": "furniture",
+   "desc": "식탁 의자 (하트 등받이)",
+   "groups": [
+    "fabric",
+    "wood"
+   ],
+   "size": [
+    0.6,
+    1.12,
+    0.6
+   ],
+   "footprint": [
+    0.5,
+    0.5
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "dining_table",
+   "cat": "furniture",
+   "desc": "식탁 (체크 테이블보)",
+   "groups": [
+    "fabric",
+    "wood"
+   ],
+   "size": [
+    1.9,
+    0.87,
+    1.2
+   ],
+   "footprint": [
+    1.8,
+    1.1
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "oven",
+   "cat": "furniture",
+   "desc": "오븐 레인지",
+   "groups": [
+    "body"
+   ],
+   "size": [
+    0.9,
+    1.02,
+    0.8
+   ],
+   "footprint": [
+    0.8,
+    0.7
+   ],
+   "hang": [],
+   "light": [
+    0,
+    0.4,
+    0.3
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "fridge",
+   "cat": "furniture",
+   "desc": "둥근 레트로 냉장고",
+   "groups": [
+    "body"
+   ],
+   "size": [
+    0.84,
+    1.92,
+    0.78
+   ],
+   "footprint": [
+    0.8,
+    0.7
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "kitchen_counter",
+   "cat": "furniture",
+   "desc": "조리대 (서랍장 + 싱크)",
+   "groups": [
+    "cabinet",
+    "top"
+   ],
+   "size": [
+    1.7,
+    1.02,
+    0.78
+   ],
+   "footprint": [
+    1.6,
+    0.7
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "kitchen_shelf",
+   "cat": "furniture",
+   "desc": "벽 선반 (그릇, 병)",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.2,
+    0.72,
+    0.35
+   ],
+   "footprint": [
+    1.1,
+    0.25
+   ],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bed",
+   "cat": "furniture",
+   "desc": "나무 침대 (퀼트 이불)",
+   "groups": [
+    "fabric",
+    "wood"
+   ],
+   "size": [
+    1.5,
+    1.17,
+    2.3
+   ],
+   "footprint": [
+    1.4,
+    2.2
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wardrobe",
+   "cat": "furniture",
+   "desc": "옷장",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.24,
+    2.02,
+    0.7
+   ],
+   "footprint": [
+    1.2,
+    0.6
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "nightstand_lamp",
+   "cat": "furniture",
+   "desc": "협탁 + 버섯 램프",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    0.56,
+    0.97,
+    0.5
+   ],
+   "footprint": [
+    0.5,
+    0.45
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "lamp"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "dresser",
+   "cat": "furniture",
+   "desc": "서랍장",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.1,
+    0.97,
+    0.6
+   ],
+   "footprint": [
+    1.0,
+    0.5
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_star_topper",
+   "cat": "tree",
+   "desc": "트리 꼭대기 별",
+   "groups": [
+    "star"
+   ],
+   "size": [
+    1.2,
+    1.25,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_skirt",
+   "cat": "tree",
+   "desc": "트리 밑 받침천",
+   "groups": [
+    "skirt"
+   ],
+   "size": [
+    4.6,
+    0.45,
+    4.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_planter",
+   "cat": "tree",
+   "desc": "나무 화분 받침",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    2.0,
+    1.15,
+    2.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball",
+   "cat": "ornament",
+   "desc": "기본 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_stripe",
+   "cat": "ornament",
+   "desc": "줄무늬 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_dot",
+   "cat": "ornament",
+   "desc": "물방울 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_glitter",
+   "cat": "ornament",
+   "desc": "반짝이 띠 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_drop",
+   "cat": "ornament",
+   "desc": "물방울 모양",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_star",
+   "cat": "ornament",
+   "desc": "별",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_heart",
+   "cat": "ornament",
+   "desc": "하트",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bell",
+   "cat": "ornament",
+   "desc": "종",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_candycane",
+   "cat": "ornament",
+   "desc": "지팡이 사탕",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    -0.035,
+    -0.0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_snowflake",
+   "cat": "ornament",
+   "desc": "눈송이",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_gift",
+   "cat": "ornament",
+   "desc": "작은 선물상자",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_gingerbread",
+   "cat": "ornament",
+   "desc": "진저브레드맨",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_pinecone",
+   "cat": "ornament",
+   "desc": "솔방울",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_icicle",
+   "cat": "ornament",
+   "desc": "고드름",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bow",
+   "cat": "ornament",
+   "desc": "리본",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    -0.04,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_stocking",
+   "cat": "ornament",
+   "desc": "작은 양말",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_snowman",
+   "cat": "ornament",
+   "desc": "작은 눈사람",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_acorn",
+   "cat": "ornament",
+   "desc": "도토리",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_mushroom",
+   "cat": "ornament",
+   "desc": "버섯",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bird",
+   "cat": "ornament",
+   "desc": "작은 새",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_cookie",
+   "cat": "ornament",
+   "desc": "별 쿠키",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_light_bulb",
+   "cat": "ornament",
+   "desc": "전구",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_moon",
+   "cat": "ornament",
+   "desc": "초승달",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "pine_tall",
+   "cat": "nature",
+   "desc": "키 큰 전나무",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    2.6,
+    4.25,
+    2.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_giant",
+   "cat": "tree",
+   "desc": "장식 없는 거대 트리 (오너먼트 붙이는 곳)",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    6.0,
+    7.15,
+    6.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "pine_small",
+   "cat": "nature",
+   "desc": "작은 전나무",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    1.4,
+    2.15,
+    1.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "round_tree",
+   "cat": "nature",
+   "desc": "동그란 활엽수 (구름 모양 잎)",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    2.6,
+    3.45,
+    2.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "pine_snowy",
+   "cat": "nature",
+   "desc": "눈 덮인 전나무",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    2.6,
+    4.35,
+    2.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "fruit_tree",
+   "cat": "nature",
+   "desc": "열매 나무 (사과)",
+   "groups": [
+    "bark",
+    "fruit",
+    "leaves"
+   ],
+   "size": [
+    2.4,
+    3.05,
+    2.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "birch",
+   "cat": "nature",
+   "desc": "자작나무 (흰 줄기, 노란 잎)",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    1.8,
+    3.45,
+    1.8
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "palm_cedar",
+   "cat": "nature",
+   "desc": "삼나무 (둥근 원뿔형 사이프러스)",
+   "groups": [
+    "bark",
+    "leaves"
+   ],
+   "size": [
+    2.0,
+    3.85,
+    2.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "rock_small",
+   "cat": "nature",
+   "desc": "작은 돌",
+   "groups": [
+    "rock"
+   ],
+   "size": [
+    0.7,
+    0.4,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "snow_pile",
+   "cat": "nature",
+   "desc": "눈 더미",
+   "groups": [],
+   "size": [
+    1.8,
+    0.6,
+    1.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "snowball_pile",
+   "cat": "nature",
+   "desc": "눈뭉치 쌓인 것",
+   "groups": [],
+   "size": [
+    0.8,
+    0.45,
+    0.8
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "fence",
+   "cat": "nature",
+   "desc": "나무 울타리 (2m, 이어붙임)",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    2.1,
+    0.95,
+    0.24
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "lamp_post",
+   "cat": "nature",
+   "desc": "가로등 (리본 장식)",
+   "groups": [
+    "metal",
+    "ribbon"
+   ],
+   "size": [
+    0.8,
+    2.75,
+    0.8
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [
+    0,
+    2.25,
+    0
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "glass"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "mailbox",
+   "cat": "nature",
+   "desc": "우체통",
+   "groups": [
+    "box",
+    "wood"
+   ],
+   "size": [
+    0.6,
+    1.35,
+    0.65
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bench",
+   "cat": "nature",
+   "desc": "공원 벤치 (눈)",
+   "groups": [
+    "metal",
+    "wood"
+   ],
+   "size": [
+    1.8,
+    1.0,
+    0.8
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "signpost",
+   "cat": "nature",
+   "desc": "표지판",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    1.0,
+    1.65,
+    0.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "igloo",
+   "cat": "nature",
+   "desc": "이글루",
+   "groups": [
+    "ice"
+   ],
+   "size": [
+    2.6,
+    1.45,
+    3.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bare_tree",
+   "cat": "nature",
+   "desc": "겨울 앙상한 나무 (가지에 눈)",
+   "groups": [
+    "bark"
+   ],
+   "size": [
+    2.4,
+    3.25,
+    2.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "lantern_ground",
+   "cat": "nature",
+   "desc": "바닥 랜턴 (촛불)",
+   "groups": [
+    "metal"
+   ],
+   "size": [
+    0.4,
+    0.6,
+    0.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [
+    0,
+    0.25,
+    0
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "glass"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "ice_skates",
+   "cat": "nature",
+   "desc": "스케이트 한 켤레",
+   "groups": [
+    "boot"
+   ],
+   "size": [
+    0.5,
+    0.4,
+    0.45
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bush_round",
+   "cat": "nature",
+   "desc": "동그란 덤불",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    1.4,
+    0.95,
+    1.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bush_holly",
+   "cat": "nature",
+   "desc": "호랑가시 덤불 (빨간 열매)",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    1.4,
+    0.95,
+    1.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bush_snowy",
+   "cat": "nature",
+   "desc": "눈 덮인 덤불",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    1.4,
+    1.0,
+    1.4
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "rock_big",
+   "cat": "nature",
+   "desc": "큰 바위",
+   "groups": [
+    "rock"
+   ],
+   "size": [
+    1.4,
+    0.8,
+    1.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "floor_tiles",
+   "cat": "room",
+   "desc": "부엌 타일 바닥 2x2m (체크)",
+   "groups": [
+    "floor"
+   ],
+   "size": [
+    2.062,
+    0.125,
+    2.062
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "floor_planks",
+   "cat": "room",
+   "desc": "나무 마루 바닥 2x2m",
+   "groups": [
+    "floor"
+   ],
+   "size": [
+    2.04,
+    0.08,
+    2.04
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wall_plain",
+   "cat": "room",
+   "desc": "벽 2m (판자 징두리), 원점=바닥 중앙, 안쪽=+z",
+   "groups": [
+    "trim",
+    "wainscot",
+    "wall"
+   ],
+   "size": [
+    2.04,
+    3.54,
+    0.24
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wall_window",
+   "cat": "room",
+   "desc": "창 달린 벽 2m (밖은 눈 풍경)",
+   "groups": [
+    "trim",
+    "wainscot",
+    "wall"
+   ],
+   "size": [
+    2.04,
+    3.54,
+    0.35
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [
+    "glass"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "wall_corner",
+   "cat": "room",
+   "desc": "벽 모서리 기둥",
+   "groups": [
+    "trim"
+   ],
+   "size": [
+    0.3,
+    3.54,
+    0.3
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "ceiling_beam",
+   "cat": "room",
+   "desc": "천장 들보 2m (원점=천장 높이)",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    2.04,
+    0.22,
+    0.3
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wall_door",
+   "cat": "room",
+   "desc": "현관문 벽 2m (둥근 나무문, 리스 자리)",
+   "groups": [
+    "door",
+    "trim",
+    "wainscot",
+    "wall"
+   ],
+   "size": [
+    2.04,
+    3.54,
+    0.45
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "ground_snow",
+   "cat": "room",
+   "desc": "눈 덮인 바깥 땅 4x4m (울퉁불퉁)",
+   "groups": [
+    "snow"
+   ],
+   "size": [
+    4.04,
+    0.27,
+    4.04
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 4.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "path_stones",
+   "cat": "room",
+   "desc": "징검다리 돌길 2m",
+   "groups": [
+    "stone"
+   ],
+   "size": [
+    2.04,
+    0.11,
+    2.04
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "stairs",
+   "cat": "room",
+   "desc": "나무 계단 (2층 장식용)",
+   "groups": [
+    "trim",
+    "wood"
+   ],
+   "size": [
+    1.3,
+    3.62,
+    3.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "house_cottage",
+   "cat": "outdoor",
+   "desc": "눈 덮인 오두막 (바깥 배경, 창문 불빛)",
+   "groups": [
+    "brick",
+    "door",
+    "roof",
+    "wall"
+   ],
+   "size": [
+    6.6,
+    6.15,
+    6.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "windows"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "gingerbread_man",
+   "cat": "xmas",
+   "desc": "진저브레드맨 (큰 쿠키 인형)",
+   "groups": [
+    "cookie"
+   ],
+   "size": [
+    0.84,
+    1.04,
+    0.33
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "gingerbread_woman",
+   "cat": "xmas",
+   "desc": "진저브레드 아가씨",
+   "groups": [
+    "cookie"
+   ],
+   "size": [
+    0.84,
+    1.04,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "snowman_big",
+   "cat": "xmas",
+   "desc": "큰 눈사람 (실크햇)",
+   "groups": [
+    "hat",
+    "scarf"
+   ],
+   "size": [
+    1.7,
+    1.87,
+    0.95
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "snowman_bucket",
+   "cat": "xmas",
+   "desc": "눈사람 (양동이 모자)",
+   "groups": [
+    "hat",
+    "scarf"
+   ],
+   "size": [
+    1.7,
+    1.87,
+    0.95
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "gift_box",
+   "cat": "xmas",
+   "desc": "선물 상자 (정육면체)",
+   "groups": [
+    "box",
+    "ribbon"
+   ],
+   "size": [
+    0.6,
+    0.64,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "gift_tall",
+   "cat": "xmas",
+   "desc": "길쭉한 선물 상자 (물방울)",
+   "groups": [
+    "box",
+    "ribbon"
+   ],
+   "size": [
+    0.44,
+    0.77,
+    0.44
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "gift_flat",
+   "cat": "xmas",
+   "desc": "납작한 선물 상자 (줄무늬)",
+   "groups": [
+    "box",
+    "ribbon"
+   ],
+   "size": [
+    0.7,
+    0.37,
+    0.5
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "snowman_small",
+   "cat": "xmas",
+   "desc": "작은 눈사람 (털모자)",
+   "groups": [
+    "hat",
+    "scarf"
+   ],
+   "size": [
+    0.9,
+    1.02,
+    0.55
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "candy_cane_big",
+   "cat": "xmas",
+   "desc": "큰 지팡이 사탕 (바닥 장식)",
+   "groups": [
+    "stripe"
+   ],
+   "size": [
+    0.6,
+    1.27,
+    0.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "stocking",
+   "cat": "xmas",
+   "desc": "벽난로 양말 (원점=거는 곳)",
+   "groups": [
+    "sock"
+   ],
+   "size": [
+    0.55,
+    0.67,
+    0.22
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "gift_pile",
+   "cat": "xmas",
+   "desc": "선물 더미",
+   "groups": [],
+   "size": [
+    1.4,
+    0.77,
+    1.15
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "wreath",
+   "cat": "xmas",
+   "desc": "리스 (원점=중심, 벽걸이)",
+   "groups": [
+    "bow",
+    "leaves"
+   ],
+   "size": [
+    0.84,
+    0.84,
+    0.24
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "garland",
+   "cat": "xmas",
+   "desc": "늘어진 가랜드 (벽/벽난로, 원점=양끝 높이 중심)",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    2.5,
+    0.52,
+    0.26
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [
+    "lights"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "bell_pair",
+   "cat": "xmas",
+   "desc": "쌍방울 종 (리본, 원점=거는 곳)",
+   "groups": [
+    "metal",
+    "ribbon"
+   ],
+   "size": [
+    0.6,
+    0.55,
+    0.28
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "string_lights",
+   "cat": "xmas",
+   "desc": "전구 줄 (원점=양끝 높이)",
+   "groups": [],
+   "size": [
+    2.6,
+    0.3,
+    0.13
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": true,
+   "tile": 0.0,
+   "emissiveParts": [
+    "bulbs"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "toy_train",
+   "cat": "xmas",
+   "desc": "장난감 기차",
+   "groups": [
+    "body",
+    "trim"
+   ],
+   "size": [
+    1.2,
+    0.57,
+    0.5
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "nutcracker",
+   "cat": "xmas",
+   "desc": "호두까기 인형 병정",
+   "groups": [
+    "coat",
+    "pants"
+   ],
+   "size": [
+    0.6,
+    1.37,
+    0.5
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "teddy_bear",
+   "cat": "xmas",
+   "desc": "곰 인형 (앉은 자세)",
+   "groups": [
+    "bow",
+    "fur"
+   ],
+   "size": [
+    0.6,
+    0.62,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "cookie_plate",
+   "cat": "xmas",
+   "desc": "쿠키 접시 + 우유",
+   "groups": [
+    "cookie"
+   ],
+   "size": [
+    0.5,
+    0.18,
+    0.5
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "cocoa_mug",
+   "cat": "xmas",
+   "desc": "코코아 머그 (마시멜로)",
+   "groups": [
+    "mug"
+   ],
+   "size": [
+    0.23,
+    0.22,
+    0.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sled",
+   "cat": "xmas",
+   "desc": "나무 썰매",
+   "groups": [
+    "runner",
+    "wood"
+   ],
+   "size": [
+    0.9,
+    0.62,
+    1.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "candle_set",
+   "cat": "xmas",
+   "desc": "양초 3개 + 호랑가시",
+   "groups": [
+    "wax"
+   ],
+   "size": [
+    0.5,
+    0.5,
+    0.3
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [
+    0,
+    0.4,
+    0
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "flame"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "mistletoe",
+   "cat": "xmas",
+   "desc": "겨우살이 (천장에 매다는 것, 원점=거는 곳)",
+   "groups": [
+    "bow",
+    "leaves"
+   ],
+   "size": [
+    0.4,
+    0.55,
+    0.4
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "holly_sprig",
+   "cat": "xmas",
+   "desc": "호랑가시 잎 장식",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    0.3,
+    0.1,
+    0.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "star_lantern",
+   "cat": "xmas",
+   "desc": "별 램프 (선반 장식)",
+   "groups": [
+    "star"
+   ],
+   "size": [
+    0.5,
+    0.57,
+    0.3
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [
+    0,
+    0.3,
+    0
+   ],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "star"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "snow_globe",
+   "cat": "xmas",
+   "desc": "스노우볼",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    0.32,
+    0.36,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": [
+    "glass"
+   ]
+  },
+  {
+   "name": "present_sack",
+   "cat": "xmas",
+   "desc": "산타 선물 자루",
+   "groups": [
+    "rope",
+    "sack"
+   ],
+   "size": [
+    0.9,
+    0.97,
+    0.85
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "poinsettia",
+   "cat": "xmas",
+   "desc": "포인세티아 화분",
+   "groups": [
+    "petal",
+    "pot"
+   ],
+   "size": [
+    0.7,
+    0.67,
+    0.7
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "reindeer_plush",
+   "cat": "xmas",
+   "desc": "루돌프 인형",
+   "groups": [
+    "fur"
+   ],
+   "size": [
+    0.8,
+    1.02,
+    0.75
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_star_topper",
+   "cat": "tree",
+   "desc": "트리 꼭대기 별",
+   "groups": [
+    "star"
+   ],
+   "size": [
+    1.2,
+    1.25,
+    0.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_skirt",
+   "cat": "tree",
+   "desc": "트리 밑 받침천",
+   "groups": [
+    "skirt"
+   ],
+   "size": [
+    4.6,
+    0.45,
+    4.6
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_planter",
+   "cat": "tree",
+   "desc": "나무 화분 받침",
+   "groups": [
+    "wood"
+   ],
+   "size": [
+    2.0,
+    1.15,
+    2.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball",
+   "cat": "ornament",
+   "desc": "기본 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_stripe",
+   "cat": "ornament",
+   "desc": "줄무늬 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_dot",
+   "cat": "ornament",
+   "desc": "물방울 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_ball_glitter",
+   "cat": "ornament",
+   "desc": "반짝이 띠 공",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_drop",
+   "cat": "ornament",
+   "desc": "물방울 모양",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_star",
+   "cat": "ornament",
+   "desc": "별",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_heart",
+   "cat": "ornament",
+   "desc": "하트",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bell",
+   "cat": "ornament",
+   "desc": "종",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_snowflake",
+   "cat": "ornament",
+   "desc": "눈송이",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_gift",
+   "cat": "ornament",
+   "desc": "작은 선물상자",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_gingerbread",
+   "cat": "ornament",
+   "desc": "진저브레드맨",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_pinecone",
+   "cat": "ornament",
+   "desc": "솔방울",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_icicle",
+   "cat": "ornament",
+   "desc": "고드름",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_stocking",
+   "cat": "ornament",
+   "desc": "작은 양말",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_snowman",
+   "cat": "ornament",
+   "desc": "작은 눈사람",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_acorn",
+   "cat": "ornament",
+   "desc": "도토리",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_mushroom",
+   "cat": "ornament",
+   "desc": "버섯",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bird",
+   "cat": "ornament",
+   "desc": "작은 새",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_cookie",
+   "cat": "ornament",
+   "desc": "별 쿠키",
+   "groups": [
+    "orn",
+    "orn2"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_light_bulb",
+   "cat": "ornament",
+   "desc": "전구",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_moon",
+   "cat": "ornament",
+   "desc": "초승달",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "tree_giant",
+   "cat": "tree",
+   "desc": "장식 없는 거대 트리 (오너먼트 붙이는 곳)",
+   "groups": [
+    "leaves"
+   ],
+   "size": [
+    6.0,
+    7.15,
+    6.0
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_candycane",
+   "cat": "ornament",
+   "desc": "지팡이 사탕",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    -0.035,
+    -0.0,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "orn_bow",
+   "cat": "ornament",
+   "desc": "리본",
+   "groups": [
+    "orn"
+   ],
+   "size": [
+    0.32,
+    0.35,
+    0.32
+   ],
+   "footprint": [],
+   "hang": [
+    0,
+    -0.04,
+    0
+   ],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  }
+ ],
+ "species": [
+  {
+   "name": "bear",
+   "top": 1.04,
+   "fur": [
+    0.72,
+    0.5,
+    0.34
+   ]
+  },
+  {
+   "name": "cat",
+   "top": 1.02,
+   "fur": [
+    0.98,
+    0.76,
+    0.48
+   ]
+  },
+  {
+   "name": "rabbit",
+   "top": 1.04,
+   "fur": [
+    0.98,
+    0.97,
+    0.96
+   ]
+  },
+  {
+   "name": "dog",
+   "top": 1.04,
+   "fur": [
+    0.92,
+    0.78,
+    0.58
+   ]
+  },
+  {
+   "name": "fox",
+   "top": 1.02,
+   "fur": [
+    0.95,
+    0.55,
+    0.28
+   ]
+  },
+  {
+   "name": "panda",
+   "top": 1.04,
+   "fur": [
+    0.98,
+    0.98,
+    0.97
+   ]
+  },
+  {
+   "name": "lion",
+   "top": 1.1,
+   "fur": [
+    0.97,
+    0.8,
+    0.45
+   ]
+  },
+  {
+   "name": "pig",
+   "top": 1.02,
+   "fur": [
+    0.99,
+    0.75,
+    0.75
+   ]
+  },
+  {
+   "name": "human",
+   "top": 1.07,
+   "fur": [
+    1.0,
+    0.86,
+    0.76
+   ]
+  }
+ ],
+ "faces": [
+  "f1",
+  "f2",
+  "f3",
+  "f4",
+  "f5"
+ ],
+ "hairFemale": [
+  "long",
+  "bob",
+  "twin",
+  "pony",
+  "bun"
+ ],
+ "hairMale": [
+  "short",
+  "spiky"
+ ],
+ "hats": [
+  "antlers",
+  "beanie",
+  "earmuffs",
+  "elf",
+  "santa",
+  "tophat"
+ ],
+ "hatTop": 1.04,
+ "palette": [
+  [
+   0.9,
+   0.2,
+   0.22
+  ],
+  [
+   0.98,
+   0.78,
+   0.32
+  ],
+  [
+   0.25,
+   0.5,
+   0.85
+  ],
+  [
+   0.6,
+   0.35,
+   0.8
+  ],
+  [
+   0.3,
+   0.66,
+   0.42
+  ],
+  [
+   0.95,
+   0.5,
+   0.65
+  ],
+  [
+   0.86,
+   0.88,
+   0.92
+  ],
+  [
+   0.98,
+   0.6,
+   0.25
+  ],
+  [
+   0.4,
+   0.8,
+   0.85
+  ],
+  [
+   0.98,
+   0.97,
+   0.94
+  ],
+  [
+   0.2,
+   0.2,
+   0.24
+  ],
+  [
+   0.55,
+   0.36,
+   0.24
+  ],
+  [
+   0.98,
+   0.9,
+   0.4
+  ],
+  [
+   0.7,
+   0.85,
+   0.4
+  ],
+  [
+   0.45,
+   0.3,
+   0.6
+  ],
+  [
+   0.9,
+   0.4,
+   0.4
+  ]
+ ]
+}

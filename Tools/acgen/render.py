@@ -12,7 +12,9 @@ def _serve():
     if _server:
         return _server.server_address[1]
     h = functools.partial(SimpleHTTPRequestHandler, directory=ROOT)
-    h.log_message = lambda *a, **k: None
+    class Q(SimpleHTTPRequestHandler):
+        def log_message(self, *a): pass
+    h = functools.partial(Q, directory=ROOT)
     _server = ThreadingHTTPServer(("127.0.0.1", 0), h)
     threading.Thread(target=_server.serve_forever, daemon=True).start()
     return _server.server_address[1]

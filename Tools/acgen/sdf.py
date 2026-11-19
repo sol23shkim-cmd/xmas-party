@@ -4,8 +4,28 @@
 - 마칭 큐브로 메시를 뽑고, 정점마다 색·AO(구석 어둡게)·색바꿈 마스크를 계산한다.
 - 좌표계는 Unity와 같다: x 오른쪽, y 위, z 앞(캐릭터 얼굴 방향).
 """
+import os, subprocess, tempfile, struct
 import numpy as np
 from skimage.measure import marching_cubes
+
+_SIMPLIFY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "native", "simplify")
+
+
+def simplify_mesh(verts, faces, colors, target, color_weight=None):
+    """QEM 단순화 (native/simplify). 색이 바뀌는 경계는 잘 안 뭉개지게 벌점."""
+    cw = float(os.environ.get("ACG_COLOR_W", "0.02")) if color_weight is None else color_weight
+    with tempfile.TemporaryDirectory() as d:
+        fi, fo = os.path.join(d, "i.bin"), os.path.join(d, "o.bin")
+        with open(fi, "wb") as f:
+            f.write(struct.pack("<ii", len(verts), len(faces)))
+            f.write(np.asarray(verts, "<f4").tobytes()); f.write(np.asarray(colors, "<f4").tobytes())
+            f.write(np.asarray(faces, "<i4").tobytes())
+        subprocess.run([_SIMPLIFY, fi, fo, str(int(target)), str(cw)], check=True)
+        b = open(fo, "rb").read()
+        nv, nf = struct.unpack_from("<ii", b, 0)
+        v = np.frombuffer(b, "<f4", nv * 3, 8).reshape(-1, 3).astype(np.float64)
+        f_ = np.frombuffer(b, "<i4", nf * 3, 8 + nv * 12).reshape(-1, 3)
+    return v, f_
 
 
 # ---------------------------------------------------------------- 회전
@@ -80,10 +100,17 @@ def sd_cylinder(p, c, h, r, round_=0.0, R=None):
 
 
 def sd_cone(p, c, h, r_base, r_top=0.0, round_=0.0, R=None):
-    """c가 바닥 중심인 세로 원뿔대 (높이 h)"""
-    q = local(p, c, R)
-    a = np.array([0.0, 0.0, 0.0]); b = np.array([0.0, h, 0.0])
-    return sd_roundcone(q, a, b, r_base, max(r_top, 1e-3)) - round_
+    """c가 바닥 중심인 세로 원뿔대 (높이 h, 바닥 반지름 r_base, 윗면 r_top), 모서리 둥글기 round_"""
+    q0 = local(p, c, R)
+    rd = round_
+    hh = max(h / 2 - rd, 1e-4); r1 = max(r_base - rd, 1e-4); r2 = max(r_top - rd, 0.0)
+    qx = np.hypot(q0[:, 0], q0[:, 2]); qy = q0[:, 1] - h / 2
+    k1 = np.array([r2, hh]); k2 = np.array([r2 - r1, 2 * hh])
+    cax = qx - np.minimum(qx, np.where(qy < 0, r1, r2)); cay = np.abs(qy) - hh
+    t = np.clip(((k1[0] - qx) * k2[0] + (k1[1] - qy) * k2[1]) / (k2 @ k2), 0, 1)
+    cbx = qx - k1[0] + k2[0] * t; cby = qy - k1[1] + k2[1] * t
+    sgn = np.where((cbx < 0) & (cay < 0), -1.0, 1.0)
+    return sgn * np.sqrt(np.minimum(cax * cax + cay * cay, cbx * cbx + cby * cby)) - rd
 
 
 def smin(a, b, k):
@@ -103,6 +130,7 @@ class Part:
         self.pivot = tuple(float(x) for x in pivot)
         self.parent = parent
         self.region = box or region      # (lo, hi) 이 조각만 따로 격자를 쓸 때
+        self.reduce = None               # 단순화 비율 (None = 기본값)
         self.step = step
         self.tint = tint          # 기본 색바꿈 색 (None이면 색바꿈 없음)
         self.gloss = gloss
@@ -180,6 +208,36 @@ class Part:
         if np.sum(np.sum(fn_ * normals[faces[:, 0]], axis=1) > 0) < len(faces) / 2:
             faces = faces[:, [0, 2, 1]]
         col, mask = self.colors(verts)
+        red = float(os.environ.get("ACG_REDUCE", "0.22")) if self.reduce is None else self.reduce
+        if red < 1.0 and len(faces) > 1500:
+            verts, faces = simplify_mesh(verts, faces, np.concatenate([col, mask[:, None]], 1)[:, :3] * 0.7 + mask[:, None] * 0.3,
+                                         max(1200, int(len(faces) * red)))
+            # 표면으로 다시 붙이고 법선·색을 SDF에서 다시 계산
+            for _ in range(2):
+                e = step * 0.5
+                g = np.stack([self.sdf(verts + [e, 0, 0]) - self.sdf(verts - [e, 0, 0]),
+                              self.sdf(verts + [0, e, 0]) - self.sdf(verts - [0, e, 0]),
+                              self.sdf(verts + [0, 0, e]) - self.sdf(verts - [0, 0, e])], 1)
+                g /= np.maximum(np.linalg.norm(g, axis=1, keepdims=True), 1e-9)
+                verts = verts - g * np.clip(self.sdf(verts), -step, step)[:, None]
+            normals = g
+            # 날카로운 모서리: 면 법선과 많이 다르면 정점을 나눠 면 법선 사용
+            a, b, c = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+            fn_ = np.cross(b - a, c - a); fn_ /= np.maximum(np.linalg.norm(fn_, axis=1, keepdims=True), 1e-12)
+            if np.sum(np.sum(fn_ * normals[faces[:, 0]], axis=1) < 0) > len(faces) / 2:
+                fn_ = -fn_
+            corner_v = faces.ravel()
+            corner_n = normals[corner_v].copy()
+            fnc = np.repeat(fn_, 3, axis=0)
+            bad = np.sum(corner_n * fnc, axis=1) < 0.75
+            corner_n[bad] = fnc[bad]
+            key = np.concatenate([corner_v[:, None].astype(np.int64), np.round(corner_n * 20).astype(np.int64)], 1)
+            uk, inv = np.unique(key, axis=0, return_inverse=True)
+            inv = inv.ravel()
+            nv_ = np.zeros((len(uk), 3)); np.add.at(nv_, inv, corner_n)
+            nv_ /= np.maximum(np.linalg.norm(nv_, axis=1, keepdims=True), 1e-12)
+            verts = verts[uk[:, 0]]; normals = nv_; faces = inv.reshape(-1, 3)
+            col, mask = self.colors(verts)
         return verts.astype(np.float32), normals.astype(np.float32), faces.astype(np.uint32), col, mask
 
 
@@ -222,3 +280,41 @@ class Model:
             self.meshes.append(dict(name=p.name, v=v, n=n, f=f, col=col, mask=mask, ao=ao,
                                     tint=p.tint, gloss=p.gloss, group=p.group, pivot=p.pivot, parent=p.parent))
         return self
+
+
+# ---------------------------------------------------------------- 2D 도형을 두께 있게 (별, 하트)
+def _extrude(d2, z, thick, rnd):
+    w = np.stack([d2 + rnd, np.abs(z) - thick + rnd], axis=1)
+    return np.minimum(np.max(w, axis=1), 0) + np.linalg.norm(np.maximum(w, 0), axis=1) - rnd
+
+
+def sd_star(p, c, r, n=5, m=2.6, thick=0.02, rnd=0.015, R=None):
+    """xy 평면 별 (위쪽 꼭짓점), z 두께 thick(반두께), 둥글기 rnd"""
+    q = local(p, c, R)
+    x, y = q[:, 0], q[:, 1]
+    an = np.pi / n; en = np.pi / m
+    acs = np.array([np.cos(an), np.sin(an)]); ecs = np.array([np.cos(en), np.sin(en)])
+    bn = np.mod(np.arctan2(x, y), 2 * an) - an
+    l = np.hypot(x, y)
+    px, py = l * np.cos(bn), np.abs(l * np.sin(bn))
+    px, py = px - r * acs[0], py - r * acs[1]
+    t = np.clip(-(px * ecs[0] + py * ecs[1]), 0, r * acs[1] / ecs[1])
+    px, py = px + ecs[0] * t, py + ecs[1] * t
+    d2 = np.hypot(px, py) * np.sign(px)
+    return _extrude(d2, q[:, 2], thick, rnd)
+
+
+def sd_heart(p, c, s, thick=0.02, rnd=0.015, R=None):
+    """xy 평면 하트, 크기 s (아래 꼭짓점이 c 아래 s*0.5)"""
+    q = local(p, c, R)
+    x = np.abs(q[:, 0]) / s; y = q[:, 1] / s + 0.5
+    d_a = np.hypot(x - 0.25, y - 0.75) - np.sqrt(2) / 4
+    t = 0.5 * np.maximum(x + y, 0)
+    d_b = np.sqrt(np.minimum((x) ** 2 + (y - 1) ** 2, (x - t) ** 2 + (y - t) ** 2)) * np.sign(x - y)
+    d2 = np.where(y + x > 1, d_a, d_b) * s
+    return _extrude(d2, q[:, 2], thick, rnd)
+
+
+def sd_box(p, c, half, R=None):
+    q = np.abs(local(p, c, R)) - np.asarray(half, float)
+    return np.linalg.norm(np.maximum(q, 0), axis=1) + np.minimum(np.max(q, axis=1), 0)

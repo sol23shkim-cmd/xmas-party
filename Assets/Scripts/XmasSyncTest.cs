@@ -54,8 +54,8 @@ public class XmasSyncTest : MonoBehaviour
     const int WriteMs = 150;
     const int ReadMs = 250;
     const float Speed = 4.2f;
-    const float CamPitch = 34f, CamDist = 27f, CamFov = 30f;
-    const float XMin = -17f, XMax = 17f, ZMin = -11f, ZMax = 10f;   // 걸어 다닐 수 있는 범위
+    const float CamPitch = 38f, CamDist = 25f, CamFov = 32f;
+    const float XMin = -16f, XMax = 16f, ZMin = -11f, ZMax = 8f;   // 걸어 다닐 수 있는 범위
     const float CharHeight = 1.9f;                                  // 캐릭터 키 (월드 단위)
 
     static readonly Stopwatch Clock = Stopwatch.StartNew();
@@ -65,6 +65,7 @@ public class XmasSyncTest : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
     {
+        if (AcRoom.Enabled) return;   // 동물의 숲풍 거실(AcRoom)이 있으면 예전 디오라마는 끔
         if (FindAnyObjectByType<XmasSyncTest>() != null) return;
         new GameObject("XmasSyncTest").AddComponent<XmasSyncTest>();
     }
@@ -112,15 +113,15 @@ public class XmasSyncTest : MonoBehaviour
 
     static readonly Zone[] Zones =
     {
-        new Zone { id = "spot",  label = "시계탑 집 · 틀린 그림 찾기", art = "house_clock",  pos = new Vector3(-12f, 0, 9f),  height = 8.5f, radius = 2.2f,
+        new Zone { id = "spot",  label = "시계탑 집 · 틀린 그림 찾기", art = "house_clock",  pos = new Vector3(-11f, 0, 7f),  height = 9.5f, radius = 2.2f,
                    desc = "같은 그림 두 장에서 다른 곳을 먼저 찾는 사람이 이겨요." },
-        new Zone { id = "mines", label = "분홍 집 · 눈 지뢰찾기",     art = "house_pink",   pos = new Vector3(-5.5f, 0, 11.5f), height = 8f, radius = 2.2f,
+        new Zone { id = "mines", label = "분홍 집 · 눈 지뢰찾기",     art = "house_pink",   pos = new Vector3(-4.8f, 0, 9f),  height = 9f, radius = 2.2f,
                    desc = "같은 지뢰밭을 동시에 풀어요. 먼저 다 찾으면 승리, 지뢰를 밟으면 패배!" },
-        new Zone { id = "tree",  label = "소원 트리",                 art = "tree_big",     pos = new Vector3(0, 0, 2.5f),  height = 8.5f, radius = 3.2f,
+        new Zone { id = "tree",  label = "소원 트리",                 art = "tree_big",     pos = new Vector3(0, 0, 1.5f),  height = 8f, radius = 3.2f,
                    desc = "올해의 소원을 트리에 걸어 보세요. 다른 사람의 소원도 볼 수 있어요." },
-        new Zone { id = "ark",   label = "베이커리 · 선물 깨기",      art = "house_bakery", pos = new Vector3(5.5f, 0, 11.5f), height = 7.5f, radius = 2.2f,
+        new Zone { id = "ark",   label = "베이커리 · 선물 깨기",      art = "house_bakery", pos = new Vector3(4.8f, 0, 9f),  height = 8.5f, radius = 2.2f,
                    desc = "각자 선물 벽돌을 깨면서 상대에게 방해 선물을 보내요." },
-        new Zone { id = "photo", label = "빨간 사진관 · 포토존",      art = "house_studio", pos = new Vector3(12f, 0, 9f),   height = 8f, radius = 2.2f,
+        new Zone { id = "photo", label = "빨간 사진관 · 포토존",      art = "house_studio", pos = new Vector3(11f, 0, 7f),  height = 9f, radius = 2.2f,
                    desc = "모여서 찰칵! 사진은 내 PC의 '사진\\XmasPlaza' 폴더에 저장돼요." },
     };
 
@@ -404,7 +405,7 @@ public class XmasSyncTest : MonoBehaviour
             var sh = new GameObject(art + "-shadow").AddComponent<SpriteRenderer>();
             sh.sprite = SprShadow();
             sh.transform.SetPositionAndRotation(pos + new Vector3(0, 0.01f, 0.15f), Quaternion.Euler(90, 0, 0));
-            sh.transform.localScale = new Vector3(w * 1.6f, w * 0.9f, 1);
+            sh.transform.localScale = new Vector3(w * 1.15f, w * 0.45f, 1);
             sh.color = new Color(1, 1, 1, 0.9f);
             sh.sortingOrder = -25000;
         }
@@ -425,8 +426,8 @@ public class XmasSyncTest : MonoBehaviour
                 float u = (float)x / size, v = (float)y / size;
                 float n = Mathf.PerlinNoise(u * 6f, v * 6f) * 0.6f + Mathf.PerlinNoise(u * 23f + 5, v * 23f + 9) * 0.3f + Mathf.PerlinNoise(u * 70f, v * 70f) * 0.1f;
                 var c = Color.Lerp(snowA, snowB, Mathf.SmoothStep(0.35f, 0.75f, n));
-                // 트리 둘레의 둥근 돌길 (u,v 0.5,0.62 근처) 과 입구 길
-                float dx = (u - 0.5f) * 46f, dz = (v - 0.62f) * 34f;
+                // 트리 둘레의 둥근 돌길 (u,v 0.5,0.59 근처) 과 입구 길
+                float dx = (u - 0.5f) * 70f, dz = (v - 0.5f) * 52f - 3f;
                 float d = Mathf.Sqrt(dx * dx + dz * dz);
                 float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 6.2f) / 1.6f);
                 float path = (Mathf.Abs(dx) < 1.6f && dz < -5f) ? 1f : 0f;
@@ -495,15 +496,16 @@ public class XmasSyncTest : MonoBehaviour
         // 눈 바닥
         var ground = new GameObject("Ground").AddComponent<SpriteRenderer>();
         var gtex = MakeGroundTexture(512);
-        ground.sprite = Sprite.Create(gtex, new Rect(0, 0, 512, 512), new Vector2(0.5f, 0.5f), 512f / 46f);
+        ground.sprite = Sprite.Create(gtex, new Rect(0, 0, 512, 512), new Vector2(0.5f, 0.5f), 512f / 70f);
         ground.transform.SetPositionAndRotation(new Vector3(0, 0, -1.5f), Quaternion.Euler(90, 0, 0));
-        ground.transform.localScale = new Vector3(1f, 34f / 46f, 1f);
+        ground.transform.localScale = new Vector3(1f, 52f / 70f, 1f);
         ground.sortingOrder = -30000;
 
         // 집들과 트리
         foreach (var z in Zones)
         {
             var sr = Standee(z.art, z.pos, z.height);
+            if (sr != null && z.pos.x > 1f) sr.flipX = true;   // 오른쪽 집은 좌우 반전해서 옆면이 광장 안쪽을 보게
             z.door = z.pos + new Vector3(0, 0, z.id == "tree" ? -2.8f : -2.2f);
             blockers.Add((new Vector2(z.pos.x, z.pos.z + (z.id == "tree" ? 0 : 0.6f)), z.id == "tree" ? 1.6f : 2.6f));
             if (z.id == "tree") treeSr = sr;
@@ -563,7 +565,7 @@ public class XmasSyncTest : MonoBehaviour
 
     void UpdateCamera(float dt, bool snap = false)
     {
-        var target = new Vector3(Mathf.Clamp(me.pos.x, -9f, 9f), 1.2f, Mathf.Clamp(me.pos.y, -6f, 5f));
+        var target = new Vector3(Mathf.Clamp(me.pos.x, -9f, 9f), 1.2f, Mathf.Clamp(me.pos.y, -7f, 3.5f));
         var want = target + billboardRot * new Vector3(0, 0, -CamDist);
         cam.transform.rotation = billboardRot;
         cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1 - Mathf.Exp(-dt * 4f));
