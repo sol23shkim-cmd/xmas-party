@@ -44,10 +44,26 @@ public static class AcmLoader
     }
 
     static Dictionary<string, byte[]> pack;
+    /// 웹에서는 파일을 직접 못 읽으므로 내려받은 묶음을 넣어 줌
+    public static void SetPack(byte[] bytes)
+    {
+        pack = new Dictionary<string, byte[]>();
+        ReadPack(new BinaryReader(new MemoryStream(bytes)));
+    }
+    static void ReadPack(BinaryReader br)
+    {
+        using (br)
+        {
+            if (Encoding.ASCII.GetString(br.ReadBytes(4)) != "ACPK") return;
+            int n = br.ReadInt32();
+            for (int i = 0; i < n; i++) { string nm = Str(br); int len = br.ReadInt32(); pack[nm] = br.ReadBytes(len); }
+        }
+    }
     static void LoadPack()
     {
         if (pack != null) return;
         pack = new Dictionary<string, byte[]>();
+        if (Application.platform == RuntimePlatform.WebGLPlayer) return;
         string pp = Path.Combine(ModelDir, "models.pack");
         if (!File.Exists(pp)) return;
         using (var br = new BinaryReader(File.OpenRead(pp)))
@@ -58,7 +74,7 @@ public static class AcmLoader
         }
     }
 
-    public static bool Exists(string name) { LoadPack(); return pack.ContainsKey(name) || File.Exists(Path.Combine(ModelDir, name + ".acm")); }
+    public static bool Exists(string name) { LoadPack(); return pack.ContainsKey(name) || (Application.platform != RuntimePlatform.WebGLPlayer && File.Exists(Path.Combine(ModelDir, name + ".acm"))); }
 
     public static ModelData Load(string name)
     {
@@ -66,14 +82,15 @@ public static class AcmLoader
         LoadPack();
         string path = Path.Combine(ModelDir, name + ".acm");
         Stream st;
-        if (File.Exists(path)) st = File.OpenRead(path);          // 낱개 파일이 있으면 그걸 우선 (작업 중 교체용)
+        if (Application.platform != RuntimePlatform.WebGLPlayer && File.Exists(path)) st = File.OpenRead(path);   // 낱개 파일이 있으면 우선 (작업 중 교체용)
         else if (pack.TryGetValue(name, out var bytes)) st = new MemoryStream(bytes);
         else { Debug.LogWarning("[AcmLoader] 모델 없음: " + name); return null; }
         md = new ModelData { name = name };
         using (var br = new BinaryReader(st))
         {
             var magic = Encoding.ASCII.GetString(br.ReadBytes(4));
-            if (magic != "ACM2") { Debug.LogWarning("[AcmLoader] 형식이 달라요: " + path); return null; }
+            if (magic != "ACM2" && magic != "ACM3") { Debug.LogWarning("[AcmLoader] 형식이 달라요: " + name); return null; }
+            bool q = magic == "ACM3";   // ACM3 = 작게 줄인 형식 (위치 16비트, 법선 2바이트, 인덱스 16비트)
             int n = br.ReadInt32();
             bool first = true;
             for (int i = 0; i < n; i++)
@@ -86,15 +103,37 @@ public static class AcmLoader
                 p.pivot = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
                 int nv = br.ReadInt32(), ni = br.ReadInt32();
                 var pos = new Vector3[nv]; var nor = new Vector3[nv]; var col = new Color32[nv]; var uv = new Vector2[nv];
-                for (int k = 0; k < nv; k++) pos[k] = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()) - p.pivot;
-                for (int k = 0; k < nv; k++) nor[k] = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                if (q)
+                {
+                    var lo = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    var sz = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()) / 65535f;
+                    var pb = br.ReadBytes(nv * 6);
+                    for (int k = 0; k < nv; k++)
+                    {
+                        int o = k * 6;
+                        pos[k] = new Vector3(lo.x + (pb[o] | pb[o + 1] << 8) * sz.x, lo.y + (pb[o + 2] | pb[o + 3] << 8) * sz.y, lo.z + (pb[o + 4] | pb[o + 5] << 8) * sz.z) - p.pivot;
+                    }
+                    var nb = br.ReadBytes(nv * 2);
+                    for (int k = 0; k < nv; k++)
+                    {
+                        float x = (sbyte)nb[k * 2] / 127f, y = (sbyte)nb[k * 2 + 1] / 127f, z = 1f - Mathf.Abs(x) - Mathf.Abs(y);
+                        if (z < 0) { float ox = x; x = (1 - Mathf.Abs(y)) * (x >= 0 ? 1 : -1); y = (1 - Mathf.Abs(ox)) * (y >= 0 ? 1 : -1); }
+                        nor[k] = new Vector3(x, y, z).normalized;
+                    }
+                }
+                else
+                {
+                    for (int k = 0; k < nv; k++) pos[k] = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()) - p.pivot;
+                    for (int k = 0; k < nv; k++) nor[k] = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                }
                 var cb = br.ReadBytes(nv * 4);
                 for (int k = 0; k < nv; k++) col[k] = new Color32(cb[k * 4], cb[k * 4 + 1], cb[k * 4 + 2], cb[k * 4 + 3]);
                 var ab = br.ReadBytes(nv);
                 for (int k = 0; k < nv; k++) uv[k] = new Vector2(ab[k] / 255f, 0);
                 var idx = new int[ni];
-                var ib = br.ReadBytes(ni * 4);
-                Buffer.BlockCopy(ib, 0, idx, 0, ni * 4);
+                bool small = q && br.ReadByte() == 1;
+                if (small) { var ib = br.ReadBytes(ni * 2); for (int k = 0; k < ni; k++) idx[k] = ib[k * 2] | ib[k * 2 + 1] << 8; }
+                else { var ib = br.ReadBytes(ni * 4); Buffer.BlockCopy(ib, 0, idx, 0, ni * 4); }
                 var mesh = new Mesh { name = name + "/" + p.name };
                 if (nv > 65000) mesh.indexFormat = IndexFormat.UInt32;
                 mesh.vertices = pos; mesh.normals = nor; mesh.colors32 = col; mesh.uv = uv;

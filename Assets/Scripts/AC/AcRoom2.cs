@@ -1,4 +1,4 @@
-// AcRoom2.cs — 거실 장면의 보조 기능: 선명한 색상표, 화살표로 고르는 꾸미기 창, 오너먼트 아이콘,
+// AcRoom2.cs - 거실 장면의 보조 기능: 선명한 색상표, 화살표로 고르는 꾸미기 창, 오너먼트 아이콘,
 //              가구와 부딪히기, 오너먼트 놓을 자리 계산, 포인터 강조, 바깥 눈
 using System;
 using System.Collections.Generic;
@@ -48,7 +48,7 @@ public static class AcPalette
 public partial class AcRoom
 {
     // ========================================================
-    // 꾸미기 창: 종류는 글자 목록, 나머지는 ◀ ▶ (키보드 ↑↓ 항목, ←→ 바꾸기)
+    // 꾸미기 창: 종류는 글자 목록, 나머지는 < > (키보드 위아래 항목, 좌우 바꾸기)
     int custRow;
     class CRow { public string label, value; public Color? swatch; public Action<int> step; }
 
@@ -127,8 +127,8 @@ public partial class AcRoom
             var r = rows[i];
             bool sel = i == custRow;
             GUILayout.BeginHorizontal(GUILayout.Height(30));
-            GUILayout.Label((sel ? "▶ " : "   ") + r.label, sel ? sLabelSel : sSmall, GUILayout.Width(92), GUILayout.Height(28));
-            if (GUILayout.Button("◀", sBtn, GUILayout.Width(30), GUILayout.Height(28))) { custRow = i; r.step(-1); ch = true; }
+            GUILayout.Label((sel ? "> " : "   ") + r.label, sel ? sLabelSel : sSmall, GUILayout.Width(92), GUILayout.Height(28));
+            if (GUILayout.Button("<", sBtn, GUILayout.Width(30), GUILayout.Height(28))) { custRow = i; r.step(-1); ch = true; }
             var box = GUILayoutUtility.GetRect(150, 28, GUILayout.Width(150), GUILayout.Height(28));
             GUI.DrawTexture(box, AcPalette.Tex(sel ? new Color(1f, 0.93f, 0.8f) : new Color(0.97f, 0.94f, 0.88f)));
             if (r.swatch.HasValue)
@@ -140,10 +140,10 @@ public partial class AcRoom
             }
             else GUI.Label(new Rect(box.x + 10, box.y + 4, box.width - 14, 22), r.value, sSmall);
             if (GUI.Button(box, "", GUIStyle.none)) custRow = i;
-            if (GUILayout.Button("▶", sBtn, GUILayout.Width(30), GUILayout.Height(28))) { custRow = i; r.step(1); ch = true; }
+            if (GUILayout.Button(">", sBtn, GUILayout.Width(30), GUILayout.Height(28))) { custRow = i; r.step(1); ch = true; }
             GUILayout.EndHorizontal();
         }
-        GUILayout.Label("<size=11>↑↓ 항목 고르기 · ←→ 바꾸기</size>", sSmall);
+        if (!IsMobile) GUILayout.Label("<size=11>위아래 항목 고르기 / 좌우 바꾸기</size>", sSmall);
         if (ch) { me.Rebuild(l); PlayerPrefs.SetString("ac_look", l.Encode()); PlayerPrefs.Save(); }
     }
 
@@ -201,7 +201,7 @@ public partial class AcRoom
     }
 
     // ========================================================
-    // 부딪히기: 가구·소품마다 바닥 위 상자(회전 포함)를 만들어 캐릭터를 밀어냄
+    // 부딪히기: 가구/소품마다 바닥 위 상자(회전 포함)를 만들어 캐릭터를 밀어냄
     struct Obb { public Vector3 c; public Vector2 h; public Quaternion rot, inv; }
     readonly List<Obb> obstacles = new List<Obb>();
     static readonly string[] NonSolid = { "rug", "floor", "wall_", "ceiling", "string_lights", "garland", "wreath", "stocking", "mistletoe", "bell_pair",

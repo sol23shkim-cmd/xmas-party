@@ -1,4 +1,4 @@
-// AcGarland.cs — 트리에 빙 두르는 장식 줄: 털 가랜드(반짝이는 털실)와 구슬 줄.
+// AcGarland.cs - 트리에 빙 두르는 장식 줄: 털 가랜드(반짝이는 털실)와 구슬 줄.
 // 트리 표면을 따라 한 바퀴 돌며, 가지 끝마다 살짝 늘어지게 걸림.
 using System.Collections.Generic;
 using UnityEngine;

@@ -30,11 +30,13 @@ public static class AcCatalog
 
     public static AcCatalogData Data { get { if (data == null) Load(); return data; } }
 
+    public static string PendingText;   // 웹에서 내려받은 catalog.json 내용
     public static void Load()
     {
         string path = Path.Combine(AcmLoader.ModelDir, "catalog.json");
-        if (!File.Exists(path)) { data = new AcCatalogData { items = new AcItem[0], species = new AcSpecies[0] }; byName = new Dictionary<string, AcItem>(); return; }
-        string json = File.ReadAllText(path);
+        string json = PendingText;
+        if (json == null && Application.platform != RuntimePlatform.WebGLPlayer && File.Exists(path)) json = File.ReadAllText(path);
+        if (json == null) { data = new AcCatalogData { items = new AcItem[0], species = new AcSpecies[0] }; byName = new Dictionary<string, AcItem>(); return; }
         // "palette": [[r,g,b],...] → 따로 파싱
         int pi = json.IndexOf("\"palette\"", StringComparison.Ordinal);
         Palette.Clear();

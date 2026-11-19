@@ -1,14 +1,17 @@
-// AcRoom.cs — 동물의 숲풍 크리스마스 거실 (모델 미리보기 + 트리 꾸미기)
+// AcRoom.cs - 동물의 숲풍 크리스마스 거실 (모델 미리보기 + 트리 꾸미기)
 // StreamingAssets/models/catalog.json 이 있으면 이 장면이 켜져요 (예전 디오라마 대신).
 //
-// 흐름: 입장 화면(캐릭터 꾸미기 + 공유 폴더·이름) → 현관문으로 들어옴 → 거실에서 함께 트리 꾸미기
-// 조작: WASD/방향키 이동 · 트리 가까이 가면 꾸미기 모드
+// 흐름: 입장 화면(캐릭터 꾸미기 + 공유 폴더/이름) → 현관문으로 들어옴 → 거실에서 함께 트리 꾸미기
+// 조작: WASD/방향키 이동 / 트리 가까이 가면 꾸미기 모드
 //       꾸미기: 왼쪽 클릭 = 오너먼트 달기, 오른쪽 클릭 = 떼기, 1~9/휠 = 종류, Q/E = 색
-//       Enter = 말하기 · Z 인사 · X 하트 · V 만세 · 친구 가까이에서 하이파이브/선물 · C 캐릭터 꾸미기
-// 동기화: 공유 폴더\room\playerNN.json (위치), 공유 폴더\tree\ornaments_<ID>.json (장식) — 각자 자기 파일만 씀
+//       Enter = 말하기 / Z 인사 / X 하트 / V 만세 / 친구 가까이에서 하이파이브/선물 / C 캐릭터 꾸미기
+// 동기화: 공유 폴더\room\playerNN.json (위치), 공유 폴더\tree\ornaments_<ID>.json (장식) - 각자 자기 파일만 씀
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using UnityEngine.Networking;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -19,7 +22,7 @@ using Random = UnityEngine.Random;
 
 public partial class AcRoom : MonoBehaviour
 {
-    public static bool Enabled => File.Exists(Path.Combine(Application.streamingAssetsPath, "models", "catalog.json"));
+    public static bool Enabled => Application.platform == RuntimePlatform.WebGLPlayer || File.Exists(Path.Combine(Application.streamingAssetsPath, "models", "catalog.json"));
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -63,7 +66,8 @@ public partial class AcRoom : MonoBehaviour
     Phase phase = Phase.Lobby;
     string uiPath = "", uiName = "", lobbyMsg = "", chatText = "";
     bool chatting; float chatOpenedAt;
-    AcSync sync;
+    AcFirebase net;
+    bool online;
     Transform doorTr; float doorOpen;
     Vector3 DoorPos => new Vector3(HalfX - SEG * 0.5f, 0, -HalfZ);
     Vector3? autoWalk;
@@ -75,30 +79,54 @@ public partial class AcRoom : MonoBehaviour
     GUIStyle sBox, sLabel, sSmall, sBtn;
 
     // ========================================================
-    void Start()
+    IEnumerator Start()
     {
         Application.targetFrameRate = 60;
         Application.runInBackground = true;   // 창을 내려도 동기화 계속
-        if (!Application.isEditor && Screen.fullScreenMode != FullScreenMode.Windowed)
+        IsMobile = DetectMobile();
+        if (!Application.isEditor && Application.platform != RuntimePlatform.WebGLPlayer && Screen.fullScreenMode != FullScreenMode.Windowed)
             Screen.SetResolution(Mathf.Min(1600, Display.main.systemWidth - 80), Mathf.Min(900, Display.main.systemHeight - 120), FullScreenMode.Windowed);
         foreach (var c in FindObjectsByType<Camera>()) if (c.gameObject.name != "AcCam") c.gameObject.SetActive(false);
         foreach (var l in FindObjectsByType<Light>()) l.gameObject.SetActive(false);
         foreach (var v in FindObjectsByType<Volume>()) v.enabled = false;   // 템플릿 톤매핑이 색을 바래게 해서 끔
+        SetupCamera();
+        if (IsMobile) QualityForMobile();
 
+        // 웹: 모델 묶음과 목록을 내려받음 (파일을 직접 못 읽음)
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+        {
+            loadingMsg = "목록 받는 중...";
+            using (var r = UnityWebRequest.Get(Application.streamingAssetsPath + "/models/catalog.json"))
+            {
+                yield return r.SendWebRequest();
+                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; yield break; }
+                AcCatalog.PendingText = r.downloadHandler.text;
+            }
+            using (var r = UnityWebRequest.Get(Application.streamingAssetsPath + "/models/models.pack"))
+            {
+                var op = r.SendWebRequest();
+                while (!op.isDone) { loadingMsg = $"크리스마스 거실 불러오는 중... {Mathf.RoundToInt(r.downloadProgress * 100)}%"; yield return null; }
+                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; yield break; }
+                loadingMsg = "집 짓는 중...";
+                yield return null;
+                AcmLoader.SetPack(r.downloadHandler.data);
+            }
+        }
+        loadingMsg = "집 짓는 중...";
+        yield return null;
         AcCatalog.Load();
         world = new GameObject("World").transform;
-        SetupCamera();
         SetupLights();
         BuildRoom();
         BuildHouse();
         BuildOutdoors();
         BuildFurniture();
 
-        myId = PlayerPrefs.GetString("ac_id", "");
-        if (myId == "") { myId = Safe(Environment.UserName) + "_" + Random.Range(1000, 9999); PlayerPrefs.SetString("ac_id", myId); }
+        myId = PlayerPrefs.GetString("ac_id2", "");
+        if (myId == "") { myId = "p" + Guid.NewGuid().ToString("N").Substring(0, 10); PlayerPrefs.SetString("ac_id2", myId); }
         mine.owner = myId;
-        uiPath = PlayerPrefs.GetString("xmas_path", "");
-        uiName = PlayerPrefs.GetString("xmas_name", Environment.UserName);
+        uiPath = PlayerPrefs.GetString("ac_room", "xmas");
+        uiName = PlayerPrefs.GetString("xmas_name", "");
         var look = AcLook.Decode(PlayerPrefs.GetString("ac_look", ""));
         me = AcCharacter.Create(look, world);
         me.name = "Me";
@@ -109,39 +137,35 @@ public partial class AcRoom : MonoBehaviour
         ornTypes.Sort((a, b) => OrnOrder(a).CompareTo(OrnOrder(b)));
         ornTypes.Insert(0, BeadsId); ornTypes.Insert(0, TinselId);   // 두르는 줄은 맨 앞
         UpdateCamera(0, true);
+        loadingMsg = null;
     }
+
+    string loadingMsg = "불러오는 중...";
+    bool Ready => loadingMsg == null && me != null;
 
     // 입장 버튼
     void Enter(bool solo)
     {
-        string shared = uiPath.Trim();
-        if (!solo)
+        string code = new string(uiPath.Trim().ToLowerInvariant().Where(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_').ToArray());
+        if (!solo && code == "") { lobbyMsg = "방 코드를 입력하세요 (같은 코드끼리 만나요)"; return; }
+        if (uiName.Trim() == "") { lobbyMsg = "이름을 입력하세요"; return; }
+        uiPath = code;
+        PlayerPrefs.SetString("ac_room", code); PlayerPrefs.SetString("xmas_name", uiName.Trim()); PlayerPrefs.Save();
+        online = !solo;
+        if (online)
         {
-            if (shared == "") { lobbyMsg = "공유 폴더 경로를 입력하세요. (혼자 해 보려면 '혼자 둘러보기')"; return; }
-            if (!Directory.Exists(shared)) { lobbyMsg = "폴더를 찾을 수 없어요: " + shared; return; }
-            try { var t = Path.Combine(shared, "_w_" + myId + ".tmp"); File.WriteAllText(t, "ok"); File.Delete(t); }
-            catch (Exception e) { lobbyMsg = "쓰기 권한이 없어요: " + e.Message; return; }
+            net = gameObject.AddComponent<AcFirebase>();
+            net.Begin(code, myId, MyNet());
         }
-        if (uiName.Trim() == "") uiName = "익명";
-        PlayerPrefs.SetString("xmas_path", shared); PlayerPrefs.SetString("xmas_name", uiName.Trim()); PlayerPrefs.Save();
-        ornDir = (!solo && shared != "") ? Path.Combine(shared, "tree") : Path.Combine(Application.persistentDataPath, "tree");
-        try { Directory.CreateDirectory(ornDir); } catch { ornDir = Path.Combine(Application.persistentDataPath, "tree"); Directory.CreateDirectory(ornDir); }
-        LoadMine();
-        PollOrnaments(true);
-        if (!solo)
-        {
-            sync = new AcSync(shared, myId);
-            sync.Start(MyNet());
-        }
-        else SpawnDemoNpcs();
+        else { LoadMine(); PollOrnaments(true); SpawnDemoNpcs(); }
         showCustom = false;
         GUIUtility.keyboardControl = 0;
-        // 현관 밖에서 문 열고 걸어 들어오기
-        me.transform.position = DoorPos + new Vector3(0, 0, 0.1f);   // 열린 문간에서 시작
+        // 현관 문간에서 걸어 들어오기
+        me.transform.position = DoorPos + new Vector3(0, 0, 0.1f);
         me.transform.rotation = Quaternion.Euler(0, 0, 0); yaw = 0;
         autoWalk = DoorPos + new Vector3(0, 0, 2.8f);
         phase = Phase.Entering;
-        Toast(solo ? "혼자 둘러보기 — 트리 가까이 가서 오너먼트를 달아 보세요!" : "입장! 다른 사람들과 함께 트리를 꾸며요");
+        Toast(solo ? "혼자 둘러보기 - 트리 가까이 가서 오너먼트를 달아 보세요!" : $"'{code}' 방에 입장! 함께 트리를 꾸며요");
     }
 
     AcNet MyNet()
@@ -156,7 +180,7 @@ public partial class AcRoom : MonoBehaviour
     static int OrnOrder(string n) => n.StartsWith("orn_ball") ? 0 : n == "orn_star" || n == "orn_bell" || n == "orn_drop" ? 1 : 2;
 
     // ========================================================
-    // 카메라·빛
+    // 카메라/빛
     void SetupCamera()
     {
         var go = new GameObject("AcCam");
@@ -252,7 +276,7 @@ public partial class AcRoom : MonoBehaviour
             }
         string[] trees = { "pine_snowy", "pine_tall", "pine_small", "bare_tree", "birch", "palm_cedar", "round_tree" };
         var rnd = new System.Random(5);
-        for (int i = 0; i < 150; i++)
+        for (int i = 0; i < (IsMobile ? 45 : 150); i++)
         {
             float side = rnd.Next(5);
             Vector3 p = side <= 2 ? new Vector3(-HouseHalf - 12 + (float)rnd.NextDouble() * (2 * HouseHalf + 24), 0, -HalfZ - 4 - (float)rnd.NextDouble() * 24)
@@ -338,7 +362,7 @@ public partial class AcRoom : MonoBehaviour
         Put("bookshelf", new Vector3(-HalfX + 0.45f, 0, 4.4f), 90, 1.25f, new Dictionary<string, Color> { { "wood", new Color(0.62f, 0.42f, 0.28f) } }, f);
         Put("poinsettia", new Vector3(-HalfX + 0.7f, 0, -2.4f), 0, 1.3f, null, f);
 
-        // 피아노·시계 (오른쪽 뒤)
+        // 피아노/시계 (오른쪽 뒤)
         Put("piano", new Vector3(HalfX - SEG * 1.5f + 0.3f, 0, -HalfZ + 0.5f), 0, 1.2f, null, f);
         Put("wall_clock", new Vector3(HalfX - SEG * 1.9f, 0, -HalfZ + 0.3f), 0, 1.25f, null, f);
         Put("poinsettia", new Vector3(HalfX - 0.7f, 0, -HalfZ + 0.9f), 0, 1.3f, null, f);
@@ -475,7 +499,9 @@ public partial class AcRoom : MonoBehaviour
     // ========================================================
     void Update()
     {
+        if (!Ready) return;
         float dt = Time.deltaTime;
+        UpdatePointer();
         // 문 여닫기
         float wantOpen = phase == Phase.Entering || Vector3.Distance(me.transform.position, DoorPos) < 2.3f ? 1 : 0;
         foreach (var r in remotes.Values) if (Vector3.Distance(r.c.transform.position, DoorPos) < 2.2f) wantOpen = 1;
@@ -484,6 +510,7 @@ public partial class AcRoom : MonoBehaviour
 
         if (phase == Phase.Lobby)
         {
+            CullRooms();
             me.speed = 0;
             UpdateCamera(dt, false);
             return;
@@ -494,7 +521,7 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting) MovePlayer(dt);
+        else if (!showCustom && !chatting) { MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
@@ -509,17 +536,17 @@ public partial class AcRoom : MonoBehaviour
             if (Key("z")) Emote("wave");
             if (Key("x")) Emote("heart");
             if (Key("v")) Emote("cheer");
-            if (Key("enter")) { chatting = true; chatText = ""; chatOpenedAt = Time.unscaledTime; }
+            if (Key("enter")) OpenChat();
         }
 
         float treeDist = Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
         decorating = phase == Phase.Play && treeDist < 5.2f && !showCustom && !chatting;
         if (decorating) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
 
-        if (Time.time > nextPoll) { nextPoll = Time.time + 2f; PollOrnaments(false); }
+        if (Time.time > nextPoll) { nextPoll = Time.time + (online ? 0.5f : 2f); PollOrnaments(false); }
         CheckArea();
         if (Key("f11")) Screen.fullScreenMode = Screen.fullScreenMode == FullScreenMode.Windowed ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
-        if (sync != null) sync.SetMe(MyNet());
+        if (net != null) net.SetMe(MyNet());
     }
 
     void Emote(string kind, string target = "")
@@ -542,12 +569,12 @@ public partial class AcRoom : MonoBehaviour
     // 다른 참가자
     void UpdateRemotes(float dt)
     {
-        if (sync == null) return;
-        var peers = sync.Peers();
+        if (net == null) return;
+        var peers = net.Peers();
         var alive = new HashSet<string>();
-        foreach (var kv in peers)
+        foreach (var n in peers)
         {
-            var n = kv.Value; if (string.IsNullOrEmpty(n.id)) continue;
+            if (string.IsNullOrEmpty(n.id)) continue;
             alive.Add(n.id);
             if (!remotes.TryGetValue(n.id, out var r))
             {
@@ -556,7 +583,7 @@ public partial class AcRoom : MonoBehaviour
                 r.c.transform.position = r.target; r.c.name = "Peer " + n.name;
                 remotes[n.id] = r;
                 Toast(n.name + " 님이 들어왔어요");
-                Log("— " + n.name + " 님 입장");
+                Log("- " + n.name + " 님 입장");
                 if (npcs.Count > 0) foreach (var c in npcs) c.gameObject.SetActive(false);
             }
             if (r.look != n.look) { r.look = n.look; r.c.Rebuild(AcLook.Decode(n.look)); }
@@ -576,7 +603,7 @@ public partial class AcRoom : MonoBehaviour
         }
         var gone = new List<string>();
         foreach (var kv in remotes) if (!alive.Contains(kv.Key)) gone.Add(kv.Key);
-        foreach (var id in gone) { Log("— " + (remotes[id].net?.name ?? "") + " 님 퇴장"); Destroy(remotes[id].c.gameObject); remotes.Remove(id); }
+        foreach (var id in gone) { Log("- " + (remotes[id].net?.name ?? "") + " 님 퇴장"); Destroy(remotes[id].c.gameObject); remotes.Remove(id); }
         foreach (var r in remotes.Values)
         {
             var p = r.c.transform.position;
@@ -600,8 +627,6 @@ public partial class AcRoom : MonoBehaviour
         return best;
     }
 
-    void OnApplicationQuit() { sync?.Stop(); }
-    void OnDestroy() { sync?.Stop(); }
 
     float camYawCur = 180f;
 
@@ -703,13 +728,15 @@ public partial class AcRoom : MonoBehaviour
         if (Key("right") || Key("e")) { colSel = Wrap(colSel + 1, AcPalette.Vivid.Length); RefreshGhost(); }
 
         pointerFocus = null;
-        var mp = MousePos();
-        if (mp.y < 150 * UiK) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); return; }   // 아래 UI 위
+        var mp = ptrPos;
+        if (OverUI(mp)) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); return; }   // 화면 UI 위
         var ray = cam.ScreenPointToRay(mp);
         // 떼기: 오너먼트를 오른쪽 클릭
-        if (MouseDown(1) && Physics.Raycast(ray, out var hitO, 100f) && hitO.collider.GetComponentInParent<AcOrnTag>() is AcOrnTag tag)
+        bool removeGesture = MouseDown(1) || (LongPress && !longUsed);   // 오른쪽 클릭 또는 길게 누르기
+        if (removeGesture && Physics.Raycast(ray, out var hitO, 100f) && hitO.collider.GetComponentInParent<AcOrnTag>() is AcOrnTag tag)
         {
-            RemoveOrn(tag.id); return;
+            longUsed = true; ptrMoved = true;   // 손을 뗄 때 다시 달리지 않게
+            RemoveOrn(tag.id); Toast("장식을 뗐어요"); return;
         }
         if (treeCol.Raycast(ray, out var hit, 100f))
         {
@@ -719,7 +746,7 @@ public partial class AcRoom : MonoBehaviour
                 GhostGarland(gy);
                 pointerFocus = hit.point;
                 FocusAt(hit.point, true);
-                if (MouseDown(0)) AddOrn(ornTypes[ornSel], CurColor, new Vector3(TreePos.x, gy, TreePos.z), 0);
+                if (Tap) AddOrn(ornTypes[ornSel], CurColor, new Vector3(TreePos.x, gy, TreePos.z), 0);
                 return;
             }
             if (ghost == null || ghost.name != ornTypes[ornSel]) RefreshGhost();
@@ -730,7 +757,7 @@ public partial class AcRoom : MonoBehaviour
             var body = pos - Vector3.up * 0.11f * OrnScale;
             pointerFocus = body;
             FocusAt(body, true);
-            if (MouseDown(0)) AddOrn(ornTypes[ornSel], CurColor, pos, ry);
+            if (Tap) AddOrn(ornTypes[ornSel], CurColor, pos, ry);
         }
         else { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); }
     }
@@ -754,16 +781,14 @@ public partial class AcRoom : MonoBehaviour
     {
         var o = new Orn { id = myId + "_" + DateTime.UtcNow.Ticks.ToString("x"), type = type, color = ColorUtility.ToHtmlStringRGB(c), owner = myId,
                           x = pos.x, y = pos.y, z = pos.z, ry = ry, t = (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds };
-        mine.placed.Add(o);
-        SaveMine();
+        if (online) net.PutOrn(o); else { mine.placed.Add(o); SaveMine(); }
         ShowOrn(o);
     }
 
     void RemoveOrn(string id)
     {
-        int idx = mine.placed.FindIndex(o => o.id == id);
-        if (idx >= 0) mine.placed.RemoveAt(idx); else if (!mine.removed.Contains(id)) mine.removed.Add(id);
-        SaveMine();
+        if (online) net.DeleteOrn(id);
+        else { mine.placed.RemoveAll(o => o.id == id); SaveMine(); }
         if (ornObjs.TryGetValue(id, out var go)) { Destroy(go); ornObjs.Remove(id); ornData.Remove(id); }
     }
 
@@ -782,46 +807,22 @@ public partial class AcRoom : MonoBehaviour
         ornObjs[o.id] = go; ornData[o.id] = o;
     }
 
-    string MyFile => Path.Combine(ornDir, "ornaments_" + Safe(myId) + ".json");
     static string Safe(string s) { foreach (var ch in Path.GetInvalidFileNameChars()) s = s.Replace(ch, '_'); return s; }
 
     void LoadMine()
     {
-        try { if (File.Exists(MyFile)) mine = JsonUtility.FromJson<OrnFile>(File.ReadAllText(MyFile)) ?? new OrnFile(); } catch { }
+        try { mine = JsonUtility.FromJson<OrnFile>(PlayerPrefs.GetString("ac_solo_orn", "")) ?? new OrnFile(); } catch { mine = new OrnFile(); }
         mine.owner = myId;
     }
 
-    void SaveMine()
-    {
-        try
-        {
-            var tmp = MyFile + ".tmp";
-            File.WriteAllText(tmp, JsonUtility.ToJson(mine));
-            if (File.Exists(MyFile)) File.Replace(tmp, MyFile, null); else File.Move(tmp, MyFile);
-        }
-        catch (Exception e) { Toast("저장 실패: " + e.Message); }
-    }
+    void SaveMine() { PlayerPrefs.SetString("ac_solo_orn", JsonUtility.ToJson(mine)); PlayerPrefs.Save(); }
 
+    // 화면의 장식을 저장된 목록과 맞춤
     void PollOrnaments(bool force)
     {
-        string[] files;
-        try { files = Directory.GetFiles(ornDir, "ornaments_*.json"); } catch { return; }
-        bool changed = force;
-        foreach (var f in files) { var t = File.GetLastWriteTimeUtc(f); if (!seen.TryGetValue(f, out var old) || old != t) { seen[f] = t; changed = true; } }
-        if (!changed) return;
-        var all = new Dictionary<string, Orn>(); var removed = new HashSet<string>();
-        foreach (var f in files)
-        {
-            try
-            {
-                var of = JsonUtility.FromJson<OrnFile>(File.ReadAllText(f));
-                if (of == null) continue;
-                foreach (var o in of.placed) all[o.id] = o;
-                foreach (var r in of.removed) removed.Add(r);
-            }
-            catch { }
-        }
-        foreach (var r in removed) all.Remove(r);
+        Dictionary<string, Orn> all;
+        if (online) all = net.Ornaments();
+        else { all = new Dictionary<string, Orn>(); foreach (var o in mine.placed) all[o.id] = o; }
         foreach (var kv in all) ShowOrn(kv.Value);
         var gone = new List<string>();
         foreach (var kv in ornObjs) if (!all.ContainsKey(kv.Key)) gone.Add(kv.Key);
@@ -832,9 +833,12 @@ public partial class AcRoom : MonoBehaviour
 
     // ========================================================
     // 화면 UI
+    static Font uiFont;
     void Styles()
     {
         if (sBox != null) return;
+        if (uiFont == null) uiFont = Resources.Load<Font>("Fonts/Jua-Regular");   // 둥근 한글 글꼴 (웹에서도 한글이 나오게)
+        if (uiFont != null) GUI.skin.font = uiFont;
         var bg = new Texture2D(1, 1); bg.SetPixel(0, 0, new Color(1f, 0.98f, 0.93f, 0.94f)); bg.Apply();
         sBox = new GUIStyle(GUI.skin.box) { normal = { background = bg }, padding = new RectOffset(14, 14, 10, 10) };
         sLabel = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.42f, 0.3f, 0.22f) }, richText = true };
@@ -843,7 +847,7 @@ public partial class AcRoom : MonoBehaviour
         sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.75f, 0.25f, 0.2f) } };
     }
 
-    static float UiK => Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 큰 화면에서는 글씨·창도 크게
+    static float UiK => IsMobile ? Mathf.Max(Screen.height / 560f, 0.6f) : Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 휴대폰은 손가락 크기에 맞게 크게
     static float SW => Screen.width / UiK;
     static float SH => Screen.height / UiK;
 
@@ -851,32 +855,44 @@ public partial class AcRoom : MonoBehaviour
     {
         GUI.matrix = Matrix4x4.Scale(new Vector3(UiK, UiK, 1));
         Styles();
+        uiRects.Clear();
+        if (!Ready)
+        {
+            GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.12f, 0.2f, 0.17f)));
+            GUI.Label(new Rect(0, SH / 2 - 30, SW, 40), "<size=26><color=#fff3d6>크리스마스 거실</color></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(0, SH / 2 + 14, SW, 30), "<color=#d8e8d0>" + loadingMsg + "</color>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+            return;
+        }
         if (phase == Phase.Lobby) { LobbyGUI(); return; }
         NameTags();
         if (toast != null && Time.time < toastUntil)
         {
             var r = new Rect(SW / 2 - 260, 18, 520, 40);
-            GUI.Box(r, "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
+            GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }
         // 대화 기록
         if (chatLog.Count > 0)
         {
             var lr = new Rect(14, 14, 360, 22 * chatLog.Count + 16);
-            GUI.Box(lr, "", sBox);
+            GUI.Box(R(lr), "", sBox);
             for (int i = 0; i < chatLog.Count; i++) GUI.Label(new Rect(26, 20 + i * 22, 340, 22), chatLog[i], sSmall);
         }
         if (decorating) DecorateBar();
         else
         {
-            GUI.Box(new Rect(14, SH - 46, 700, 34), "", sBox);
-            GUI.Label(new Rect(28, SH - 40, 690, 24), "WASD 이동 · 트리 근처에서 꾸미기 · Enter 말하기 · Z 인사 · X 하트 · V 만세 · C 캐릭터 꾸미기", sSmall);
+            if (!IsMobile)
+            {
+                GUI.Box(R(new Rect(14, SH - 46, 640, 34)), "", sBox);
+                GUI.Label(new Rect(28, SH - 40, 630, 24), "WASD/클릭 이동 / 트리 근처에서 꾸미기 / Enter 말하기 / Z 인사 / X 하트 / V 만세 / C 꾸미기", sSmall);
+            }
+            ActionButtons();
         }
         // 친구 가까이: 함께 하기
         var near = NearestRemote(2.0f);
         if (near != null && !decorating)
         {
-            var r = new Rect(SW / 2 - 200, SH - 120, 400, 60);
-            GUI.Box(r, "", sBox);
+            var r = new Rect(SW / 2 - 200, SH - (IsMobile ? 150 : 120), 400, 60);
+            GUI.Box(R(r), "", sBox);
             GUI.Label(new Rect(r.x + 14, r.y + 6, 380, 22), near.net.name + " 님과", sSmall);
             if (GUI.Button(new Rect(r.x + 14, r.y + 28, 120, 26), "하이파이브", sBtn)) { Emote("highfive", near.net.id); FaceTo(near.c.transform.position); }
             if (GUI.Button(new Rect(r.x + 140, r.y + 28, 120, 26), "선물 주기", sBtn)) { Emote("gift", near.net.id); FaceTo(near.c.transform.position); }
@@ -884,7 +900,7 @@ public partial class AcRoom : MonoBehaviour
         }
         if (chatting) ChatBox();
         if (showCustom) CustomWindow();
-        if (sync != null && sync.Status != "") GUI.Label(new Rect(SW - 330, SH - 40, 320, 24), sync.Status, sSmall);
+        if (net != null && net.Status != "") GUI.Label(new Rect(SW - 330, 14, 320, 24), net.Status, sSmall);
     }
 
     void FaceTo(Vector3 p) { var d = p - me.transform.position; d.y = 0; if (d.sqrMagnitude > 0.001f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; } }
@@ -892,7 +908,7 @@ public partial class AcRoom : MonoBehaviour
     void ChatBox()
     {
         var r = new Rect(SW / 2 - 260, SH - 190, 520, 44);
-        GUI.Box(r, "", sBox);
+        GUI.Box(R(r), "", sBox);
         GUI.SetNextControlName("chat");
         chatText = GUI.TextField(new Rect(r.x + 12, r.y + 10, r.width - 24, 26), chatText, 60);
         GUI.FocusControl("chat");
@@ -940,22 +956,27 @@ public partial class AcRoom : MonoBehaviour
     }
 
     // 입장 화면
+    Vector2 lobbyScroll;
     void LobbyGUI()
     {
         if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
-        var r = new Rect(30, 30, 430, SH - 60);
-        GUI.Box(r, "", sBox);
-        GUILayout.BeginArea(new Rect(r.x + 18, r.y + 14, r.width - 36, r.height - 28));
-        GUILayout.Label("<size=26>크리스마스 거실</size>", sLabel);
+        var r = new Rect(20, 16, 440, SH - 32);
+        GUI.Box(R(r), "", sBox);
+        GUILayout.BeginArea(new Rect(r.x + 16, r.y + 10, r.width - 32, r.height - 20));
+        GUILayout.Label("<size=24>크리스마스 거실</size>", sLabel);
         GUILayout.Label("캐릭터를 꾸미고 현관으로 들어가세요. 다 함께 커다란 트리를 꾸며요!", sSmall);
         GUILayout.Space(8);
-        GUILayout.Label("이름", sSmall);
-        uiName = GUILayout.TextField(uiName, 12, GUILayout.Height(26));
-        GUILayout.Label("공유 폴더  <size=11>(예: \\\\서버\\공유\\xmas 또는 Z:\\xmas)</size>", sSmall);
-        uiPath = GUILayout.TextField(uiPath, GUILayout.Height(26));
-        GUILayout.Space(6);
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("이름", sSmall, GUILayout.Width(60));
+        uiName = TextBox("이름을 입력하세요", uiName, 12);
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("방 코드", sSmall, GUILayout.Width(60));
+        uiPath = TextBox("방 코드 (같은 코드를 쓴 사람끼리 만나요)", uiPath, 20);
+        GUILayout.EndHorizontal();
+        lobbyScroll = GUILayout.BeginScrollView(lobbyScroll, false, false);
         CustomControls();
-        GUILayout.FlexibleSpace();
+        GUILayout.EndScrollView();
         if (lobbyMsg != "") GUILayout.Label("<color=#b03030>" + lobbyMsg + "</color>", sSmall);
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("입장하기", sBtn, GUILayout.Height(38))) Enter(false);
@@ -967,13 +988,13 @@ public partial class AcRoom : MonoBehaviour
     void DecorateBar()
     {
         float h = 150, y = SH - h - 8;
-        GUI.Box(new Rect(10, y, SW - 20, h), "", sBox);
-        GUI.Label(new Rect(26, y + 6, SW - 60, 24), "트리 꾸미기  <size=13>왼쪽 클릭 달기 · 오른쪽 클릭 떼기 · ↑↓/휠 모양 · ←→ 색</size>", sLabel);
+        GUI.Box(R(new Rect(10, y, SW - 20, h)), "", sBox);
+        GUI.Label(new Rect(26, y + 6, SW - 60, 24), IsMobile ? "트리 꾸미기  <size=13>트리를 눌러 달기 / 장식을 길게 눌러 떼기</size>" : "트리 꾸미기  <size=13>클릭 달기 / 오른쪽 클릭 떼기 / 위아래/휠 모양 / 좌우 색</size>", sLabel);
         // 모양 (실제 오너먼트 그림)
         float x = 26, size = 62;
         int perRow = Mathf.Max(1, (int)((SW - 330) / (size + 6)));
         int start = Mathf.Clamp(ornSel - perRow / 2, 0, Mathf.Max(0, ornTypes.Count - perRow));
-        if (start > 0) GUI.Label(new Rect(x - 14, y + 52, 14, 24), "‹", sLabel);
+        if (start > 0) GUI.Label(new Rect(x - 14, y + 52, 14, 24), "<", sLabel);
         for (int i = start; i < Mathf.Min(ornTypes.Count, start + perRow); i++)
         {
             var r = new Rect(x, y + 34, size, size);
@@ -983,16 +1004,16 @@ public partial class AcRoom : MonoBehaviour
             if (GUI.Button(r, "", GUIStyle.none)) SetSel(i);
             x += size + 6;
         }
-        if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), "›", sLabel);
+        if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), ">", sLabel);
         var it = AcCatalog.Get(ornTypes[ornSel]);
-        GUI.Label(new Rect(26, y + 102, 420, 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " — 트리를 누른 높이에 한 바퀴 둘러요" : it != null ? it.desc : ornTypes[ornSel], sSmall);
-        // 색: ◀ ■ 이름 ▶
+        GUI.Label(new Rect(26, y + 102, 420, 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 트리를 누른 높이에 한 바퀴 둘러요" : it != null ? it.desc : ornTypes[ornSel], sSmall);
+        // 색: < ■ 이름 >
         float cx = SW - 290, cy = y + 40;
         GUI.Label(new Rect(cx, cy - 6, 260, 22), "색", sSmall);
-        if (GUI.Button(new Rect(cx, cy + 16, 34, 40), "◀", sBtn)) { colSel = Wrap(colSel - 1, AcPalette.Vivid.Length); RefreshGhost(); }
+        if (GUI.Button(new Rect(cx, cy + 16, 34, 40), "<", sBtn)) { colSel = Wrap(colSel - 1, AcPalette.Vivid.Length); RefreshGhost(); }
         GUI.DrawTexture(new Rect(cx + 41, cy + 15, 102, 42), AcPalette.Tex(new Color(0.45f, 0.35f, 0.28f)));
         GUI.DrawTexture(new Rect(cx + 42, cy + 16, 100, 40), AcPalette.Tex(CurColor));
-        if (GUI.Button(new Rect(cx + 150, cy + 16, 34, 40), "▶", sBtn)) { colSel = Wrap(colSel + 1, AcPalette.Vivid.Length); RefreshGhost(); }
+        if (GUI.Button(new Rect(cx + 150, cy + 16, 34, 40), ">", sBtn)) { colSel = Wrap(colSel + 1, AcPalette.Vivid.Length); RefreshGhost(); }
         GUI.Label(new Rect(cx + 192, cy + 26, 90, 22), AcPalette.VividNames[Wrap(colSel, AcPalette.Vivid.Length)], sSmall);
         // 이웃 색 미리보기
         for (int k = -3; k <= 3; k++)
@@ -1010,13 +1031,16 @@ public partial class AcRoom : MonoBehaviour
     static readonly string[] HatId = { "santa", "beanie", "earmuffs", "antlers", "tophat", "elf", "none" };
     static readonly string[] HatKo = { "산타", "털모자", "귀마개", "뿔", "중절모", "요정", "없음" };
 
+    Vector2 customScroll;
     void CustomWindow()
     {
         var r = new Rect(SW - 470, 20, 450, Mathf.Min(SH - 40, 640));
-        GUI.Box(r, "", sBox);
+        GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
         GUILayout.Label("캐릭터 꾸미기", sLabel);
+        customScroll = GUILayout.BeginScrollView(customScroll, false, false, GUILayout.Height(r.height - 100));
         CustomControls();
+        GUILayout.EndScrollView();
         GUILayout.Space(8);
         if (GUILayout.Button("완료", sBtn, GUILayout.Height(30))) showCustom = false;
         GUILayout.EndArea();

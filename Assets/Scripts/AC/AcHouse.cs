@@ -1,4 +1,4 @@
-// AcHouse.cs — 큰 집: 가운데 트리 거실 + 양옆으로 방 4개씩 (모두 8개). 방 사이는 아치 문으로 이어짐.
+// AcHouse.cs - 큰 집: 가운데 트리 거실 + 양옆으로 방 4개씩 (모두 8개). 방 사이는 아치 문으로 이어짐.
 // 카메라가 남쪽(+z)에서 보므로 방들을 가로 한 줄로 배치하고, 앞쪽(+z) 벽은 두지 않음.
 using System.Collections.Generic;
 using UnityEngine;
@@ -20,6 +20,22 @@ public partial class AcRoom
 
     readonly List<(float x0, float x1, string name)> areas = new List<(float, float, string)>();
     string curArea = "";
+    readonly List<(float x0, float x1, GameObject go)> roomRoots = new List<(float, float, GameObject)>();
+    float nextCull;
+
+    // 멀리 있는 방은 꺼서 휴대폰에서도 가볍게
+    void CullRooms()
+    {
+        if (Time.unscaledTime < nextCull || me == null) return;
+        nextCull = Time.unscaledTime + 0.3f;
+        float x = me.transform.position.x, reach = IsMobile ? 15f : 24f;
+        foreach (var (x0, x1, go) in roomRoots)
+        {
+            float d = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
+            bool on = d < reach;
+            if (go.activeSelf != on) go.SetActive(on);
+        }
+    }
 
     static Color C(string h) { ColorUtility.TryParseHtmlString("#" + h, out var c); return c; }
     Dictionary<string, Color> T(params (string k, string hex)[] kv) { var d = new Dictionary<string, Color>(); foreach (var (k, h) in kv) d[k] = C(h); return d; }
@@ -69,6 +85,7 @@ public partial class AcRoom
                 float x0 = side < 0 ? -HalfX - (i + 1) * RoomW : HalfX + i * RoomW;
                 float cx = x0 + RoomW / 2;
                 var room = new GameObject(d.name).transform; room.SetParent(house, false);
+                roomRoots.Add((x0, x0 + RoomW, room.gameObject));
                 var floorT = d.floorTint.a > 0 ? new Dictionary<string, Color> { { "floor", d.floorTint } } : null;
                 for (int ix = 0; ix < RoomSegs; ix++)
                     for (int iz = 0; iz < NZ; iz++)
@@ -156,6 +173,7 @@ public partial class AcRoom
 
     void CheckArea()
     {
+        CullRooms();
         if (me == null || phase != Phase.Play || Outside) return;
         var a = AreaAt(me.transform.position.x);
         if (a != "" && a != curArea) { if (curArea != "") Toast(a); curArea = a; }
