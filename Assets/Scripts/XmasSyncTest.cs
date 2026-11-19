@@ -232,7 +232,7 @@ public class XmasSyncTest : MonoBehaviour
         if (camData != null) camData.renderPostProcessing = true;
 
         // 기존 조명 끄고 달빛 생성
-        foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.enabled = false;
+        foreach (var l in FindObjectsByType<Light>()) l.enabled = false;
         var moon = new GameObject("Moonlight").AddComponent<Light>();
         moon.type = LightType.Directional;
         moon.color = new Color(0.75f, 0.82f, 1f);
