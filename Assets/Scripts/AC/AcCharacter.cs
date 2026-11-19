@@ -45,6 +45,8 @@ public class AcCharacter : MonoBehaviour
     Transform body, armL, armR, legL, legR, tail, head;
     readonly List<GameObject> attached = new List<GameObject>();
     float phase, bob;
+    string emote = ""; float emoteT = -10;
+    public void PlayEmote(string kind) { emote = kind; emoteT = Time.time; }
 
     public static AcCharacter Create(AcLook look, Transform parent = null)
     {
@@ -105,12 +107,35 @@ public class AcCharacter : MonoBehaviour
         if (legL) legL.localRotation = Quaternion.Euler(-sw * 0.9f, 0, 0);
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
+        float et = Time.time - emoteT, jump = 0;
+        if (et < 1.8f)
+        {
+            float k = Mathf.Sin(Mathf.Clamp01(et / 1.8f) * Mathf.PI);   // 들었다 내리기
+            switch (emote)
+            {
+                case "wave":      // 오른팔 흔들기
+                    if (armR) armR.localRotation = Quaternion.Euler(0, 0, 4f + k * (150f + Mathf.Sin(et * 16f) * 25f));
+                    break;
+                case "highfive":  // 두 팔 번쩍
+                case "cheer":
+                    if (armL) armL.localRotation = Quaternion.Euler(0, 0, -4f - k * 160f);
+                    if (armR) armR.localRotation = Quaternion.Euler(0, 0, 4f + k * 160f);
+                    jump = emote == "cheer" ? Mathf.Abs(Mathf.Sin(et * 9f)) * 0.12f * k : 0;
+                    break;
+                case "heart":     // 폴짝
+                case "gift":
+                    jump = Mathf.Abs(Mathf.Sin(et * 7f)) * 0.15f * k;
+                    if (armL) armL.localRotation = Quaternion.Euler(-k * 70f, 0, -20f * k);
+                    if (armR) armR.localRotation = Quaternion.Euler(-k * 70f, 0, 20f * k);
+                    break;
+            }
+        }
         // 걸을 때 통통 튀고, 서 있을 때는 숨쉬듯 살짝
         float target = s > 0.05f ? Mathf.Abs(Mathf.Sin(phase)) * 0.045f * s : Mathf.Sin(Time.time * 2.2f) * 0.006f + 0.006f;
         bob = Mathf.Lerp(bob, target, 1 - Mathf.Exp(-dt * 20f));
         if (body)
         {
-            body.localPosition = new Vector3(0, bob, 0);
+            body.localPosition = new Vector3(0, bob + jump, 0);
             body.localRotation = Quaternion.Euler(s * 6f, 0, Mathf.Sin(phase) * 3f * s);
         }
     }

@@ -1,10 +1,11 @@
 // AcRoom.cs — 동물의 숲풍 크리스마스 거실 (모델 미리보기 + 트리 꾸미기)
 // StreamingAssets/models/catalog.json 이 있으면 이 장면이 켜져요 (예전 디오라마 대신).
 //
+// 흐름: 입장 화면(캐릭터 꾸미기 + 공유 폴더·이름) → 현관문으로 들어옴 → 거실에서 함께 트리 꾸미기
 // 조작: WASD/방향키 이동 · 트리 가까이 가면 꾸미기 모드
 //       꾸미기: 왼쪽 클릭 = 오너먼트 달기, 오른쪽 클릭 = 떼기, 1~9/휠 = 종류, Q/E = 색
-//       C = 캐릭터 꾸미기 창 · F2 = 다른 캐릭터(데모) 보이기/숨기기
-// 장식 저장: 공유 폴더(입장 때 쓴 경로, PlayerPrefs xmas_path)\tree\ornaments_<내ID>.json — 각자 자기 파일만 씀
+//       Enter = 말하기 · Z 인사 · X 하트 · V 만세 · 친구 가까이에서 하이파이브/선물 · C 캐릭터 꾸미기
+// 동기화: 공유 폴더\room\playerNN.json (위치), 공유 폴더\tree\ornaments_<ID>.json (장식) — 각자 자기 파일만 씀
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -58,6 +59,18 @@ public class AcRoom : MonoBehaviour
     readonly Dictionary<string, DateTime> seen = new Dictionary<string, DateTime>();
 
     bool decorating, showCustom, showNpcs = true;
+    enum Phase { Lobby, Entering, Play }
+    Phase phase = Phase.Lobby;
+    string uiPath = "", uiName = "", lobbyMsg = "", chatText = "";
+    bool chatting; float chatOpenedAt;
+    AcSync sync;
+    Transform doorTr; float doorOpen;
+    Vector3 DoorPos => new Vector3(HalfX - SEG * 0.5f, 0, -HalfZ);
+    Vector3? autoWalk;
+    string myEmote = ""; double myEmoteT; string myChat = ""; double myChatT;
+    class Remote { public AcCharacter c; public string look; public AcNet net; public Vector3 target; public double lastEmoteT, lastChatT; }
+    readonly Dictionary<string, Remote> remotes = new Dictionary<string, Remote>();
+    readonly List<string> chatLog = new List<string>();
     string toast; float toastUntil;
     GUIStyle sBox, sLabel, sSmall, sBtn;
 
@@ -65,6 +78,7 @@ public class AcRoom : MonoBehaviour
     void Start()
     {
         Application.targetFrameRate = 60;
+        Application.runInBackground = true;   // 창을 내려도 동기화 계속
         foreach (var c in FindObjectsByType<Camera>()) if (c.gameObject.name != "AcCam") c.gameObject.SetActive(false);
         foreach (var l in FindObjectsByType<Light>()) l.gameObject.SetActive(false);
         foreach (var v in FindObjectsByType<Volume>()) v.enabled = false;   // 템플릿 톤매핑이 색을 바래게 해서 끔
@@ -78,23 +92,61 @@ public class AcRoom : MonoBehaviour
         BuildFurniture();
 
         myId = PlayerPrefs.GetString("ac_id", "");
-        if (myId == "") { myId = Environment.UserName + "_" + Random.Range(1000, 9999); PlayerPrefs.SetString("ac_id", myId); }
+        if (myId == "") { myId = Safe(Environment.UserName) + "_" + Random.Range(1000, 9999); PlayerPrefs.SetString("ac_id", myId); }
         mine.owner = myId;
+        uiPath = PlayerPrefs.GetString("xmas_path", "");
+        uiName = PlayerPrefs.GetString("xmas_name", Environment.UserName);
         var look = AcLook.Decode(PlayerPrefs.GetString("ac_look", ""));
         me = AcCharacter.Create(look, world);
         me.name = "Me";
-        me.transform.position = new Vector3(0, 0, HalfZ - 2.5f);
-        me.transform.rotation = Quaternion.Euler(0, 180, 0);
-        SpawnDemoNpcs();
-
+        me.transform.position = DoorPos + new Vector3(0, 0, 1.3f);
+        me.transform.rotation = Quaternion.Euler(0, 0, 0);
+        yaw = 0;
         foreach (var it in AcCatalog.ByCat("ornament")) ornTypes.Add(it.name);
         ornTypes.Sort((a, b) => OrnOrder(a).CompareTo(OrnOrder(b)));
-        string shared = PlayerPrefs.GetString("xmas_path", "");
-        ornDir = (shared != "" && Directory.Exists(shared)) ? Path.Combine(shared, "tree") : Path.Combine(Application.persistentDataPath, "tree");
+        UpdateCamera(0, true);
+    }
+
+    // 입장 버튼
+    void Enter(bool solo)
+    {
+        string shared = uiPath.Trim();
+        if (!solo)
+        {
+            if (shared == "") { lobbyMsg = "공유 폴더 경로를 입력하세요. (혼자 해 보려면 '혼자 둘러보기')"; return; }
+            if (!Directory.Exists(shared)) { lobbyMsg = "폴더를 찾을 수 없어요: " + shared; return; }
+            try { var t = Path.Combine(shared, "_w_" + myId + ".tmp"); File.WriteAllText(t, "ok"); File.Delete(t); }
+            catch (Exception e) { lobbyMsg = "쓰기 권한이 없어요: " + e.Message; return; }
+        }
+        if (uiName.Trim() == "") uiName = "익명";
+        PlayerPrefs.SetString("xmas_path", shared); PlayerPrefs.SetString("xmas_name", uiName.Trim()); PlayerPrefs.Save();
+        ornDir = (!solo && shared != "") ? Path.Combine(shared, "tree") : Path.Combine(Application.persistentDataPath, "tree");
         try { Directory.CreateDirectory(ornDir); } catch { ornDir = Path.Combine(Application.persistentDataPath, "tree"); Directory.CreateDirectory(ornDir); }
         LoadMine();
         PollOrnaments(true);
-        Toast("트리 가까이 가서 오너먼트를 달아 보세요!  (C: 캐릭터 꾸미기)");
+        if (!solo)
+        {
+            sync = new AcSync(shared, myId);
+            sync.Start(MyNet());
+        }
+        else SpawnDemoNpcs();
+        showCustom = false;
+        GUIUtility.keyboardControl = 0;
+        // 현관 밖에서 문 열고 걸어 들어오기
+        me.transform.position = DoorPos + new Vector3(0, 0, 0.1f);   // 열린 문간에서 시작
+        me.transform.rotation = Quaternion.Euler(0, 0, 0); yaw = 0;
+        autoWalk = DoorPos + new Vector3(0, 0, 2.8f);
+        phase = Phase.Entering;
+        Toast(solo ? "혼자 둘러보기 — 트리 가까이 가서 오너먼트를 달아 보세요!" : "입장! 다른 사람들과 함께 트리를 꾸며요");
+    }
+
+    AcNet MyNet()
+    {
+        return new AcNet
+        {
+            name = uiName.Trim(), look = me.look.Encode(), x = me.transform.position.x, z = me.transform.position.z, ry = yaw, speed = me.speed,
+            emote = myEmote, emoteT = myEmoteT, chat = myChat, chatT = myChatT, decorating = decorating,
+        };
     }
 
     static int OrnOrder(string n) => n.StartsWith("orn_ball") ? 0 : n == "orn_star" || n == "orn_bell" || n == "orn_drop" ? 1 : 2;
@@ -165,7 +217,12 @@ public class AcRoom : MonoBehaviour
             string w = ix == 1 || ix == 4 ? "wall_window" : ix == 5 ? "wall_door" : "wall_plain";
             var g = Put(w, new Vector3(-HalfX + SEG * (ix + 0.5f), 0, -HalfZ), 0, S, null, room);
             if (w == "wall_window") { HidePart(g, "glass"); Put("curtain", new Vector3(g.transform.position.x, 1.75f * S - 1.9f, -HalfZ + 0.12f), 0, S * 0.85f, null, room); }
-            if (w == "wall_door") Put("wreath", new Vector3(g.transform.position.x, 1.75f * S, -HalfZ + 0.12f), 0, 1.1f, null, room);
+            if (w == "wall_door")
+            {
+                Put("wreath", new Vector3(g.transform.position.x, 1.75f * S + 1.2f, -HalfZ + 0.16f), 0, 1.1f, null, room);
+                doorTr = AcmLoader.Find(g, "door");
+                var shell = AcmLoader.Find(g, "wall"); // 문 뒤는 바깥이 보이게 둠
+            }
         }
         // 옆벽
         for (int iz = 0; iz < NZ; iz++)
@@ -192,6 +249,7 @@ public class AcRoom : MonoBehaviour
                 Put("ground_snow", new Vector3(ix * 8f, -0.05f, -HalfZ - 4f - iz * 8f), Random.Range(0, 4) * 90, 2f, null, o);
                 Put("ground_snow", new Vector3(-HalfX - 4f - iz * 8f, -0.05f, ix * 8f), 0, 2f, null, o);
                 Put("ground_snow", new Vector3(HalfX + 4f + iz * 8f, -0.05f, ix * 8f), 0, 2f, null, o);
+                Put("ground_snow", new Vector3(ix * 8f, -0.05f, HalfZ + 4f + iz * 8f), 0, 2f, null, o);
             }
         string[] trees = { "pine_snowy", "pine_tall", "pine_small", "bare_tree", "birch", "palm_cedar", "round_tree" };
         var rnd = new System.Random(5);
@@ -342,6 +400,8 @@ public class AcRoom : MonoBehaviour
             case "q": return kb.qKey.wasPressedThisFrame; case "e": return kb.eKey.wasPressedThisFrame;
             case "c": return kb.cKey.wasPressedThisFrame; case "f2": return kb.f2Key.wasPressedThisFrame;
             case "esc": return kb.escapeKey.wasPressedThisFrame;
+            case "z": return kb.zKey.wasPressedThisFrame; case "x": return kb.xKey.wasPressedThisFrame; case "v": return kb.vKey.wasPressedThisFrame;
+            case "enter": return kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9')
         {
@@ -355,6 +415,8 @@ public class AcRoom : MonoBehaviour
             case "q": return Input.GetKeyDown(KeyCode.Q); case "e": return Input.GetKeyDown(KeyCode.E);
             case "c": return Input.GetKeyDown(KeyCode.C); case "f2": return Input.GetKeyDown(KeyCode.F2);
             case "esc": return Input.GetKeyDown(KeyCode.Escape);
+            case "z": return Input.GetKeyDown(KeyCode.Z); case "x": return Input.GetKeyDown(KeyCode.X); case "v": return Input.GetKeyDown(KeyCode.V);
+            case "enter": return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9') return Input.GetKeyDown(KeyCode.Alpha1 + (k[0] - '1'));
         return false;
@@ -391,25 +453,135 @@ public class AcRoom : MonoBehaviour
     void Update()
     {
         float dt = Time.deltaTime;
-        if (!showCustom) MovePlayer(dt);
+        // 문 여닫기
+        float wantOpen = phase == Phase.Entering ? 1 : 0;
+        foreach (var r in remotes.Values) if (Vector3.Distance(r.c.transform.position, DoorPos) < 2.2f) wantOpen = 1;
+        doorOpen = Mathf.MoveTowards(doorOpen, wantOpen, dt * 1.8f);
+        if (doorTr) doorTr.localRotation = Quaternion.Euler(0, -Mathf.SmoothStep(0, 1, doorOpen) * 95f, 0);
+
+        if (phase == Phase.Lobby)
+        {
+            me.speed = 0;
+            UpdateCamera(dt, false);
+            return;
+        }
+        if (phase == Phase.Entering && autoWalk.HasValue)
+        {
+            var d = autoWalk.Value - me.transform.position; d.y = 0;
+            if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
+            else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
+        }
+        else if (!showCustom && !chatting) MovePlayer(dt);
+        else me.speed = 0;
+
         UpdateNpcs(dt);
+        UpdateRemotes(dt);
         UpdateCamera(dt, false);
 
-        if (Key("c")) showCustom = !showCustom;
-        if (Key("f2")) { showNpcs = !showNpcs; foreach (var n in npcs) n.gameObject.SetActive(showNpcs); }
-        if (Key("esc")) showCustom = false;
+        if (!chatting)
+        {
+            if (Key("c")) showCustom = !showCustom;
+            if (Key("f2")) { showNpcs = !showNpcs; foreach (var n in npcs) n.gameObject.SetActive(showNpcs); }
+            if (Key("esc")) showCustom = false;
+            if (Key("z")) Emote("wave");
+            if (Key("x")) Emote("heart");
+            if (Key("v")) Emote("cheer");
+            if (Key("enter")) { chatting = true; chatText = ""; chatOpenedAt = Time.unscaledTime; }
+        }
 
         float treeDist = Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
-        decorating = treeDist < 5.2f && !showCustom;
+        decorating = phase == Phase.Play && treeDist < 5.2f && !showCustom && !chatting;
         if (decorating) Decorate(); else if (ghost) ghost.SetActive(false);
 
         if (Time.time > nextPoll) { nextPoll = Time.time + 2f; PollOrnaments(false); }
+        if (sync != null) sync.SetMe(MyNet());
     }
+
+    void Emote(string kind, string target = "")
+    {
+        myEmote = target == "" ? kind : kind + ":" + target;
+        myEmoteT = AcSync.UnixMs;
+        me.PlayEmote(kind);
+    }
+
+    void Say(string text)
+    {
+        text = text.Trim(); if (text == "") return;
+        if (text.Length > 60) text = text.Substring(0, 60);
+        myChat = text; myChatT = AcSync.UnixMs;
+        Log(uiName + ": " + text);
+    }
+
+    void Log(string line) { chatLog.Add(line); if (chatLog.Count > 6) chatLog.RemoveAt(0); }
+
+    // 다른 참가자
+    void UpdateRemotes(float dt)
+    {
+        if (sync == null) return;
+        var peers = sync.Peers();
+        var alive = new HashSet<string>();
+        foreach (var kv in peers)
+        {
+            var n = kv.Value; if (string.IsNullOrEmpty(n.id)) continue;
+            alive.Add(n.id);
+            if (!remotes.TryGetValue(n.id, out var r))
+            {
+                r = new Remote { c = AcCharacter.Create(AcLook.Decode(n.look), world), look = n.look, target = new Vector3(n.x, 0, n.z),
+                                 lastEmoteT = n.emoteT, lastChatT = n.chatT };
+                r.c.transform.position = r.target; r.c.name = "Peer " + n.name;
+                remotes[n.id] = r;
+                Toast(n.name + " 님이 들어왔어요");
+                Log("— " + n.name + " 님 입장");
+                if (npcs.Count > 0) foreach (var c in npcs) c.gameObject.SetActive(false);
+            }
+            if (r.look != n.look) { r.look = n.look; r.c.Rebuild(AcLook.Decode(n.look)); }
+            r.net = n; r.target = new Vector3(n.x, 0, n.z);
+            if (n.emoteT > r.lastEmoteT && AcSync.UnixMs - n.emoteT < 5000)
+            {
+                r.lastEmoteT = n.emoteT;
+                var parts = n.emote.Split(':');
+                r.c.PlayEmote(parts[0]);
+                if (parts.Length > 1 && parts[1] == myId)
+                {
+                    if (parts[0] == "highfive") { me.PlayEmote("highfive"); Toast(n.name + " 님과 하이파이브!"); }
+                    if (parts[0] == "gift") { me.PlayEmote("heart"); Toast(n.name + " 님이 선물을 줬어요!"); }
+                }
+            }
+            if (n.chatT > r.lastChatT) { r.lastChatT = n.chatT; Log(n.name + ": " + n.chat); }
+        }
+        var gone = new List<string>();
+        foreach (var kv in remotes) if (!alive.Contains(kv.Key)) gone.Add(kv.Key);
+        foreach (var id in gone) { Log("— " + (remotes[id].net?.name ?? "") + " 님 퇴장"); Destroy(remotes[id].c.gameObject); remotes.Remove(id); }
+        foreach (var r in remotes.Values)
+        {
+            var p = r.c.transform.position;
+            var d = r.target - p; d.y = 0;
+            float dist = d.magnitude;
+            if (dist > 6f) r.c.transform.position = r.target;   // 너무 멀면 순간이동
+            else r.c.transform.position = Vector3.MoveTowards(p, r.target, Mathf.Max(dist * 6f, 1.2f) * dt);
+            r.c.speed = Mathf.Lerp(r.c.speed, dist > 0.05f ? Mathf.Max(r.net.speed, 1.5f) : 0, 1 - Mathf.Exp(-dt * 10f));
+            r.c.transform.rotation = Quaternion.Slerp(r.c.transform.rotation, Quaternion.Euler(0, r.net.ry, 0), 1 - Mathf.Exp(-dt * 12f));
+        }
+    }
+
+    Remote NearestRemote(float within)
+    {
+        Remote best = null; float bd = within;
+        foreach (var r in remotes.Values)
+        {
+            float d = Vector3.Distance(r.c.transform.position, me.transform.position);
+            if (d < bd) { bd = d; best = r; }
+        }
+        return best;
+    }
+
+    void OnApplicationQuit() { sync?.Stop(); }
+    void OnDestroy() { sync?.Stop(); }
 
     void MovePlayer(float dt)
     {
         var a = MoveAxis();
-        Vector3 dir = new Vector3(a.x, 0, a.y);
+        Vector3 dir = new Vector3(-a.x, 0, -a.y);   // 카메라가 -z를 보므로 화면 위 = -z
         if (dir.sqrMagnitude > 1) dir.Normalize();
         float spd = 3.6f;
         var p = me.transform.position + dir * spd * dt;
@@ -417,6 +589,11 @@ public class AcRoom : MonoBehaviour
         p.z = Mathf.Clamp(p.z, -HalfZ + 0.9f, HalfZ - 0.5f);
         var d2 = new Vector2(p.x - TreePos.x, p.z - TreePos.z);
         if (d2.magnitude < 2.6f) { d2 = d2.normalized * 2.6f; p.x = TreePos.x + d2.x; p.z = TreePos.z + d2.y; }
+        foreach (var r in remotes.Values)
+        {
+            var dd = new Vector2(p.x - r.c.transform.position.x, p.z - r.c.transform.position.z);
+            if (dd.magnitude < 0.75f && dd.magnitude > 0.001f) { dd = dd.normalized * 0.75f; p.x = r.c.transform.position.x + dd.x; p.z = r.c.transform.position.z + dd.y; }
+        }
         me.speed = dir.magnitude * spd;
         if (dir.sqrMagnitude > 0.01f) yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
         me.transform.position = p;
@@ -455,10 +632,19 @@ public class AcRoom : MonoBehaviour
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
         if (decorating) focus = Vector3.Lerp(focus, TreePos + new Vector3(0, 2.6f, 0), 0.55f);
-        float dist = decorating ? 15.5f : 14f, pitch = decorating ? 24f : 36f;
-        var want = focus + Quaternion.Euler(pitch, 0, 0) * new Vector3(0, 0, -dist);
-        cam.transform.position = Vector3.SmoothDamp(cam.transform.position, want, ref camVel, 0.25f);
-        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.Euler(pitch, 0, 0), 1 - Mathf.Exp(-dt * 5f));
+        float dist = decorating ? 13f : 14f, pitch = decorating ? 20f : 36f, camYaw = 180f;   // 방 앞(+z)에서 뒷벽 쪽을 봄
+        if (phase == Phase.Lobby)
+        {
+            // 입장 화면: 캐릭터를 앞에서 가까이 (뒤로 현관문이 보임). 왼쪽 패널을 피해 캐릭터를 오른쪽에
+            focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; pitch = 8f; camYaw = 180f;
+            me.transform.rotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 0.6f) * 35f, 0);
+        }
+        var rotq = Quaternion.Euler(pitch, camYaw, 0);
+        var want = focus + rotq * new Vector3(0, 0, -dist);
+        if (snap) { cam.transform.position = want; cam.transform.rotation = rotq; return; }
+        float smooth = phase == Phase.Entering ? 0.6f : 0.25f;
+        cam.transform.position = Vector3.SmoothDamp(cam.transform.position, want, ref camVel, smooth);
+        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, rotq, 1 - Mathf.Exp(-dt * (phase == Phase.Entering ? 2.5f : 5f)));
     }
 
     // ========================================================
@@ -474,7 +660,7 @@ public class AcRoom : MonoBehaviour
         if (Key("e")) { colSel = (colSel + 1) % AcCatalog.Palette.Count; RefreshGhost(); }
 
         var mp = MousePos();
-        if (mp.y < 120) { if (ghost) ghost.SetActive(false); return; }   // 아래 UI 위
+        if (mp.y < 125 * UiK) { if (ghost) ghost.SetActive(false); return; }   // 아래 UI 위
         var ray = cam.ScreenPointToRay(mp);
         // 떼기: 오너먼트를 오른쪽 클릭
         if (MouseDown(1) && Physics.Raycast(ray, out var hitO, 100f) && hitO.collider.GetComponentInParent<AcOrnTag>() is AcOrnTag tag)
@@ -506,7 +692,7 @@ public class AcRoom : MonoBehaviour
         foreach (var r in ghost.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
     }
 
-    const float OrnScale = 2.4f;
+    const float OrnScale = 3.2f;
 
     void AddOrn(string type, Color c, Vector3 pos, float ry)
     {
@@ -599,28 +785,131 @@ public class AcRoom : MonoBehaviour
         sBtn = new GUIStyle(GUI.skin.button) { fontSize = 14 };
     }
 
+    static float UiK => Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 큰 화면에서는 글씨·창도 크게
+    static float SW => Screen.width / UiK;
+    static float SH => Screen.height / UiK;
+
     void OnGUI()
     {
+        GUI.matrix = Matrix4x4.Scale(new Vector3(UiK, UiK, 1));
         Styles();
+        if (phase == Phase.Lobby) { LobbyGUI(); return; }
+        NameTags();
         if (toast != null && Time.time < toastUntil)
         {
-            var r = new Rect(Screen.width / 2 - 260, 18, 520, 40);
+            var r = new Rect(SW / 2 - 260, 18, 520, 40);
             GUI.Box(r, "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
+        }
+        // 대화 기록
+        if (chatLog.Count > 0)
+        {
+            var lr = new Rect(14, 14, 360, 22 * chatLog.Count + 16);
+            GUI.Box(lr, "", sBox);
+            for (int i = 0; i < chatLog.Count; i++) GUI.Label(new Rect(26, 20 + i * 22, 340, 22), chatLog[i], sSmall);
         }
         if (decorating) DecorateBar();
         else
         {
-            GUI.Box(new Rect(14, Screen.height - 46, 520, 34), "", sBox);
-            GUI.Label(new Rect(28, Screen.height - 40, 500, 24), "WASD 이동 · 트리 근처에서 꾸미기 · C 캐릭터 꾸미기 · F2 데모 친구", sSmall);
+            GUI.Box(new Rect(14, SH - 46, 700, 34), "", sBox);
+            GUI.Label(new Rect(28, SH - 40, 690, 24), "WASD 이동 · 트리 근처에서 꾸미기 · Enter 말하기 · Z 인사 · X 하트 · V 만세 · C 캐릭터 꾸미기", sSmall);
         }
+        // 친구 가까이: 함께 하기
+        var near = NearestRemote(2.0f);
+        if (near != null && !decorating)
+        {
+            var r = new Rect(SW / 2 - 200, SH - 120, 400, 60);
+            GUI.Box(r, "", sBox);
+            GUI.Label(new Rect(r.x + 14, r.y + 6, 380, 22), near.net.name + " 님과", sSmall);
+            if (GUI.Button(new Rect(r.x + 14, r.y + 28, 120, 26), "하이파이브", sBtn)) { Emote("highfive", near.net.id); FaceTo(near.c.transform.position); }
+            if (GUI.Button(new Rect(r.x + 140, r.y + 28, 120, 26), "선물 주기", sBtn)) { Emote("gift", near.net.id); FaceTo(near.c.transform.position); }
+            if (GUI.Button(new Rect(r.x + 266, r.y + 28, 120, 26), "인사", sBtn)) { Emote("wave", near.net.id); FaceTo(near.c.transform.position); }
+        }
+        if (chatting) ChatBox();
         if (showCustom) CustomWindow();
+        if (sync != null && sync.Status != "") GUI.Label(new Rect(SW - 330, SH - 40, 320, 24), sync.Status, sSmall);
+    }
+
+    void FaceTo(Vector3 p) { var d = p - me.transform.position; d.y = 0; if (d.sqrMagnitude > 0.001f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; } }
+
+    void ChatBox()
+    {
+        var r = new Rect(SW / 2 - 260, SH - 190, 520, 44);
+        GUI.Box(r, "", sBox);
+        GUI.SetNextControlName("chat");
+        chatText = GUI.TextField(new Rect(r.x + 12, r.y + 10, r.width - 24, 26), chatText, 60);
+        GUI.FocusControl("chat");
+        var e = Event.current;
+        if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) && Time.unscaledTime - chatOpenedAt < 0.2f) e.Use();
+        else if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter))
+        { Say(chatText); chatting = false; chatText = ""; GUIUtility.keyboardControl = 0; e.Use(); }
+        else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) { chatting = false; GUIUtility.keyboardControl = 0; e.Use(); }
+    }
+
+    GUIStyle sTag, sTagMe, sBubble;
+    void NameTags()
+    {
+        if (sTag == null)
+        {
+            sTag = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, normal = { background = sBox.normal.background, textColor = new Color(0.42f, 0.3f, 0.22f) } };
+            var red = new Texture2D(1, 1); red.SetPixel(0, 0, new Color(0.78f, 0.25f, 0.25f, 0.95f)); red.Apply();
+            sTagMe = new GUIStyle(sTag) { normal = { background = red, textColor = Color.white } };
+            sBubble = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontSize = 15, normal = { background = sBox.normal.background, textColor = new Color(0.3f, 0.22f, 0.16f) }, padding = new RectOffset(10, 10, 6, 6) };
+        }
+        Tag(me.transform.position, uiName, true, myChat, myChatT, myEmote, myEmoteT);
+        foreach (var r in remotes.Values) if (r.net != null) Tag(r.c.transform.position, r.net.name, false, r.net.chat, r.net.chatT, r.net.emote, r.net.emoteT);
+    }
+
+    static readonly Dictionary<string, string> EmoteText = new Dictionary<string, string>
+        { { "wave", "안녕!" }, { "heart", "♥" }, { "cheer", "메리 크리스마스!" }, { "highfive", "하이파이브!" }, { "gift", "선물이에요!" } };
+
+    void Tag(Vector3 pos, string name, bool isMe, string chat, double chatT, string emote, double emoteT)
+    {
+        var sp = cam.WorldToScreenPoint(pos + new Vector3(0, 1.55f, 0));
+        if (sp.z < 0) return;
+        float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK;
+        var size = sTag.CalcSize(new GUIContent(name));
+        GUI.Label(new Rect(x - size.x / 2 - 8, y - 12, size.x + 16, 22), name, isMe ? sTagMe : sTag);
+        double now = AcSync.UnixMs;
+        string bubble = null;
+        if (!string.IsNullOrEmpty(chat) && now - chatT < 5000) bubble = chat;
+        else if (!string.IsNullOrEmpty(emote) && now - emoteT < 2500) EmoteText.TryGetValue(emote.Split(':')[0], out bubble);
+        if (bubble != null)
+        {
+            float w = Mathf.Min(260, sBubble.CalcSize(new GUIContent(bubble)).x + 4);
+            float h = sBubble.CalcHeight(new GUIContent(bubble), w);
+            GUI.Label(new Rect(x - w / 2, y - 20 - h, w, h), bubble, sBubble);
+        }
+    }
+
+    // 입장 화면
+    void LobbyGUI()
+    {
+        var r = new Rect(30, 30, 430, SH - 60);
+        GUI.Box(r, "", sBox);
+        GUILayout.BeginArea(new Rect(r.x + 18, r.y + 14, r.width - 36, r.height - 28));
+        GUILayout.Label("<size=26>크리스마스 거실</size>", sLabel);
+        GUILayout.Label("캐릭터를 꾸미고 현관으로 들어가세요. 다 함께 커다란 트리를 꾸며요!", sSmall);
+        GUILayout.Space(8);
+        GUILayout.Label("이름", sSmall);
+        uiName = GUILayout.TextField(uiName, 12, GUILayout.Height(26));
+        GUILayout.Label("공유 폴더  <size=11>(예: \\\\서버\\공유\\xmas 또는 Z:\\xmas)</size>", sSmall);
+        uiPath = GUILayout.TextField(uiPath, GUILayout.Height(26));
+        GUILayout.Space(6);
+        CustomControls();
+        GUILayout.FlexibleSpace();
+        if (lobbyMsg != "") GUILayout.Label("<color=#b03030>" + lobbyMsg + "</color>", sSmall);
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("입장하기", sBtn, GUILayout.Height(38))) Enter(false);
+        if (GUILayout.Button("혼자 둘러보기", sBtn, GUILayout.Height(38), GUILayout.Width(130))) Enter(true);
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
     }
 
     void DecorateBar()
     {
-        float h = 108, y = Screen.height - h - 10;
-        GUI.Box(new Rect(10, y, Screen.width - 20, h), "", sBox);
-        GUI.Label(new Rect(26, y + 8, 600, 24), "🎄 트리 꾸미기  <size=13>왼쪽 클릭 달기 · 오른쪽 클릭 떼기 · 휠/1~9 종류 · Q/E 색</size>", sLabel);
+        float h = 108, y = SH - h - 10;
+        GUI.Box(new Rect(10, y, SW - 20, h), "", sBox);
+        GUI.Label(new Rect(26, y + 8, 600, 24), "트리 꾸미기  <size=13>왼쪽 클릭 달기 · 오른쪽 클릭 떼기 · 휠/1~9 종류 · Q/E 색</size>", sLabel);
         float x = 26;
         for (int i = 0; i < ornTypes.Count; i++)
         {
@@ -630,7 +919,7 @@ public class AcRoom : MonoBehaviour
             bool sel = i == ornSel;
             if (GUI.Toggle(r, sel, label, sBtn) && !sel) SetSel(i);
             x += 82;
-            if (x > Screen.width - 120) break;
+            if (x > SW - 120) break;
         }
         x = 26;
         for (int i = 0; i < AcCatalog.Palette.Count; i++)
@@ -651,10 +940,18 @@ public class AcRoom : MonoBehaviour
 
     void CustomWindow()
     {
-        var r = new Rect(Screen.width - 430, 20, 410, 560);
+        var r = new Rect(SW - 430, 20, 410, 560);
         GUI.Box(r, "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
         GUILayout.Label("캐릭터 꾸미기", sLabel);
+        CustomControls();
+        GUILayout.Space(8);
+        if (GUILayout.Button("완료", sBtn, GUILayout.Height(30))) showCustom = false;
+        GUILayout.EndArea();
+    }
+
+    void CustomControls()
+    {
         var l = AcLook.Decode(me.look.Encode());
         bool ch = false;
         GUILayout.Label("종류", sSmall);
@@ -691,9 +988,6 @@ public class AcRoom : MonoBehaviour
         if (l.hat != "none") ch |= ColorRow("모자", ref l.hatColor);
         if (l.species == "human") ch |= ColorRow("머리", ref l.hairColor);
         if (l.species == "lion") ch |= ColorRow("갈기", ref l.mane);
-        GUILayout.Space(8);
-        if (GUILayout.Button("완료", sBtn, GUILayout.Height(30))) showCustom = false;
-        GUILayout.EndArea();
         if (ch) { me.Rebuild(l); PlayerPrefs.SetString("ac_look", l.Encode()); PlayerPrefs.Save(); }
     }
 

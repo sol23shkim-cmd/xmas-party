@@ -21,7 +21,7 @@ if __name__ == "__main__":
     for mod in mods:
         importlib.import_module(mod)
         from assets import REG
-        names = [n for n in REG if flt in n]
+        names = [n for n in REG if flt in n and REG[n]["fn"].__module__ == mod]
         cat_path = f"models/catalog_{mod}.json"
         cat = json.load(open(cat_path)) if os.path.exists(cat_path) else {}
         with Pool(min(8, os.cpu_count())) as pool:

@@ -1,9 +1,10 @@
 """models/catalog_*.json + char_info → models/catalog.json (Unity JsonUtility용 배열 형식)"""
 import json, glob, os
-items = []
+items = []; seen = set()
 for f in sorted(glob.glob("models/catalog_*.json")):
     for name, info in json.load(open(f)).items():
-        if not os.path.exists(f"models/{name}.acm"): continue
+        if not os.path.exists(f"models/{name}.acm") or name in seen: continue
+        seen.add(name)
         it = dict(name=name, cat=info.get("cat", ""), desc=info.get("desc", ""), groups=info.get("groups", []),
                   size=[round(info["hi"][i] - info["lo"][i], 3) for i in range(3)],
                   footprint=info.get("footprint", []), hang=info.get("hang", []), light=info.get("light", []),
