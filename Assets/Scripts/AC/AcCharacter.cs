@@ -82,7 +82,14 @@ public class AcCharacter : MonoBehaviour
         {
             var h = AcmLoader.Spawn("hat_" + l.hat, body, tints);
             float hatTop = AcCatalog.Data.hatTop > 0 ? AcCatalog.Data.hatTop : 1.04f;
-            h.transform.localPosition = new Vector3(0, top - hatTop + (human && l.hair != "" ? 0.03f : 0f), 0);
+            if (human && !string.IsNullOrEmpty(l.hair))
+            {
+                // 사람은 머리카락 부피만큼 모자를 키우고, 이마 쪽으로 깊게 눌러 씌움 (귀마개는 높이 그대로)
+                const float sc = 1.12f, py = 0.80f, pz = -0.03f;
+                h.transform.localScale = Vector3.one * sc;
+                h.transform.localPosition = new Vector3(0, py * (1 - sc) - (l.hat == "earmuffs" ? 0f : 0.075f), pz * (1 - sc) - 0.01f);
+            }
+            else h.transform.localPosition = new Vector3(0, human ? 0f : top - hatTop, 0);
             attached.Add(h);
         }
     }

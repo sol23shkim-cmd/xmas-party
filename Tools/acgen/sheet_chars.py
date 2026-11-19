@@ -12,8 +12,11 @@ def char(sp, x, z, i, hat=None, hair=None, face=None, hairtint=(0.45,0.28,0.18),
     if face: items.append(dict(base, model="face_"+face, shadow=0))
     if hair: items.append(dict(base, model="hair_"+hair, tints={"hair":hairtint}, shadow=0))
     if hat:
-        dy = top - 1.04 + (0.03 if hair else 0)
-        items.append(dict(base, pos=[x,dy,z], model="hat_"+hat, shadow=0))
+        if sp == "human":   # 사람: 머리카락 위로 살짝 크게, 깊게 눌러 씌움
+            sc, py, pz = (1.12, 0.80, -0.03) if hair else (1.0, 0, 0)   # 머리카락 덩어리 중심 기준으로 키움
+            items.append(dict(base, pos=[x, py * (1 - sc) - (0 if hat == "earmuffs" else 0.075), z + pz * (1 - sc) - 0.01], scale=sc, model="hat_"+hat, shadow=0))
+        else:
+            items.append(dict(base, pos=[x, top - 1.04, z], model="hat_"+hat, shadow=0))
     return items
 def scene(items, cam, w=1600, h=900):
     return dict(width=w, height=h, bg=[0.93,0.96,1.0], floorA=[0.86,0.92,0.8], floorB=[0.82,0.9,0.76], floorSize=30,
