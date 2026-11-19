@@ -41,7 +41,7 @@ public static class AcWebBuild
         };
         BuildReport rep = BuildPipeline.BuildPlayer(opt);
         Debug.Log($"[AcWebBuild] {rep.summary.result}  {rep.summary.totalSize / 1048576f:0.0}MB  {rep.summary.totalTime}  → {outDir}");
-        if (rep.summary.result == BuildResult.Succeeded) EditorUtility.RevealInFinder(Path.Combine(outDir, "index.html"));
+
     }
 }
 #endif

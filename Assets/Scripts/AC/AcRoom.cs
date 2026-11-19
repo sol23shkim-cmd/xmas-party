@@ -847,7 +847,7 @@ public partial class AcRoom : MonoBehaviour
         sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.75f, 0.25f, 0.2f) } };
     }
 
-    static float UiK => IsMobile ? Mathf.Max(Screen.height / 560f, 0.6f) : Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 휴대폰은 손가락 크기에 맞게 크게
+    static float UiK => IsMobile ? Mathf.Max(Mathf.Min(Screen.height / 560f, Screen.width / 400f), 0.6f) : Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 휴대폰은 손가락 크기에 맞게 크게
     static float SW => Screen.width / UiK;
     static float SH => Screen.height / UiK;
 
@@ -867,7 +867,8 @@ public partial class AcRoom : MonoBehaviour
         NameTags();
         if (toast != null && Time.time < toastUntil)
         {
-            var r = new Rect(SW / 2 - 260, 18, 520, 40);
+            float tw = Mathf.Min(520, SW - 20);
+            var r = new Rect(SW / 2 - tw / 2, 18, tw, 40);
             GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }
         // 대화 기록
@@ -891,7 +892,7 @@ public partial class AcRoom : MonoBehaviour
         var near = NearestRemote(2.0f);
         if (near != null && !decorating)
         {
-            var r = new Rect(SW / 2 - 200, SH - (IsMobile ? 150 : 120), 400, 60);
+            var r = new Rect(SW / 2 - 200, SH - (IsMobile ? 150 : 120) - (SW < 640 ? 10 : 0), 400, 60);
             GUI.Box(R(r), "", sBox);
             GUI.Label(new Rect(r.x + 14, r.y + 6, 380, 22), near.net.name + " 님과", sSmall);
             if (GUI.Button(new Rect(r.x + 14, r.y + 28, 120, 26), "하이파이브", sBtn)) { Emote("highfive", near.net.id); FaceTo(near.c.transform.position); }
@@ -960,7 +961,8 @@ public partial class AcRoom : MonoBehaviour
     void LobbyGUI()
     {
         if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
-        var r = new Rect(20, 16, 440, SH - 32);
+        float lw = Mathf.Min(440, SW - 20);
+        var r = new Rect(Mathf.Min(20, (SW - lw) / 2), 16, lw, SH - 32);
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 16, r.y + 10, r.width - 32, r.height - 20));
         GUILayout.Label("<size=24>크리스마스 거실</size>", sLabel);
@@ -987,12 +989,13 @@ public partial class AcRoom : MonoBehaviour
 
     void DecorateBar()
     {
-        float h = 150, y = SH - h - 8;
+        bool narrow = SW < 640;   // 세로 화면: 모양 줄 아래에 색 줄
+        float h = narrow ? 216 : 150, y = SH - h - 8;
         GUI.Box(R(new Rect(10, y, SW - 20, h)), "", sBox);
         GUI.Label(new Rect(26, y + 6, SW - 60, 24), IsMobile ? "트리 꾸미기  <size=13>트리를 눌러 달기 / 장식을 길게 눌러 떼기</size>" : "트리 꾸미기  <size=13>클릭 달기 / 오른쪽 클릭 떼기 / 위아래/휠 모양 / 좌우 색</size>", sLabel);
         // 모양 (실제 오너먼트 그림)
         float x = 26, size = 62;
-        int perRow = Mathf.Max(1, (int)((SW - 330) / (size + 6)));
+        int perRow = Mathf.Max(1, (int)((SW - (narrow ? 52 : 330)) / (size + 6)));
         int start = Mathf.Clamp(ornSel - perRow / 2, 0, Mathf.Max(0, ornTypes.Count - perRow));
         if (start > 0) GUI.Label(new Rect(x - 14, y + 52, 14, 24), "<", sLabel);
         for (int i = start; i < Mathf.Min(ornTypes.Count, start + perRow); i++)
@@ -1006,9 +1009,9 @@ public partial class AcRoom : MonoBehaviour
         }
         if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), ">", sLabel);
         var it = AcCatalog.Get(ornTypes[ornSel]);
-        GUI.Label(new Rect(26, y + 102, 420, 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 트리를 누른 높이에 한 바퀴 둘러요" : it != null ? it.desc : ornTypes[ornSel], sSmall);
+        GUI.Label(new Rect(26, y + 102, Mathf.Min(420, SW - 52), 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 트리를 누른 높이에 한 바퀴 둘러요" : it != null ? it.desc : ornTypes[ornSel], sSmall);
         // 색: < ■ 이름 >
-        float cx = SW - 290, cy = y + 40;
+        float cx = narrow ? 26 : SW - 290, cy = narrow ? y + 128 : y + 40;
         GUI.Label(new Rect(cx, cy - 6, 260, 22), "색", sSmall);
         if (GUI.Button(new Rect(cx, cy + 16, 34, 40), "<", sBtn)) { colSel = Wrap(colSel - 1, AcPalette.Vivid.Length); RefreshGhost(); }
         GUI.DrawTexture(new Rect(cx + 41, cy + 15, 102, 42), AcPalette.Tex(new Color(0.45f, 0.35f, 0.28f)));
@@ -1022,7 +1025,7 @@ public partial class AcRoom : MonoBehaviour
             var c = AcPalette.Vivid[Wrap(colSel + k, AcPalette.Vivid.Length)];
             GUI.DrawTexture(new Rect(cx + 82 + k * 22, cy + 66, 18, 12), AcPalette.Tex(c));
         }
-        GUI.Label(new Rect(SW - 150, y + 6, 130, 22), $"장식 {ornObjs.Count}개", sSmall);
+        GUI.Label(narrow ? new Rect(SW - 120, cy - 6, 110, 22) : new Rect(SW - 150, y + 6, 130, 22), $"장식 {ornObjs.Count}개", sSmall);
     }
 
     // 캐릭터 꾸미기
@@ -1034,7 +1037,8 @@ public partial class AcRoom : MonoBehaviour
     Vector2 customScroll;
     void CustomWindow()
     {
-        var r = new Rect(SW - 470, 20, 450, Mathf.Min(SH - 40, 640));
+        float cw = Mathf.Min(450, SW - 20);
+        var r = new Rect(SW - cw - 10, 20, cw, Mathf.Min(SH - 40, 640));
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
         GUILayout.Label("캐릭터 꾸미기", sLabel);

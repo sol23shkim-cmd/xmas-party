@@ -50,10 +50,13 @@ public partial class AcRoom
 #if ENABLE_INPUT_SYSTEM
         var p = Pointer.current;
         pressed = p != null && p.press.isPressed; pos = p != null ? p.position.ReadValue() : Vector2.zero;
+        // 아주 짧게 톡 누르면 한 프레임 안에 눌림+뗌이 다 지나가요 → 이번 프레임 기록으로도 잡기
+        bool wDown = p != null && p.press.wasPressedThisFrame, wUp = p != null && p.press.wasReleasedThisFrame;
 #else
         pressed = Input.GetMouseButton(0); pos = Input.mousePosition;
+        bool wDown = Input.GetMouseButtonDown(0), wUp = Input.GetMouseButtonUp(0);
 #endif
-        ptrDown = pressed && !ptrPressed; ptrUp = !pressed && ptrPressed; ptrPressed = pressed; ptrPos = pos;
+        ptrDown = wDown || (pressed && !ptrPressed); ptrUp = wUp || (!pressed && ptrPressed); ptrPressed = pressed; ptrPos = pos;
         if (ptrDown) { ptrStart = pos; ptrDownAt = Time.unscaledTime; ptrOnUI = OverUI(pos); ptrMoved = false; }
         if (pressed && (pos - ptrStart).magnitude > 18f) ptrMoved = true;
     }
@@ -76,6 +79,7 @@ public partial class AcRoom
         if (ptrDown) longUsed = false;
         // 꾸미는 중에 트리를 누른 것이면 이동하지 않음
         bool onTree = decorating && treeCol != null && treeCol.Raycast(cam.ScreenPointToRay(ptrPos), out _, 100f);
+        if (ptrDown) onTreeAtDown = onTree;
         bool keyMove = MoveAxis().sqrMagnitude > 0.01f;
         if (keyMove) { walkTarget = null; return; }
         if (ptrPressed && !ptrOnUI && !onTreeAtDown && (ptrMoved || Time.unscaledTime - ptrDownAt > 0.15f) && !showCustom)
@@ -83,7 +87,6 @@ public partial class AcRoom
             if (GroundAt(ptrPos, out var g)) walkTarget = g;   // 끌면 계속 따라감
         }
         else if (Tap && !onTree && !onTreeAtDown && GroundAt(ptrPos, out var g2)) walkTarget = g2;
-        if (ptrDown) onTreeAtDown = onTree;
         if (!walkTarget.HasValue) return;
         var d = walkTarget.Value - me.transform.position; d.y = 0;
         if (d.magnitude < 0.15f) { walkTarget = null; return; }
@@ -133,7 +136,7 @@ public partial class AcRoom
     // ===== 화면 버튼 (말하기/인사/하트/만세/꾸미기) =====
     void ActionButtons()
     {
-        float bw = IsMobile ? 70 : 62, bh = IsMobile ? 46 : 36, gap = 6;
+        float gap = 6, bw = Mathf.Min(IsMobile ? 70 : 62, (SW - 30) / 5f - gap), bh = IsMobile ? 46 : 36;
         string[] labels = { "말하기", "인사", "하트", "만세", "꾸미기" };
         float x = SW - (bw + gap) * labels.Length - 10, y = SH - bh - 12;
         GUI.Box(R(new Rect(x - 8, y - 8, (bw + gap) * labels.Length + 10, bh + 16)), "", sBox);
