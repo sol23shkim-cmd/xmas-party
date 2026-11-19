@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script>
+// 동물의 숲풍 툰 렌더러 (Unity 셰이더와 같은 계산)
+const qs = new URLSearchParams(location.search);
+const scene = JSON.parse(decodeURIComponent(qs.get('scene')));
+const W = scene.width || 1200, H = scene.height || 900, SS = 2;
+const cv = document.getElementById('c');
+cv.width = W * SS; cv.height = H * SS; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const gl = cv.getContext('webgl2', {antialias: true, preserveDrawingBuffer: true});
+
+function parseACM(buf) {
+  const dv = new DataView(buf); let o = 4; const parts = [];
+  const n = dv.getInt32(o, true); o += 4;
+  for (let i = 0; i < n; i++) {
+    const str = () => { const nl = dv.getInt32(o, true); o += 4; const s = new TextDecoder().decode(new Uint8Array(buf, o, nl)); o += nl; return s; };
+    const name = str(), group = str(), parent = str();
+    const hasTint = dv.getUint8(o); o += 1;
+    const tint = [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)]; o += 12;
+    const gloss = dv.getFloat32(o, true); o += 4;
+    o += 12; // pivot
+    const nv = dv.getInt32(o, true), ni = dv.getInt32(o + 4, true); o += 8;
+    const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+    const nor = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+    const col = new Uint8Array(buf.slice(o, o + nv * 4)); o += nv * 4;
+    const ao = new Uint8Array(buf.slice(o, o + nv)); o += nv;
+    const idx = new Uint32Array(buf.slice(o, o + ni * 4)); o += ni * 4;
+    parts.push({name, group, hasTint, tint, gloss, pos, nor, col, ao, idx});
+  }
+  return parts;
+}
+
+const VS = `#version 300 es
+in vec3 aPos; in vec3 aNor; in vec4 aCol; in float aAO;
+uniform mat4 uModel, uVP;
+out vec3 vN; out vec4 vC; out float vAO; out vec3 vW;
+void main(){ vec4 w = uModel * vec4(aPos,1.0); vW = w.xyz; vN = mat3(uModel) * aNor; vC = aCol; vAO = aAO; gl_Position = uVP * w; }`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vN; in vec4 vC; in float vAO; in vec3 vW;
+uniform vec3 uTint; uniform float uHasTint, uGloss; uniform vec3 uCam, uLight;
+out vec4 o;
+void main(){
+  vec3 n = normalize(vN);
+  vec3 base = vC.rgb;
+  if (uHasTint > 0.5) base = mix(base, base * uTint, vC.a);
+  vec3 L = normalize(uLight);
+  vec3 V = normalize(uCam - vW);
+  float ndl = dot(n, L);
+  float lit = smoothstep(-0.05, 0.22, ndl);                  // 부드러운 2단 그림자
+  vec3 shadowTint = vec3(0.8, 0.8, 0.95);                   // 그림자는 살짝 푸르스름
+  vec3 light = mix(shadowTint, vec3(1.04, 1.0, 0.94), lit);
+  float sky = n.y * 0.5 + 0.5;
+  vec3 amb = mix(vec3(0.86, 0.82, 0.86), vec3(1.0, 1.0, 1.04), sky);
+  float ao = mix(0.55, 1.0, vAO);
+  vec3 c = base * light * amb * ao;
+  float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.22 * lit;
+  vec3 H = normalize(L + V);
+  float spec = smoothstep(0.55, 0.62, pow(max(dot(n, H), 0.0), 40.0)) * uGloss;
+  c += rim + spec * 0.85;
+  o = vec4(pow(c, vec3(1.0/1.05)), 1.0);
+}`;
+const GVS = `#version 300 es
+in vec2 aP; uniform mat4 uVP; uniform float uSize; out vec3 vW;
+void main(){ vW = vec3(aP.x*uSize, 0.0, aP.y*uSize); gl_Position = uVP*vec4(vW,1.0); }`;
+const GFS = `#version 300 es
+precision highp float; in vec3 vW; uniform vec4 uBlobs[48]; uniform int uN; uniform vec3 uFloorA, uFloorB; uniform float uSize; out vec4 o;
+void main(){
+  float s = 1.0;
+  for (int i=0;i<48;i++){ if(i>=uN) break; vec2 d=(vW.xz-uBlobs[i].xy)/vec2(uBlobs[i].z, uBlobs[i].z*0.8); s *= mix(0.62,1.0,smoothstep(0.35,1.15,length(d))); }
+  float r = length(vW.xz)/uSize;
+  vec3 c = mix(uFloorA, uFloorB, smoothstep(0.2, 1.0, r));
+  o = vec4(c*s, 1.0);
+}`;
+
+function prog(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(sh);
+    gl.attachShader(p, sh);
+  }
+  gl.linkProgram(p); return p;
+}
+const P = prog(VS, FS), G = prog(GVS, GFS);
+
+// --- 행렬
+function mul(a, b) { const r = new Float32Array(16); for (let i=0;i<4;i++) for (let j=0;j<4;j++){ let s=0; for(let k=0;k<4;k++) s+=a[k*4+j]*b[i*4+k]; r[i*4+j]=s;} return r; }
+function persp(fov, asp, n, f) { const t = 1/Math.tan(fov*Math.PI/360); return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]); }
+function lookAt(e, c, u) {
+  const z=norm(sub(e,c)), x=norm(cross(u,z)), y=cross(z,x);
+  return new Float32Array([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot(x,e),-dot(y,e),-dot(z,e),1]);
+}
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], norm=a=>{const l=Math.hypot(...a);return a.map(x=>x/l);};
+// Unity(왼손) → GL(오른손): z 뒤집기
+function modelMat(pos, rotY, scale) {
+  const r = (rotY||0)*Math.PI/180, c=Math.cos(r), s=Math.sin(r), k=scale||1;
+  // Unity 좌표에서 Y회전·스케일 후, z를 뒤집어 GL로
+  return new Float32Array([c*k,0,s*k,0, 0,k,0,0, s*k,0,-c*k,0, pos[0],pos[1],-pos[2],1]);
+}
+
+async function main() {
+  const cache = {};
+  for (const inst of scene.items) if (!cache[inst.model]) cache[inst.model] = parseACM(await (await fetch('models/' + inst.model + '.acm')).arrayBuffer());
+  for (const k in cache) for (const p of cache[k]) {
+    p.vao = gl.createVertexArray(); gl.bindVertexArray(p.vao);
+    const buf = (data, loc, size, type, normd) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normd, 0, 0); };
+    buf(p.pos, gl.getAttribLocation(P,'aPos'), 3, gl.FLOAT, false);
+    buf(p.nor, gl.getAttribLocation(P,'aNor'), 3, gl.FLOAT, false);
+    buf(p.col, gl.getAttribLocation(P,'aCol'), 4, gl.UNSIGNED_BYTE, true);
+    buf(p.ao, gl.getAttribLocation(P,'aAO'), 1, gl.UNSIGNED_BYTE, true);
+    const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, p.idx, gl.STATIC_DRAW);
+  }
+  const camU = scene.camera; // Unity 좌표
+  const eye = [camU.pos[0], camU.pos[1], -camU.pos[2]], tgt = [camU.target[0], camU.target[1], -camU.target[2]];
+  const VP = mul(persp(camU.fov || 30, W/H, 0.05, 200), lookAt(eye, tgt, [0,1,0]));
+  gl.viewport(0, 0, W*SS, H*SS);
+  const bg = scene.bg || [0.93, 0.9, 0.86];
+  gl.clearColor(bg[0], bg[1], bg[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  // 바닥 + 둥근 그림자
+  if (scene.floor !== false) {
+    gl.useProgram(G);
+    const q = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, q);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    gl.enableVertexAttribArray(gl.getAttribLocation(G,'aP')); gl.vertexAttribPointer(gl.getAttribLocation(G,'aP'), 2, gl.FLOAT, false, 0, 0);
+    const blobs = new Float32Array(48*4); let nb = 0;
+    for (const it of scene.items) if (it.shadow !== 0 && nb < 48) { blobs.set([it.pos[0], -it.pos[2], (it.shadow||0.35)*(it.scale||1), 0], nb*4); nb++; }
+    gl.uniform4fv(gl.getUniformLocation(G,'uBlobs'), blobs); gl.uniform1i(gl.getUniformLocation(G,'uN'), nb);
+    gl.uniform3fv(gl.getUniformLocation(G,'uFloorA'), scene.floorA || [0.97,0.94,0.88]);
+    gl.uniform3fv(gl.getUniformLocation(G,'uFloorB'), scene.floorB || bg);
+    const size = scene.floorSize || 8; gl.uniform1f(gl.getUniformLocation(G,'uSize'), size);
+    gl.uniformMatrix4fv(gl.getUniformLocation(G,'uVP'), false, VP);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  gl.useProgram(P);
+  gl.uniformMatrix4fv(gl.getUniformLocation(P,'uVP'), false, VP);
+  gl.uniform3fv(gl.getUniformLocation(P,'uCam'), eye);
+  const Lu = scene.light || [-0.5, 0.85, 0.55];
+  gl.uniform3fv(gl.getUniformLocation(P,'uLight'), [Lu[0], Lu[1], -Lu[2]]);
+  for (const it of scene.items) {
+    gl.uniformMatrix4fv(gl.getUniformLocation(P,'uModel'), false, modelMat(it.pos, it.rotY, it.scale));
+    for (const p of cache[it.model]) {
+      if (it.hide && it.hide.includes(p.name)) continue;
+      if (it.only && !it.only.includes(p.name)) continue;
+      const t = (it.tints && (it.tints[p.group] || it.tints[p.name])) || p.tint;
+      gl.uniform3fv(gl.getUniformLocation(P,'uTint'), t);
+      gl.uniform1f(gl.getUniformLocation(P,'uHasTint'), p.hasTint);
+      gl.uniform1f(gl.getUniformLocation(P,'uGloss'), p.gloss);
+      gl.bindVertexArray(p.vao);
+      gl.drawElements(gl.TRIANGLES, p.idx.length, gl.UNSIGNED_INT, 0);
+    }
+  }
+  document.title = 'done';
+}
+main().catch(e => { document.title = 'err ' + e; });
+</script></body></html>
