@@ -17,7 +17,7 @@ using UnityEngine.InputSystem;
 #endif
 using Random = UnityEngine.Random;
 
-public class AcRoom : MonoBehaviour
+public partial class AcRoom : MonoBehaviour
 {
     public static bool Enabled => File.Exists(Path.Combine(Application.streamingAssetsPath, "models", "catalog.json"));
 
@@ -200,6 +200,7 @@ public class AcRoom : MonoBehaviour
         go.transform.position = pos;
         go.transform.rotation = Quaternion.Euler(0, rotY, 0);
         go.transform.localScale = Vector3.one * scale;
+        AddObstacle(name, pos, rotY, scale);
         return go;
     }
 
@@ -216,7 +217,7 @@ public class AcRoom : MonoBehaviour
         {
             string w = ix == 1 || ix == 4 ? "wall_window" : ix == 5 ? "wall_door" : "wall_plain";
             var g = Put(w, new Vector3(-HalfX + SEG * (ix + 0.5f), 0, -HalfZ), 0, S, null, room);
-            if (w == "wall_window") { HidePart(g, "glass"); Put("curtain", new Vector3(g.transform.position.x, 1.75f * S - 1.9f, -HalfZ + 0.12f), 0, S * 0.85f, null, room); }
+            if (w == "wall_window") { HidePart(g, "glass"); Put("curtain", new Vector3(g.transform.position.x, 2.72f * S - 2.02f * S * 0.85f, -HalfZ + 0.16f), 0, S * 0.85f, null, room); }   // 커튼 봉이 창틀 바로 위
             if (w == "wall_door")
             {
                 Put("wreath", new Vector3(g.transform.position.x, 1.75f * S + 1.2f, -HalfZ + 0.16f), 0, 1.1f, null, room);
@@ -260,6 +261,7 @@ public class AcRoom : MonoBehaviour
                       : side == 1 ? new Vector3(-HalfX - 4 - (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8))
                                   : new Vector3(HalfX + 4 + (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8));
             if (Mathf.Abs(p.x) < 6 && p.z > -HalfZ - 9 && p.z < -HalfZ - 2) continue;   // 창밖 눈사람 자리
+            if (Mathf.Abs(p.x - DoorPos.x) < 3.5f && p.z > -HalfZ - 12) continue;          // 현관 앞 길
             Put(trees[rnd.Next(trees.Length)], p, rnd.Next(360), 0.9f + (float)rnd.NextDouble() * 0.6f, null, o);
         }
         Put("house_cottage", new Vector3(-4f, 0, -HalfZ - 16f), 15, 1.2f, null, o);
@@ -269,11 +271,18 @@ public class AcRoom : MonoBehaviour
         Put("snow_pile", new Vector3(1.2f, 0, -HalfZ - 5f), 0, 1.4f, null, o);
         Put("snowball_pile", new Vector3(-1.0f, 0, -HalfZ - 3.2f), 0, 1.2f, null, o);
         Put("sled", new Vector3(5.6f, 0, -HalfZ - 4.6f), 70, 1.2f, null, o);
-        Put("mailbox", new Vector3(8.8f, 0, -HalfZ - 2.4f), 0, 1.2f, null, o);
-        for (int i = -3; i <= 3; i++) Put("fence", new Vector3(i * 2.1f * 1.2f, 0, -HalfZ - 9.5f), 0, 1.2f, null, o);
+        Put("mailbox", new Vector3(DoorPos.x + 2.6f, 0, -HalfZ - 1.8f), 180, 1.2f, null, o);
+        for (int i = -3; i <= 2; i++) Put("fence", new Vector3(i * 2.1f * 1.2f, 0, -HalfZ - 9.5f), 0, 1.2f, null, o);
         Put("igloo", new Vector3(10f, 0, -HalfZ - 12f), -30, 1.5f, null, o);
         Put("bush_snowy", new Vector3(-6f, 0, -HalfZ - 2.5f), 0, 1.3f, null, o);
-        Put("bush_holly", new Vector3(6.8f, 0, -HalfZ - 2.5f), 0, 1.3f, null, o);
+        Put("bush_holly", new Vector3(DoorPos.x - 2.4f, 0, -HalfZ - 1.5f), 0, 1.3f, null, o);
+        for (int i = 0; i < 5; i++) Put("path_stones", new Vector3(DoorPos.x, 0.0f, -HalfZ - 1.6f - i * 2.0f), i * 37, 1.0f, null, o);
+        Put("lantern_ground", new Vector3(DoorPos.x + 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
+        Put("lantern_ground", new Vector3(DoorPos.x - 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
+        Put("bench", new Vector3(DoorPos.x - 4.5f, 0, -HalfZ - 6f), 30, 1.2f, null, o);
+        Put("signpost", new Vector3(DoorPos.x + 2.2f, 0, -HalfZ - 7f), -20, 1.2f, null, o);
+        Put("snowman_bucket", new Vector3(DoorPos.x + 4.5f, 0, -HalfZ - 9f), -30, 1.1f, null, o);
+        BuildSnow();
         PointLight(new Vector3(3.2f, 2.7f, -HalfZ - 3.0f), new Color(1f, 0.85f, 0.55f), 6f, 1.5f);
     }
 
@@ -377,16 +386,18 @@ public class AcRoom : MonoBehaviour
         var kb = Keyboard.current;
         if (kb != null)
         {
-            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) h -= 1;
-            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) h += 1;
-            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) v -= 1;
-            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) v += 1;
+            bool arrows = !decorating;   // 꾸미는 중에는 화살표를 오너먼트 고르기에 씀
+            if (kb.aKey.isPressed || (arrows && kb.leftArrowKey.isPressed)) h -= 1;
+            if (kb.dKey.isPressed || (arrows && kb.rightArrowKey.isPressed)) h += 1;
+            if (kb.sKey.isPressed || (arrows && kb.downArrowKey.isPressed)) v -= 1;
+            if (kb.wKey.isPressed || (arrows && kb.upArrowKey.isPressed)) v += 1;
         }
 #else
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) h -= 1;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) h += 1;
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) v -= 1;
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) v += 1;
+        bool arrows = !decorating;
+        if (Input.GetKey(KeyCode.A) || (arrows && Input.GetKey(KeyCode.LeftArrow))) h -= 1;
+        if (Input.GetKey(KeyCode.D) || (arrows && Input.GetKey(KeyCode.RightArrow))) h += 1;
+        if (Input.GetKey(KeyCode.S) || (arrows && Input.GetKey(KeyCode.DownArrow))) v -= 1;
+        if (Input.GetKey(KeyCode.W) || (arrows && Input.GetKey(KeyCode.UpArrow))) v += 1;
 #endif
         return new Vector2(h, v);
     }
@@ -402,6 +413,8 @@ public class AcRoom : MonoBehaviour
             case "esc": return kb.escapeKey.wasPressedThisFrame;
             case "z": return kb.zKey.wasPressedThisFrame; case "x": return kb.xKey.wasPressedThisFrame; case "v": return kb.vKey.wasPressedThisFrame;
             case "enter": return kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
+            case "left": return kb.leftArrowKey.wasPressedThisFrame; case "right": return kb.rightArrowKey.wasPressedThisFrame;
+            case "up": return kb.upArrowKey.wasPressedThisFrame; case "down": return kb.downArrowKey.wasPressedThisFrame;
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9')
         {
@@ -417,6 +430,8 @@ public class AcRoom : MonoBehaviour
             case "esc": return Input.GetKeyDown(KeyCode.Escape);
             case "z": return Input.GetKeyDown(KeyCode.Z); case "x": return Input.GetKeyDown(KeyCode.X); case "v": return Input.GetKeyDown(KeyCode.V);
             case "enter": return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+            case "left": return Input.GetKeyDown(KeyCode.LeftArrow); case "right": return Input.GetKeyDown(KeyCode.RightArrow);
+            case "up": return Input.GetKeyDown(KeyCode.UpArrow); case "down": return Input.GetKeyDown(KeyCode.DownArrow);
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9') return Input.GetKeyDown(KeyCode.Alpha1 + (k[0] - '1'));
         return false;
@@ -454,7 +469,7 @@ public class AcRoom : MonoBehaviour
     {
         float dt = Time.deltaTime;
         // 문 여닫기
-        float wantOpen = phase == Phase.Entering ? 1 : 0;
+        float wantOpen = phase == Phase.Entering || Vector3.Distance(me.transform.position, DoorPos) < 2.3f ? 1 : 0;
         foreach (var r in remotes.Values) if (Vector3.Distance(r.c.transform.position, DoorPos) < 2.2f) wantOpen = 1;
         doorOpen = Mathf.MoveTowards(doorOpen, wantOpen, dt * 1.8f);
         if (doorTr) doorTr.localRotation = Quaternion.Euler(0, -Mathf.SmoothStep(0, 1, doorOpen) * 95f, 0);
@@ -491,7 +506,7 @@ public class AcRoom : MonoBehaviour
 
         float treeDist = Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
         decorating = phase == Phase.Play && treeDist < 5.2f && !showCustom && !chatting;
-        if (decorating) Decorate(); else if (ghost) ghost.SetActive(false);
+        if (decorating) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
 
         if (Time.time > nextPoll) { nextPoll = Time.time + 2f; PollOrnaments(false); }
         if (sync != null) sync.SetMe(MyNet());
@@ -578,15 +593,19 @@ public class AcRoom : MonoBehaviour
     void OnApplicationQuit() { sync?.Stop(); }
     void OnDestroy() { sync?.Stop(); }
 
+    float camYawCur = 180f;
+
     void MovePlayer(float dt)
     {
         var a = MoveAxis();
-        Vector3 dir = new Vector3(-a.x, 0, -a.y);   // 카메라가 -z를 보므로 화면 위 = -z
+        // 카메라 방향 기준 (실내: 카메라가 -z를 봄, 실외: +z를 봄)
+        Vector3 dir = Quaternion.Euler(0, Mathf.Round(camYawCur / 180f) * 180f, 0) * new Vector3(a.x, 0, a.y);
         if (dir.sqrMagnitude > 1) dir.Normalize();
         float spd = 3.6f;
-        var p = me.transform.position + dir * spd * dt;
-        p.x = Mathf.Clamp(p.x, -HalfX + 0.7f, HalfX - 0.7f);
-        p.z = Mathf.Clamp(p.z, -HalfZ + 0.9f, HalfZ - 0.5f);
+        var prev = me.transform.position;
+        var p = prev + dir * spd * dt;
+        p = Collide(p, 0.36f);
+        p = ClampRegion(prev, p);
         var d2 = new Vector2(p.x - TreePos.x, p.z - TreePos.z);
         if (d2.magnitude < 2.6f) { d2 = d2.normalized * 2.6f; p.x = TreePos.x + d2.x; p.z = TreePos.z + d2.y; }
         foreach (var r in remotes.Values)
@@ -594,7 +613,9 @@ public class AcRoom : MonoBehaviour
             var dd = new Vector2(p.x - r.c.transform.position.x, p.z - r.c.transform.position.z);
             if (dd.magnitude < 0.75f && dd.magnitude > 0.001f) { dd = dd.normalized * 0.75f; p.x = r.c.transform.position.x + dd.x; p.z = r.c.transform.position.z + dd.y; }
         }
-        me.speed = dir.magnitude * spd;
+        p = ClampRegion(prev, p);
+        var moved = p - prev; moved.y = 0;
+        me.speed = dt > 0 ? Mathf.Min(moved.magnitude / dt, spd) : 0;
         if (dir.sqrMagnitude > 0.01f) yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
         me.transform.position = p;
         me.transform.rotation = Quaternion.Slerp(me.transform.rotation, Quaternion.Euler(0, yaw, 0), 1 - Mathf.Exp(-dt * 14f));
@@ -623,44 +644,57 @@ public class AcRoom : MonoBehaviour
                 continue;
             }
             var step = d.normalized * Mathf.Min(1.6f * dt, d.magnitude);
-            c.transform.position = p + step; c.speed = 1.6f;
+            c.transform.position = Collide(p + step, 0.36f); c.speed = 1.6f;
             c.transform.rotation = Quaternion.Slerp(c.transform.rotation, Quaternion.LookRotation(d), 1 - Mathf.Exp(-dt * 8));
         }
     }
 
+    Vector3? pointerFocus;
+
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
-        if (decorating) focus = Vector3.Lerp(focus, TreePos + new Vector3(0, 2.6f, 0), 0.55f);
-        float dist = decorating ? 13f : 14f, pitch = decorating ? 20f : 36f, camYaw = 180f;   // 방 앞(+z)에서 뒷벽 쪽을 봄
+        float dist = 14f, pitch = 36f, targetYaw = Outside ? 0f : 180f;   // 실내: 방 앞(+z)에서, 실외: 집 반대편에서
+        if (decorating)
+        {
+            // 트리 전체(꼭대기 별까지)가 보이게
+            focus = Vector3.Lerp(me.transform.position, TreePos, 0.8f) + new Vector3(0, 3.2f, 0);
+            dist = 17f; pitch = 13f;
+            if (pointerFocus.HasValue) { focus = Vector3.Lerp(focus, pointerFocus.Value, 0.18f); dist -= 1.6f; }   // 가리키는 곳으로 살짝 다가감
+        }
         if (phase == Phase.Lobby)
         {
             // 입장 화면: 캐릭터를 앞에서 가까이 (뒤로 현관문이 보임). 왼쪽 패널을 피해 캐릭터를 오른쪽에
-            focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; pitch = 8f; camYaw = 180f;
+            focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; pitch = 8f; targetYaw = 180f;
             me.transform.rotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 0.6f) * 35f, 0);
         }
-        var rotq = Quaternion.Euler(pitch, camYaw, 0);
+        camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
+        var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);
         if (snap) { cam.transform.position = want; cam.transform.rotation = rotq; return; }
         float smooth = phase == Phase.Entering ? 0.6f : 0.25f;
         cam.transform.position = Vector3.SmoothDamp(cam.transform.position, want, ref camVel, smooth);
-        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, rotq, 1 - Mathf.Exp(-dt * (phase == Phase.Entering ? 2.5f : 5f)));
+        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, rotq, 1 - Mathf.Exp(-dt * (phase == Phase.Entering ? 2.5f : 6f)));
     }
 
     // ========================================================
     // 트리 꾸미기
-    Color CurColor => AcCatalog.Palette.Count > 0 ? AcCatalog.Palette[colSel % AcCatalog.Palette.Count] : Color.red;
+    Color CurColor => AcPalette.Vivid[Wrap(colSel, AcPalette.Vivid.Length)];
 
     void Decorate()
     {
         if (ornTypes.Count == 0 || treeCol == null) return;
+        RenderIcons(CurColor);
         for (int i = 1; i <= 9; i++) if (Key(i.ToString())) SetSel(i - 1);
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.1f) SetSel((ornSel + (sc > 0 ? -1 : 1) + ornTypes.Count) % ornTypes.Count);
-        if (Key("q")) { colSel = (colSel - 1 + AcCatalog.Palette.Count) % AcCatalog.Palette.Count; RefreshGhost(); }
-        if (Key("e")) { colSel = (colSel + 1) % AcCatalog.Palette.Count; RefreshGhost(); }
+        float sc = Scroll(); if (Mathf.Abs(sc) > 0.1f) SetSel(Wrap(ornSel + (sc > 0 ? -1 : 1), ornTypes.Count));
+        if (Key("up")) SetSel(Wrap(ornSel - 1, ornTypes.Count));
+        if (Key("down")) SetSel(Wrap(ornSel + 1, ornTypes.Count));
+        if (Key("left") || Key("q")) { colSel = Wrap(colSel - 1, AcPalette.Vivid.Length); RefreshGhost(); }
+        if (Key("right") || Key("e")) { colSel = Wrap(colSel + 1, AcPalette.Vivid.Length); RefreshGhost(); }
 
+        pointerFocus = null;
         var mp = MousePos();
-        if (mp.y < 125 * UiK) { if (ghost) ghost.SetActive(false); return; }   // 아래 UI 위
+        if (mp.y < 150 * UiK) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); return; }   // 아래 UI 위
         var ray = cam.ScreenPointToRay(mp);
         // 떼기: 오너먼트를 오른쪽 클릭
         if (MouseDown(1) && Physics.Raycast(ray, out var hitO, 100f) && hitO.collider.GetComponentInParent<AcOrnTag>() is AcOrnTag tag)
@@ -671,13 +705,15 @@ public class AcRoom : MonoBehaviour
         {
             if (ghost == null || ghost.name != ornTypes[ornSel]) RefreshGhost();
             ghost.SetActive(true);
-            var pos = hit.point + hit.normal * 0.02f;
-            float ry = Mathf.Atan2(hit.normal.x, hit.normal.z) * Mathf.Rad2Deg;
+            OrnPlacement(hit, out var pos, out var ry);
             ghost.transform.position = pos;
             ghost.transform.rotation = Quaternion.Euler(0, ry, 0);
+            var body = pos - Vector3.up * 0.11f * OrnScale;
+            pointerFocus = body;
+            FocusAt(body, true);
             if (MouseDown(0)) AddOrn(ornTypes[ornSel], CurColor, pos, ry);
         }
-        else if (ghost) ghost.SetActive(false);
+        else { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); }
     }
 
     void SetSel(int i) { ornSel = Mathf.Clamp(i, 0, ornTypes.Count - 1); RefreshGhost(); }
@@ -783,6 +819,7 @@ public class AcRoom : MonoBehaviour
         sLabel = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.42f, 0.3f, 0.22f) }, richText = true };
         sSmall = new GUIStyle(sLabel) { fontSize = 13, fontStyle = FontStyle.Normal };
         sBtn = new GUIStyle(GUI.skin.button) { fontSize = 14 };
+        sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.75f, 0.25f, 0.2f) } };
     }
 
     static float UiK => Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 큰 화면에서는 글씨·창도 크게
@@ -884,6 +921,7 @@ public class AcRoom : MonoBehaviour
     // 입장 화면
     void LobbyGUI()
     {
+        if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
         var r = new Rect(30, 30, 430, SH - 60);
         GUI.Box(r, "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 18, r.y + 14, r.width - 36, r.height - 28));
@@ -907,29 +945,42 @@ public class AcRoom : MonoBehaviour
 
     void DecorateBar()
     {
-        float h = 108, y = SH - h - 10;
+        float h = 150, y = SH - h - 8;
         GUI.Box(new Rect(10, y, SW - 20, h), "", sBox);
-        GUI.Label(new Rect(26, y + 8, 600, 24), "트리 꾸미기  <size=13>왼쪽 클릭 달기 · 오른쪽 클릭 떼기 · 휠/1~9 종류 · Q/E 색</size>", sLabel);
-        float x = 26;
-        for (int i = 0; i < ornTypes.Count; i++)
+        GUI.Label(new Rect(26, y + 6, SW - 60, 24), "트리 꾸미기  <size=13>왼쪽 클릭 달기 · 오른쪽 클릭 떼기 · ↑↓/휠 모양 · ←→ 색</size>", sLabel);
+        // 모양 (실제 오너먼트 그림)
+        float x = 26, size = 62;
+        int perRow = Mathf.Max(1, (int)((SW - 330) / (size + 6)));
+        int start = Mathf.Clamp(ornSel - perRow / 2, 0, Mathf.Max(0, ornTypes.Count - perRow));
+        if (start > 0) GUI.Label(new Rect(x - 14, y + 52, 14, 24), "‹", sLabel);
+        for (int i = start; i < Mathf.Min(ornTypes.Count, start + perRow); i++)
         {
-            var it = AcCatalog.Get(ornTypes[i]);
-            string label = it != null ? it.desc : ornTypes[i];
-            var r = new Rect(x, y + 40, 78, 26);
+            var r = new Rect(x, y + 34, size, size);
             bool sel = i == ornSel;
-            if (GUI.Toggle(r, sel, label, sBtn) && !sel) SetSel(i);
-            x += 82;
-            if (x > SW - 120) break;
+            GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(sel ? new Color(0.85f, 0.3f, 0.3f) : new Color(0.86f, 0.8f, 0.72f)));
+            if (icons.TryGetValue(ornTypes[i], out var rt) && rt != null) GUI.DrawTexture(r, rt, ScaleMode.ScaleToFit, false);
+            if (GUI.Button(r, "", GUIStyle.none)) SetSel(i);
+            x += size + 6;
         }
-        x = 26;
-        for (int i = 0; i < AcCatalog.Palette.Count; i++)
+        if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), "›", sLabel);
+        var it = AcCatalog.Get(ornTypes[ornSel]);
+        GUI.Label(new Rect(26, y + 102, 300, 22), it != null ? it.desc : ornTypes[ornSel], sSmall);
+        // 색: ◀ ■ 이름 ▶
+        float cx = SW - 290, cy = y + 40;
+        GUI.Label(new Rect(cx, cy - 6, 260, 22), "색", sSmall);
+        if (GUI.Button(new Rect(cx, cy + 16, 34, 40), "◀", sBtn)) { colSel = Wrap(colSel - 1, AcPalette.Vivid.Length); RefreshGhost(); }
+        GUI.DrawTexture(new Rect(cx + 41, cy + 15, 102, 42), AcPalette.Tex(new Color(0.45f, 0.35f, 0.28f)));
+        GUI.DrawTexture(new Rect(cx + 42, cy + 16, 100, 40), AcPalette.Tex(CurColor));
+        if (GUI.Button(new Rect(cx + 150, cy + 16, 34, 40), "▶", sBtn)) { colSel = Wrap(colSel + 1, AcPalette.Vivid.Length); RefreshGhost(); }
+        GUI.Label(new Rect(cx + 192, cy + 26, 90, 22), AcPalette.VividNames[Wrap(colSel, AcPalette.Vivid.Length)], sSmall);
+        // 이웃 색 미리보기
+        for (int k = -3; k <= 3; k++)
         {
-            var r = new Rect(x, y + 74, 26, 22);
-            var old = GUI.color; GUI.color = AcCatalog.Palette[i];
-            if (GUI.Button(r, i == colSel ? "●" : "")) { colSel = i; RefreshGhost(); }
-            GUI.color = old; x += 30;
+            if (k == 0) continue;
+            var c = AcPalette.Vivid[Wrap(colSel + k, AcPalette.Vivid.Length)];
+            GUI.DrawTexture(new Rect(cx + 82 + k * 22, cy + 66, 18, 12), AcPalette.Tex(c));
         }
-        GUI.Label(new Rect(x + 16, y + 74, 300, 24), $"장식 {ornObjs.Count}개", sSmall);
+        GUI.Label(new Rect(SW - 150, y + 6, 130, 22), $"장식 {ornObjs.Count}개", sSmall);
     }
 
     // 캐릭터 꾸미기
@@ -940,7 +991,7 @@ public class AcRoom : MonoBehaviour
 
     void CustomWindow()
     {
-        var r = new Rect(SW - 430, 20, 410, 560);
+        var r = new Rect(SW - 470, 20, 450, Mathf.Min(SH - 40, 640));
         GUI.Box(r, "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
         GUILayout.Label("캐릭터 꾸미기", sLabel);
@@ -950,68 +1001,6 @@ public class AcRoom : MonoBehaviour
         GUILayout.EndArea();
     }
 
-    void CustomControls()
-    {
-        var l = AcLook.Decode(me.look.Encode());
-        bool ch = false;
-        GUILayout.Label("종류", sSmall);
-        int si = Array.IndexOf(SpeciesId, l.species);
-        int ns = GUILayout.SelectionGrid(Mathf.Max(si, 0), SpeciesKo, 5, sBtn);
-        if (ns != si)
-        {
-            l.species = SpeciesId[ns]; ch = true;
-            var sp = AcCatalog.Species(l.species);
-            if (sp != null && sp.fur != null && sp.fur.Length >= 3) l.fur = new Color(sp.fur[0], sp.fur[1], sp.fur[2]);
-        }
-        if (l.species == "human")
-        {
-            int g = GUILayout.Toolbar(l.female ? 0 : 1, new[] { "여자", "남자" }, sBtn);
-            if ((g == 0) != l.female) { l.female = g == 0; l.hair = l.female ? "long" : "short"; l.face = "f1"; ch = true; }
-            var hairs = l.female ? AcCatalog.Data.hairFemale : AcCatalog.Data.hairMale;
-            string[] hairKo = l.female ? new[] { "긴머리", "단발", "양갈래", "포니테일", "올림머리" } : new[] { "짧은머리", "덥수룩" };
-            int hi = Mathf.Max(0, Array.IndexOf(hairs, l.hair));
-            int nh = GUILayout.Toolbar(hi, hairKo, sBtn);
-            if (nh != hi) { l.hair = hairs[nh]; ch = true; }
-            string[] faces = l.female ? new[] { "f1", "f2", "f3", "f4", "f5" } : new[] { "f1", "f2" };
-            string[] faceKo = l.female ? new[] { "또랑", "방긋", "반짝", "졸린", "속눈썹" } : new[] { "또랑", "방긋" };
-            int fi = Mathf.Max(0, Array.IndexOf(faces, l.face));
-            int nf = GUILayout.Toolbar(fi, faceKo, sBtn);
-            if (nf != fi) { l.face = faces[nf]; ch = true; }
-        }
-        GUILayout.Label("모자", sSmall);
-        int hti = Mathf.Max(0, Array.IndexOf(HatId, l.hat));
-        int nht = GUILayout.SelectionGrid(hti, HatKo, 4, sBtn);
-        if (nht != hti) { l.hat = HatId[nht]; ch = true; }
-        ch |= ColorRow(l.species == "human" ? "피부" : "털", ref l.fur);
-        ch |= ColorRow("스웨터", ref l.sweater);
-        ch |= ColorRow("목도리", ref l.scarf);
-        if (l.hat != "none") ch |= ColorRow("모자", ref l.hatColor);
-        if (l.species == "human") ch |= ColorRow("머리", ref l.hairColor);
-        if (l.species == "lion") ch |= ColorRow("갈기", ref l.mane);
-        if (ch) { me.Rebuild(l); PlayerPrefs.SetString("ac_look", l.Encode()); PlayerPrefs.Save(); }
-    }
-
-    static readonly Color[] SkinTones = { new Color(1f, 0.86f, 0.76f), new Color(0.95f, 0.78f, 0.62f), new Color(0.82f, 0.62f, 0.45f), new Color(0.6f, 0.42f, 0.3f),
-                                           new Color(0.72f, 0.5f, 0.34f), new Color(0.98f, 0.97f, 0.96f), new Color(0.3f, 0.28f, 0.3f), new Color(0.99f, 0.75f, 0.75f) };
-    bool ColorRow(string label, ref Color c)
-    {
-        GUILayout.BeginHorizontal();
-        GUILayout.Label(label, sSmall, GUILayout.Width(56));
-        bool changed = false;
-        var list = new List<Color>(AcCatalog.Palette);
-        if (label == "털" || label == "피부") list.InsertRange(0, SkinTones);
-        int n = 0;
-        foreach (var col in list)
-        {
-            if (n++ >= 18) break;
-            var old = GUI.color; GUI.color = col;
-            if (GUILayout.Button(ApproxEq(col, c) ? "●" : "", GUILayout.Width(17), GUILayout.Height(18))) { c = col; changed = true; }
-            GUI.color = old;
-        }
-        GUILayout.EndHorizontal();
-        return changed;
-    }
-    static bool ApproxEq(Color a, Color b) => Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b) < 0.03f;
 }
 
 public class AcOrnTag : MonoBehaviour { public string id; }
