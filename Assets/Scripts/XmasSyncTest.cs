@@ -317,18 +317,13 @@ public class XmasSyncTest : MonoBehaviour
         // 바닥 (눈)
         Prim(PrimitiveType.Cube, new Vector3(0, -0.25f, 0), new Vector3(46, 0.5f, 36), new Color(0.9f, 0.94f, 1f));
 
-        // 돌길: 트리 둘레 원형 + 입구까지 길
-        for (float x = -8f; x <= 8f; x += 1.5f)
-            for (float z = -8f; z <= 8f; z += 1.5f)
-            {
-                float d = Mathf.Sqrt(x * x + z * z);
-                if (d > 5.2f && d < 7.6f) Model("floor-stone", new Vector3(x, -0.09f, z), 1.5f, 0);
-            }
-        for (float z = -15f; z < -7.4f; z += 1.5f)
-        {
-            Model("floor-stone", new Vector3(-0.75f, -0.09f, z), 1.5f);
-            Model("floor-stone", new Vector3(0.75f, -0.09f, z), 1.5f);
-        }
+        // 돌길: 트리 둘레 원형 광장 + 입구까지 길 (매끈한 돌바닥)
+        var stone = new Color(0.78f, 0.74f, 0.73f);
+        Prim(PrimitiveType.Cylinder, new Vector3(0, 0.01f, 0), new Vector3(15.6f, 0.01f, 15.6f), stone, null, false, false);
+        Prim(PrimitiveType.Cylinder, new Vector3(0, 0.012f, 0), new Vector3(15.0f, 0.01f, 15.0f), new Color(0.84f, 0.8f, 0.79f), null, false, false);
+        Prim(PrimitiveType.Cylinder, new Vector3(0, 0.014f, 0), new Vector3(10.2f, 0.01f, 10.2f), stone, null, false, false);
+        Prim(PrimitiveType.Cylinder, new Vector3(0, 0.016f, 0), new Vector3(9.6f, 0.01f, 9.6f), new Color(0.92f, 0.95f, 1f), null, false, false);
+        Prim(PrimitiveType.Cube, new Vector3(0, 0.01f, -11.6f), new Vector3(3.2f, 0.02f, 8.4f), new Color(0.84f, 0.8f, 0.79f), null, false, false);
 
         // 큰 트리 (소원 트리)
         Model("tree-decorated-snow", Vector3.zero, 3.2f);
