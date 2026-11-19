@@ -689,7 +689,7 @@ public partial class AcRoom : MonoBehaviour
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
-        float dist = 14f, pitch = 36f, targetYaw = Outside ? 0f : 180f;   // 실내: 방 앞(+z)에서, 실외: 집 반대편에서
+        float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = Outside ? 0f : 180f;   // 실내: 방 앞(+z)에서, 실외: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
         if (decorating)
         {
             // 트리 전체(꼭대기 별까지)가 보이게
@@ -700,7 +700,9 @@ public partial class AcRoom : MonoBehaviour
         if (phase == Phase.Lobby)
         {
             // 입장 화면: 캐릭터를 앞에서 가까이 (뒤로 현관문이 보임). 왼쪽 패널을 피해 캐릭터를 오른쪽에
-            focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; pitch = 8f; targetYaw = 180f;
+            if (Screen.height > Screen.width) { focus = me.transform.position + new Vector3(0, -0.3f, 0); dist = 5.2f; }   // 세로 화면: 캐릭터를 위쪽에, 아래는 패널
+            else { focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; }
+            pitch = 8f; targetYaw = 180f;
             me.transform.rotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 0.6f) * 35f, 0);
         }
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
@@ -962,12 +964,12 @@ public partial class AcRoom : MonoBehaviour
     {
         if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
         float lw = Mathf.Min(440, SW - 20);
-        var r = new Rect(Mathf.Min(20, (SW - lw) / 2), 16, lw, SH - 32);
+        bool portrait = Screen.height > Screen.width;
+        var r = portrait ? new Rect((SW - lw) / 2, SH * 0.46f, lw, SH * 0.54f - 10) : new Rect(Mathf.Min(20, (SW - lw) / 2), 16, lw, SH - 32);
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 16, r.y + 10, r.width - 32, r.height - 20));
-        GUILayout.Label("<size=24>크리스마스 거실</size>", sLabel);
-        GUILayout.Label("캐릭터를 꾸미고 현관으로 들어가세요. 다 함께 커다란 트리를 꾸며요!", sSmall);
-        GUILayout.Space(8);
+        GUILayout.Label(portrait ? "<size=20>크리스마스 거실</size>" : "<size=24>크리스마스 거실</size>", sLabel);
+        if (!portrait) { GUILayout.Label("캐릭터를 꾸미고 현관으로 들어가세요. 다 함께 커다란 트리를 꾸며요!", sSmall); GUILayout.Space(8); }
         GUILayout.BeginHorizontal();
         GUILayout.Label("이름", sSmall, GUILayout.Width(60));
         uiName = TextBox("이름을 입력하세요", uiName, 12);
