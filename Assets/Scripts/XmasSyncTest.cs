@@ -1,6 +1,6 @@
-// XmasSyncTest.cs — 크리스마스 광장 (2D 그림책 버전, Unity 6 + URP)
-// 배경: Assets/StreamingAssets/village.png (Gemini로 생성한 그림)
-// 캐릭터: 코드로 그리는 작은 사람 스프라이트 (코트·모자·목도리·피부 색 커스터마이징)
+// XmasSyncTest.cs — 크리스마스 광장 (그림책 디오라마 버전, Unity 6 + URP)
+// 3D 쿼터뷰 광장에 Gemini로 그린 그림(집·트리·소품)을 종이 인형처럼 세워요.
+// 그림 파일: Assets/StreamingAssets/art/*.png (없는 그림은 건너뜀)
 //
 // 조작: WASD/방향키 또는 클릭으로 이동 · 문/트리 앞에서 E 키 · ESC로 닫기 · F1 동기화 상태
 // 동기화: 공유 폴더의 playerNN.json 슬롯 파일 (각자 자기 파일만 쓰고 남의 파일은 읽기만)
@@ -53,9 +53,10 @@ public class XmasSyncTest : MonoBehaviour
     const int MaxSlots = 12;
     const int WriteMs = 150;
     const int ReadMs = 250;
-    const float Speed = 2.4f;
-    const float WorldH = 10f;                  // 배경 높이 (월드 단위)
-    const float StreetTop = -3.25f, StreetBottom = -4.75f, XLimit = 8.5f;
+    const float Speed = 4.2f;
+    const float CamPitch = 34f, CamDist = 27f, CamFov = 30f;
+    const float XMin = -17f, XMax = 17f, ZMin = -11f, ZMax = 10f;   // 걸어 다닐 수 있는 범위
+    const float CharHeight = 1.9f;                                  // 캐릭터 키 (월드 단위)
 
     static readonly Stopwatch Clock = Stopwatch.StartNew();
     static long NowMs => Clock.ElapsedMilliseconds;
@@ -99,23 +100,28 @@ public class XmasSyncTest : MonoBehaviour
         return l;
     }
 
-    // ===== 구역 (배경 그림 속 문 위치) =====
+    // ===== 구역 (집 문 앞 / 트리 앞) =====
     class Zone
     {
-        public string id, label, desc;
-        public float x, halfW;
+        public string id, label, desc, art;
+        public Vector3 pos;       // 그림(집)이 서 있는 자리
+        public float height;      // 그림 높이
+        public Vector3 door;      // 상호작용 지점
+        public float radius;
     }
-
-    // 배경 이미지 가로 위치(0~1)를 월드 x로 바꿔서 정의
-    static float ImgX(float u) => (u - 0.5f) * WorldH * (2752f / 1536f);
 
     static readonly Zone[] Zones =
     {
-        new Zone { id = "spot",  label = "시계탑 집 · 틀린 그림 찾기", x = ImgX(126f / 1280f),  halfW = 0.75f, desc = "같은 그림 두 장에서 다른 곳을 먼저 찾는 사람이 이겨요." },
-        new Zone { id = "mines", label = "분홍 집 · 눈 지뢰찾기",     x = ImgX(397f / 1280f),  halfW = 0.75f, desc = "같은 지뢰밭을 동시에 풀어요. 먼저 다 찾으면 승리, 지뢰를 밟으면 패배!" },
-        new Zone { id = "tree",  label = "소원 트리",                 x = ImgX(642f / 1280f),  halfW = 1.0f,  desc = "올해의 소원을 트리에 걸어 보세요. 다른 사람의 소원도 볼 수 있어요." },
-        new Zone { id = "ark",   label = "베이커리 · 선물 깨기",      x = ImgX(910f / 1280f),  halfW = 0.8f,  desc = "각자 선물 벽돌을 깨면서 상대에게 방해 선물을 보내요." },
-        new Zone { id = "photo", label = "빨간 사진관 · 포토존",      x = ImgX(1090f / 1280f), halfW = 0.8f,  desc = "모여서 찰칵! 사진은 내 PC의 '사진\\XmasPlaza' 폴더에 저장돼요." },
+        new Zone { id = "spot",  label = "시계탑 집 · 틀린 그림 찾기", art = "house_clock",  pos = new Vector3(-12f, 0, 9f),  height = 8.5f, radius = 2.2f,
+                   desc = "같은 그림 두 장에서 다른 곳을 먼저 찾는 사람이 이겨요." },
+        new Zone { id = "mines", label = "분홍 집 · 눈 지뢰찾기",     art = "house_pink",   pos = new Vector3(-5.5f, 0, 11.5f), height = 8f, radius = 2.2f,
+                   desc = "같은 지뢰밭을 동시에 풀어요. 먼저 다 찾으면 승리, 지뢰를 밟으면 패배!" },
+        new Zone { id = "tree",  label = "소원 트리",                 art = "tree_big",     pos = new Vector3(0, 0, 2.5f),  height = 8.5f, radius = 3.2f,
+                   desc = "올해의 소원을 트리에 걸어 보세요. 다른 사람의 소원도 볼 수 있어요." },
+        new Zone { id = "ark",   label = "베이커리 · 선물 깨기",      art = "house_bakery", pos = new Vector3(5.5f, 0, 11.5f), height = 7.5f, radius = 2.2f,
+                   desc = "각자 선물 벽돌을 깨면서 상대에게 방해 선물을 보내요." },
+        new Zone { id = "photo", label = "빨간 사진관 · 포토존",      art = "house_studio", pos = new Vector3(12f, 0, 9f),   height = 8f, radius = 2.2f,
+                   desc = "모여서 찰칵! 사진은 내 PC의 '사진\\XmasPlaza' 폴더에 저장돼요." },
     };
 
     // ===== UI 상태 =====
@@ -145,15 +151,18 @@ public class XmasSyncTest : MonoBehaviour
 
     // ===== 장면 =====
     Camera cam;
+    Quaternion billboardRot;
     Character me;
-    Vector2? moveTarget;
-    float worldW;
+    Vector2? moveTarget;                      // (x, z)
     readonly Dictionary<int, Character> remotes = new Dictionary<int, Character>();
     Dictionary<int, PeerInfo> peersView = new Dictionary<int, PeerInfo>();
     readonly Dictionary<string, (string name, string text)> wishes = new Dictionary<string, (string, string)>();
     readonly Dictionary<string, SpriteRenderer> ornaments = new Dictionary<string, SpriteRenderer>();
     readonly List<(Transform tr, float speed, float sway)> snow = new List<(Transform, float, float)>();
     readonly List<(SpriteRenderer sr, float phase, float baseA)> glows = new List<(SpriteRenderer, float, float)>();
+    readonly List<(Vector2 c, float r)> blockers = new List<(Vector2, float)>();
+    SpriteRenderer treeSr;
+    Texture2D paperTex;
     float fps;
     GUIStyle sLabel, sSmall, sPanel, sTag, sTagMe, sSign, sTitle, sPrompt, sWishCard, sDark, sBtn;
     Rect panelRect, uiBlockRect;
@@ -331,13 +340,17 @@ public class XmasSyncTest : MonoBehaviour
         return ch;
     }
 
+    // 깊이에 따른 그리기 순서 (앞(아래쪽)일수록 위에 그림)
+    static int DepthOrder(float z) => 12000 - Mathf.RoundToInt(z * 300f);
+
     void PlaceCharacter(Character ch, Vector2 p, float dt)
     {
         ch.pos = p;
-        float s = CharScale(p);
-        ch.root.transform.position = new Vector3(p.x, p.y, 0);
-        ch.root.transform.localScale = new Vector3(s * ch.face, s, 1);
-        int baseOrder = 1000 + Mathf.RoundToInt((StreetTop + 0.5f - p.y) * 300f) * 16;   // 앞에 있을수록 위에 (최대 약 16000)
+        ch.root.transform.position = new Vector3(p.x, 0, p.y);
+        ch.root.transform.rotation = billboardRot;
+        float s = CharHeight;   // 부품이 키 1.1 정도로 그려져 있어 1.9배 ≈ 2유닛
+        ch.root.transform.localScale = new Vector3(s * ch.face, s, s);
+        int baseOrder = DepthOrder(p.y) - 8;
         for (int i = 0; i < ch.parts.Length; i++) ch.parts[i].sortingOrder = baseOrder + ch.baseOrder[i];
 
         if (ch.moving) ch.walkT += dt;
@@ -350,8 +363,6 @@ public class XmasSyncTest : MonoBehaviour
         ch.body.localPosition = new Vector3(0, bob, 0);
     }
 
-    static float CharScale(Vector2 p) => Mathf.Lerp(0.82f, 0.64f, Mathf.InverseLerp(StreetBottom, StreetTop, p.y));
-
     // ========================================================
     void Awake()
     {
@@ -362,7 +373,87 @@ public class XmasSyncTest : MonoBehaviour
         Application.targetFrameRate = 60;
         BuildScene();
         me = MakeCharacter(myLook);
-        PlaceCharacter(me, new Vector2(-1.5f, -4.1f), 0);
+        PlaceCharacter(me, new Vector2(-2.5f, -3.5f), 0);
+        UpdateCamera(1f, true);
+    }
+
+    static Texture2D LoadArt(string name)
+    {
+        var path = Path.Combine(Application.streamingAssetsPath, "art", name + ".png");
+        if (!File.Exists(path)) { Debug.LogWarning("[Xmas] 그림 없음: " + path); return null; }
+        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true);
+        tex.LoadImage(File.ReadAllBytes(path));
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Trilinear;
+        tex.anisoLevel = 4;
+        return tex;
+    }
+
+    // 그림 한 장을 땅에 세우기 (아래쪽 가운데가 pos, 카메라를 향함)
+    SpriteRenderer Standee(string art, Vector3 pos, float height, int orderBias = 0, bool shadow = true)
+    {
+        var tex = LoadArt(art);
+        if (tex == null) return null;
+        var sr = new GameObject(art).AddComponent<SpriteRenderer>();
+        sr.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.02f), tex.height / height);
+        sr.transform.SetPositionAndRotation(pos, billboardRot);
+        sr.sortingOrder = DepthOrder(pos.z) + orderBias;
+        if (shadow)
+        {
+            float w = height * tex.width / tex.height;
+            var sh = new GameObject(art + "-shadow").AddComponent<SpriteRenderer>();
+            sh.sprite = SprShadow();
+            sh.transform.SetPositionAndRotation(pos + new Vector3(0, 0.01f, 0.15f), Quaternion.Euler(90, 0, 0));
+            sh.transform.localScale = new Vector3(w * 1.6f, w * 0.9f, 1);
+            sh.color = new Color(1, 1, 1, 0.9f);
+            sh.sortingOrder = -25000;
+        }
+        return sr;
+    }
+
+    // 수채화 느낌의 눈 바닥 (코드로 그림)
+    static Texture2D MakeGroundTexture(int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color32[size * size];
+        var snowA = new Color(0.93f, 0.95f, 0.98f);
+        var snowB = new Color(0.82f, 0.87f, 0.93f);
+        var stone = new Color(0.8f, 0.76f, 0.74f);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (float)x / size, v = (float)y / size;
+                float n = Mathf.PerlinNoise(u * 6f, v * 6f) * 0.6f + Mathf.PerlinNoise(u * 23f + 5, v * 23f + 9) * 0.3f + Mathf.PerlinNoise(u * 70f, v * 70f) * 0.1f;
+                var c = Color.Lerp(snowA, snowB, Mathf.SmoothStep(0.35f, 0.75f, n));
+                // 트리 둘레의 둥근 돌길 (u,v 0.5,0.62 근처) 과 입구 길
+                float dx = (u - 0.5f) * 46f, dz = (v - 0.62f) * 34f;
+                float d = Mathf.Sqrt(dx * dx + dz * dz);
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(d - 6.2f) / 1.6f);
+                float path = (Mathf.Abs(dx) < 1.6f && dz < -5f) ? 1f : 0f;
+                float paved = Mathf.Max(ring, path) * (0.55f + 0.45f * Mathf.PerlinNoise(u * 40f, v * 40f));
+                c = Color.Lerp(c, stone, paved * 0.55f);
+                px[y * size + x] = c;
+            }
+        tex.SetPixels32(px);
+        tex.Apply(true);
+        return tex;
+    }
+
+    static Texture2D MakePaperTexture(int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat };
+        var px = new Color32[size * size];
+        var rnd = new System.Random(3);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float n = Mathf.PerlinNoise(x * 0.08f, y * 0.08f) * 0.5f + (float)rnd.NextDouble() * 0.5f;
+                byte g = (byte)(200 + n * 55);
+                px[y * size + x] = new Color32(g, (byte)(g - 6), (byte)(g - 16), (byte)(10 + n * 18));
+            }
+        tex.SetPixels32(px);
+        tex.Apply();
+        return tex;
     }
 
     void BuildScene()
@@ -373,70 +464,109 @@ public class XmasSyncTest : MonoBehaviour
 
         cam = Camera.main;
         if (!cam) { var cg = new GameObject("Main Camera") { tag = "MainCamera" }; cam = cg.AddComponent<Camera>(); }
-        cam.orthographic = true;
-        cam.transform.SetPositionAndRotation(new Vector3(0, 0, -10), Quaternion.identity);
+        cam.orthographic = false;
+        cam.fieldOfView = CamFov;
+        cam.nearClipPlane = 0.5f;
+        cam.farClipPlane = 200f;
         cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.55f, 0.62f, 0.7f);
+        cam.backgroundColor = new Color(0.6f, 0.67f, 0.75f);
         var camData = cam.GetUniversalAdditionalCameraData();
         if (camData != null) camData.renderPostProcessing = false;
+        billboardRot = Quaternion.Euler(CamPitch, 0, 0);
+        paperTex = MakePaperTexture(256);
 
-        // 배경 그림
-        worldW = WorldH * 2752f / 1536f;
-        var path = Path.Combine(Application.streamingAssetsPath, "village.png");
-        var bg = new GameObject("Background").AddComponent<SpriteRenderer>();
-        bg.sortingOrder = -30000;
-        try
+        // 하늘·숲 배경 (뒤쪽 큰 그림)
+        var sky = Standee("backdrop", new Vector3(0, -1.5f, 30f), 30f, 0, false);
+        if (sky != null) { sky.sortingOrder = -31000; sky.transform.rotation = Quaternion.identity; }
+        else
         {
-            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            tex.LoadImage(File.ReadAllBytes(path));
-            tex.filterMode = FilterMode.Bilinear;
-            tex.wrapMode = TextureWrapMode.Clamp;
-            worldW = WorldH * tex.width / tex.height;
-            bg.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), tex.height / WorldH);
+            // 그림이 없으면 마을 배경 그림을 대신 사용
+            var path = Path.Combine(Application.streamingAssetsPath, "village.png");
+            if (File.Exists(path))
+            {
+                var t = new Texture2D(2, 2); t.LoadImage(File.ReadAllBytes(path));
+                var bg = new GameObject("backdrop").AddComponent<SpriteRenderer>();
+                bg.sprite = Sprite.Create(t, new Rect(0, t.height * 0.55f, t.width, t.height * 0.45f), new Vector2(0.5f, 0f), t.height * 0.45f / 16f);
+                bg.transform.position = new Vector3(0, -2f, 32f);
+                bg.sortingOrder = -31000;
+            }
         }
-        catch (Exception e) { Debug.LogError("[Xmas] 배경 그림을 못 읽었어요: " + path + " / " + e.Message); }
 
-        // 창문 불빛 (은은하게 깜빡)
-        (float u, float v, float r)[] windows =
+        // 눈 바닥
+        var ground = new GameObject("Ground").AddComponent<SpriteRenderer>();
+        var gtex = MakeGroundTexture(512);
+        ground.sprite = Sprite.Create(gtex, new Rect(0, 0, 512, 512), new Vector2(0.5f, 0.5f), 512f / 46f);
+        ground.transform.SetPositionAndRotation(new Vector3(0, 0, -1.5f), Quaternion.Euler(90, 0, 0));
+        ground.transform.localScale = new Vector3(1f, 34f / 46f, 1f);
+        ground.sortingOrder = -30000;
+
+        // 집들과 트리
+        foreach (var z in Zones)
         {
-            (0.049f, 0.555f, 0.5f), (0.146f, 0.555f, 0.5f), (0.227f, 0.555f, 0.55f), (0.38f, 0.555f, 0.55f),
-            (0.71f, 0.53f, 0.7f), (0.937f, 0.68f, 0.9f), (0.86f, 0.68f, 0.55f), (0.5f, 0.6f, 0.9f),
+            var sr = Standee(z.art, z.pos, z.height);
+            z.door = z.pos + new Vector3(0, 0, z.id == "tree" ? -2.8f : -2.2f);
+            blockers.Add((new Vector2(z.pos.x, z.pos.z + (z.id == "tree" ? 0 : 0.6f)), z.id == "tree" ? 1.6f : 2.6f));
+            if (z.id == "tree") treeSr = sr;
+            if (sr != null && z.id != "tree")
+            {
+                // 문 앞 불빛
+                var g = new GameObject("Glow").AddComponent<SpriteRenderer>();
+                g.sprite = SprGlow();
+                g.transform.SetPositionAndRotation(z.pos + new Vector3(0, 1.2f, -0.2f), billboardRot);
+                g.transform.localScale = Vector3.one * 2.2f;
+                g.sortingOrder = sr.sortingOrder + 1;
+                glows.Add((g, Random.Range(0f, 10f), 0.25f));
+            }
+        }
+
+        // 소품 (있으면)
+        (string art, Vector3 pos, float h)[] props =
+        {
+            ("lamp", new Vector3(-4.5f, 0, -1f), 3.4f), ("lamp", new Vector3(4.5f, 0, -1f), 3.4f),
+            ("lamp", new Vector3(-2.2f, 0, -8f), 3.4f), ("lamp", new Vector3(2.2f, 0, -8f), 3.4f),
+            ("bench", new Vector3(-8f, 0, 1.5f), 1.4f), ("bench", new Vector3(8f, 0, 1.5f), 1.4f),
+            ("snowman", new Vector3(-15f, 0, -3f), 2.4f), ("snowman", new Vector3(15f, 0, -4f), 2.4f),
+            ("gifts", new Vector3(2.6f, 0, 1.2f), 1.3f),
+            ("pine_a", new Vector3(-18f, 0, 6f), 5.5f), ("pine_b", new Vector3(-16.5f, 0, 12f), 6.5f),
+            ("pine_a", new Vector3(18f, 0, 6f), 5.5f), ("pine_b", new Vector3(16.5f, 0, 12f), 6.5f),
+            ("pine_b", new Vector3(0f, 0, 15f), 7f), ("pine_a", new Vector3(-19f, 0, -7f), 5f), ("pine_a", new Vector3(19f, 0, -8f), 5f),
         };
-        foreach (var w in windows)
+        foreach (var pr in props)
         {
-            var g = new GameObject("Glow").AddComponent<SpriteRenderer>();
-            g.sprite = SprGlow();
-            g.sortingOrder = -29000;
-            g.transform.position = new Vector3((w.u - 0.5f) * worldW, (0.5f - w.v) * WorldH, 0);
-            g.transform.localScale = Vector3.one * w.r * 2.2f;
-            float baseA = 0.22f;
-            g.color = new Color(1, 1, 1, baseA);
-            glows.Add((g, Random.Range(0f, 10f), baseA));
+            var sr = Standee(pr.art, pr.pos, pr.h);
+            if (sr != null) blockers.Add((new Vector2(pr.pos.x, pr.pos.z), Mathf.Min(1.0f, pr.h * 0.25f)));
+            if (sr != null && pr.art == "lamp")
+            {
+                var g = new GameObject("LampGlow").AddComponent<SpriteRenderer>();
+                g.sprite = SprGlow();
+                g.transform.SetPositionAndRotation(pr.pos + billboardRot * new Vector3(0, pr.h * 0.86f, -0.05f), billboardRot);
+                g.transform.localScale = Vector3.one * 2.6f;
+                g.sortingOrder = sr.sortingOrder + 1;
+                glows.Add((g, Random.Range(0f, 10f), 0.5f));
+            }
         }
 
-        // 눈: 뒤쪽(작고 느림) + 앞쪽(크고 빠름)
-        for (int i = 0; i < 220; i++)
+        // 내리는 눈 (화면 앞쪽 공간)
+        for (int i = 0; i < 320; i++)
         {
-            bool front = i % 4 == 0;
             var s = new GameObject("Snow").AddComponent<SpriteRenderer>();
             s.sprite = SprSoftDot();
-            s.sortingOrder = front ? 30000 : -20000;
-            float size = front ? Random.Range(0.09f, 0.16f) : Random.Range(0.035f, 0.08f);
-            s.transform.localScale = Vector3.one * size;
-            s.color = new Color(1, 1, 1, front ? 0.85f : 0.75f);
-            s.transform.position = new Vector3(Random.Range(-worldW / 2, worldW / 2), Random.Range(-5f, 5.5f), 0);
-            snow.Add((s.transform, front ? Random.Range(0.9f, 1.4f) : Random.Range(0.35f, 0.7f), Random.Range(0f, 6f)));
+            float z = Random.Range(-14f, 18f);
+            s.sortingOrder = DepthOrder(z) + 20;
+            s.transform.localScale = Vector3.one * Random.Range(0.08f, 0.2f);
+            s.transform.rotation = billboardRot;
+            s.color = new Color(1, 1, 1, 0.85f);
+            s.transform.position = new Vector3(Random.Range(-24f, 24f), Random.Range(0f, 14f), z);
+            snow.Add((s.transform, Random.Range(0.8f, 1.6f), Random.Range(0f, 6f)));
         }
-        FitCamera();
     }
 
-    void FitCamera()
+    void UpdateCamera(float dt, bool snap = false)
     {
-        // 그림 밖이 보이지 않게 화면을 꽉 채우기
-        float aspect = (float)Screen.width / Mathf.Max(1, Screen.height);
-        cam.orthographicSize = Mathf.Min(WorldH / 2f, worldW / 2f / aspect);
-        // 화면이 가로로 길면 하늘 쪽을 잘라서 아래쪽 길이 항상 보이게
-        cam.transform.position = new Vector3(0, -WorldH / 2f + cam.orthographicSize, -10);
+        var target = new Vector3(Mathf.Clamp(me.pos.x, -9f, 9f), 1.2f, Mathf.Clamp(me.pos.y, -6f, 5f));
+        var want = target + billboardRot * new Vector3(0, 0, -CamDist);
+        cam.transform.rotation = billboardRot;
+        cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1 - Mathf.Exp(-dt * 4f));
     }
 
     // ========================================================
@@ -498,15 +628,14 @@ public class XmasSyncTest : MonoBehaviour
     {
         float dt = Time.deltaTime;
         fps = Mathf.Lerp(fps, 1f / Mathf.Max(dt, 0.0001f), 0.05f);
-        FitCamera();
 
         float t = Time.time;
         foreach (var s in snow)
         {
             var p = s.tr.position;
             p.y -= s.speed * dt;
-            p.x += Mathf.Sin(t * 0.8f + s.sway) * dt * 0.25f;
-            if (p.y < -5.3f) { p.y = 5.4f; p.x = Random.Range(-worldW / 2, worldW / 2); }
+            p.x += Mathf.Sin(t * 0.8f + s.sway) * dt * 0.3f;
+            if (p.y < 0) { p.y = 14f; p.x = cam.transform.position.x + Random.Range(-24f, 24f); }
             s.tr.position = p;
         }
         foreach (var g in glows)
@@ -523,6 +652,7 @@ public class XmasSyncTest : MonoBehaviour
             UpdateZones();
         }
         else PlaceCharacter(me, me.pos, dt);
+        UpdateCamera(dt);
 
         if (running)
         {
@@ -549,16 +679,20 @@ public class XmasSyncTest : MonoBehaviour
     {
         Vector2 mv = Vector2.zero;
         var axis = TypingInField() ? Vector2.zero : MoveAxis();
-        if (axis.sqrMagnitude > 0) { moveTarget = null; mv = new Vector2(axis.x, axis.y * 0.6f).normalized; }
+        if (axis.sqrMagnitude > 0) { moveTarget = null; mv = axis.normalized; }
         else if (ClickDown(out var mp) && !uiBlockRect.Contains(new Vector2(mp.x, Screen.height - mp.y)))
         {
-            var w = cam.ScreenToWorldPoint(new Vector3(mp.x, mp.y, 10));
-            moveTarget = new Vector2(Mathf.Clamp(w.x, -XLimit, XLimit), Mathf.Clamp(w.y, StreetBottom, StreetTop));
+            var ray = cam.ScreenPointToRay(new Vector3(mp.x, mp.y, 0));
+            if (new Plane(Vector3.up, Vector3.zero).Raycast(ray, out float d))
+            {
+                var w = ray.GetPoint(d);
+                moveTarget = new Vector2(Mathf.Clamp(w.x, XMin, XMax), Mathf.Clamp(w.z, ZMin, ZMax));
+            }
         }
         if (mv == Vector2.zero && moveTarget.HasValue)
         {
             var to = moveTarget.Value - me.pos;
-            if (to.magnitude < 0.05f) moveTarget = null; else mv = to.normalized;
+            if (to.magnitude < 0.08f) moveTarget = null; else mv = to.normalized;
         }
         me.moving = mv != Vector2.zero;
         var p = me.pos;
@@ -567,10 +701,14 @@ public class XmasSyncTest : MonoBehaviour
             p += mv * Speed * dt;
             if (Mathf.Abs(mv.x) > 0.1f) me.face = mv.x > 0 ? 1 : -1;
         }
-        // 입장 연출: 화면 아래에서 걸어 들어오는 동안은 길 아래쪽도 허용
-        bool entering = p.y < StreetBottom - 0.01f && moveTarget.HasValue;
-        p.x = Mathf.Clamp(p.x, -XLimit, XLimit);
-        p.y = entering ? Mathf.Min(p.y, StreetTop) : Mathf.Clamp(p.y, StreetBottom, StreetTop);
+        bool entering = p.y < ZMin - 0.01f && moveTarget.HasValue;   // 아래쪽 입구에서 걸어 들어오는 중
+        p.x = Mathf.Clamp(p.x, XMin, XMax);
+        p.y = entering ? Mathf.Min(p.y, ZMax) : Mathf.Clamp(p.y, ZMin, ZMax);
+        foreach (var b in blockers)
+        {
+            var d = p - b.c;
+            if (d.magnitude < b.r) p = b.c + (d.sqrMagnitude < 1e-4f ? Vector2.down : d.normalized) * b.r;
+        }
         PlaceCharacter(me, p, dt);
     }
 
@@ -579,9 +717,8 @@ public class XmasSyncTest : MonoBehaviour
         nearZone = null;
         if (openZone == null)
         {
-            if (me.pos.y > StreetTop - 0.65f)
-                foreach (var z in Zones)
-                    if (Mathf.Abs(me.pos.x - z.x) < z.halfW) { nearZone = z; break; }
+            foreach (var z in Zones)
+                if (Vector2.Distance(me.pos, new Vector2(z.door.x, z.door.z)) < z.radius) { nearZone = z; break; }
             if (nearZone != null && KeyDown("e") && !TypingInField()) OpenZone(nearZone.id);
         }
         else if (KeyDown("esc")) CloseZone();
@@ -646,26 +783,27 @@ public class XmasSyncTest : MonoBehaviour
     void UpdateWishes()
     {
         if (!string.IsNullOrEmpty(myWish)) wishes[myId] = (uiName, myWish); else wishes.Remove(myId);
-        float treeX = ImgX(642f / 1280f), treeTop = (0.5f - 300f / 714f) * WorldH, treeBottom = (0.5f - 510f / 714f) * WorldH;
+        if (treeSr == null) return;
+        var tz = Zones[2];
         foreach (var kv in wishes)
         {
             if (ornaments.ContainsKey(kv.Key)) continue;
             int h = StableHash(kv.Key);
-            float v = 0.15f + (h % 100) / 100f * 0.8f;
-            float y = Mathf.Lerp(treeTop, treeBottom, v);
-            float half = Mathf.Lerp(0.1f, 0.62f, v);
-            float x = treeX + ((h / 100 % 200) / 100f - 1f) * half;
+            float v = 0.18f + (h % 100) / 100f * 0.62f;          // 위(0)~아래(1)
+            float half = Mathf.Lerp(0.25f, 1.9f, v);
+            float lx = ((h / 100 % 200) / 100f - 1f) * half;
+            float ly = tz.height * (1f - v) * 0.9f;
             var o = new GameObject("Wish-" + kv.Key).AddComponent<SpriteRenderer>();
             o.sprite = SprGlow();
-            o.sortingOrder = -28000;
-            o.transform.position = new Vector3(x, y, 0);
+            o.sortingOrder = treeSr.sortingOrder + 2;
+            o.transform.SetPositionAndRotation(tz.pos + billboardRot * new Vector3(lx, ly, -0.05f), billboardRot);
             o.color = Color.HSVToRGB((h % 97) / 97f, 0.35f, 1f);
             ornaments[kv.Key] = o;
         }
         var gone = new List<string>();
         foreach (var kv in ornaments) if (!wishes.ContainsKey(kv.Key)) gone.Add(kv.Key);
         foreach (var key in gone) { Destroy(ornaments[key].gameObject); ornaments.Remove(key); }
-        float pulse = 0.28f + Mathf.Sin(Time.time * 3f) * 0.05f;
+        float pulse = 0.55f + Mathf.Sin(Time.time * 3f) * 0.1f;
         foreach (var o in ornaments.Values) o.transform.localScale = Vector3.one * pulse;
     }
 
@@ -707,8 +845,8 @@ public class XmasSyncTest : MonoBehaviour
         PlayerPrefs.Save();
 
         // 화면 아래(광장 입구)에서 걸어 들어오기
-        me.pos = new Vector2(Random.Range(-2f, 2f), -5.8f);
-        moveTarget = new Vector2(me.pos.x, -4.2f);
+        me.pos = new Vector2(Random.Range(-1.2f, 1.2f), ZMin - 4f);
+        moveTarget = new Vector2(me.pos.x, -7.5f);
         GUIUtility.keyboardControl = 0;
 
         dir = p;
@@ -928,9 +1066,10 @@ public class XmasSyncTest : MonoBehaviour
         GUI.skin.textField.fontSize = 16;
     }
 
-    void Tag(Vector2 world, string text, GUIStyle style)
+    void Tag(Vector3 world, string text, GUIStyle style)
     {
-        var sp = cam.WorldToScreenPoint(new Vector3(world.x, world.y, 0));
+        var sp = cam.WorldToScreenPoint(world);
+        if (sp.z < 0) return;
         var size = style.CalcSize(new GUIContent(text));
         GUI.Label(new Rect(sp.x - size.x / 2 - 8, Screen.height - sp.y - size.y / 2, size.x + 16, size.y + 6), text, style);
     }
@@ -939,23 +1078,27 @@ public class XmasSyncTest : MonoBehaviour
     {
         if (hideUI) return;
         InitStyles();
+        // 종이 질감 (화면 전체에 아주 옅게)
+        if (paperTex != null && Event.current.type == EventType.Repaint)
+            GUI.DrawTextureWithTexCoords(new Rect(0, 0, Screen.width, Screen.height), paperTex,
+                new Rect(0, 0, Screen.width / 256f, Screen.height / 256f));
         uiBlockRect = Rect.zero;
         panelRect = Rect.zero;
 
         // 문 위 간판
         if (openZone == null)
             foreach (var z in Zones)
-                Tag(new Vector2(z.x, z.id == "tree" ? -2.15f : -1.9f), z.label, sSign);
+                Tag(z.pos + billboardRot * new Vector3(0, z.id == "tree" ? -0.2f : 0.25f, -0.3f) + new Vector3(0, 0, -1.2f), z.label, sSign);
 
         // 이름표
-        Tag(me.pos + Vector2.up * 1.4f * CharScale(me.pos), joined ? uiName + " (나)" : (uiName.Length > 0 ? uiName : "나"), sTagMe);
+        Tag(Head(me.pos), joined ? uiName + " (나)" : (uiName.Length > 0 ? uiName : "나"), sTagMe);
         foreach (var ch in remotes.Values)
         {
             string label = ch.name ?? "?";
             if (!string.IsNullOrEmpty(ch.zone)) label += " · " + ZoneShort(ch.zone);
-            Tag(ch.pos + Vector2.up * 1.4f * CharScale(ch.pos), label, sTag);
+            Tag(Head(ch.pos), label, sTag);
             if (joined && openZone == null && Vector2.Distance(ch.pos, me.pos) < 0.7f)
-                Tag((ch.pos + me.pos) / 2 + Vector2.up * 1.6f, "안녕!", sTagMe);
+                Tag(Head((ch.pos + me.pos) / 2) + Vector3.up * 0.6f, "안녕!", sTagMe);
         }
 
         if (!joined) { DrawJoinPanel(); return; }
@@ -984,6 +1127,8 @@ public class XmasSyncTest : MonoBehaviour
         if (showStats) DrawStats();
         GUI.Label(new Rect(Screen.width - 210, Screen.height - 30, 200, 24), "F1: 동기화 상태", sDark);
     }
+
+    Vector3 Head(Vector2 p) => new Vector3(p.x, 0, p.y) + billboardRot * new Vector3(0, CharHeight * 1.32f, 0);
 
     static string ZoneShort(string id)
     {
