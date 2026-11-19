@@ -16,8 +16,8 @@ public static class AcPalette
         H("E53935"), H("B71C1C"), H("F06292"), H("F8BBD0"), H("FB8C00"), H("FFAB91"), H("FDD835"), H("FFF3C4"), H("C0CA33"), H("43A047"), H("81C784"), H("26A69A"),
         H("4FC3F7"), H("1E88E5"), H("283593"), H("B39DDB"), H("8E24AA"), H("FFC107"), H("8D6E63"), H("5D4037"), H("D7CCC8"), H("FAFAFA"), H("CFD8DC"), H("757575"), H("212121") };
     public static readonly string[] FurNames = {
-        "갈색곰", "밤색", "꿀색", "주황털", "크림", "하양", "회색", "검정", "분홍", "살구", "하늘", "민트",
-        "피부1", "피부2", "피부3", "피부4" };
+        "갈색", "고동색", "꿀색", "주황", "크림", "하양", "회색", "검정", "분홍", "살구", "하늘", "민트",
+        "연살구", "모래색", "캐러멜", "코코아" };
     public static readonly Color[] Fur = {
         H("B8805A"), H("8A5A3C"), H("F5C27A"), H("F28C47"), H("F7E7C9"), H("FAF8F5"), H("A9A9AE"), H("3A3436"), H("FBBFC0"), H("FFD4B0"), H("B7DDF2"), H("BFE8D5"),
         H("FFDCC2"), H("F2C7A0"), H("D19E72"), H("9A6B4C") };
@@ -177,9 +177,14 @@ public partial class AcRoom
         }
         foreach (var t in ornTypes)
         {
-            var obj = AcCatalog.Spawn(t, null, new Dictionary<string, Color> { { "orn", c } });
-            obj.transform.position = new Vector3(0, -500, 0);
-            obj.transform.rotation = Quaternion.Euler(0, 15, 0);
+            GameObject obj;
+            if (IsGarland(t)) obj = GarlandIcon(t, c);
+            else
+            {
+                obj = AcCatalog.Spawn(t, null, new Dictionary<string, Color> { { "orn", c } });
+                obj.transform.position = new Vector3(0, -500, 0);
+                obj.transform.rotation = Quaternion.Euler(0, 15, 0);
+            }
             foreach (var tr in obj.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = IconLayer;
             foreach (var r in obj.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
             if (!icons.TryGetValue(t, out var rt) || rt == null) { rt = new RenderTexture(96, 96, 16, RenderTextureFormat.ARGB32) { name = "icon_" + t }; rt.Create(); icons[t] = rt; }
@@ -247,14 +252,14 @@ public partial class AcRoom
         bool inGap = Mathf.Abs(p.x - doorX) < 0.75f;
         if (prev.z >= wallZ)   // 실내
         {
-            p.x = Mathf.Clamp(p.x, -HalfX + 0.7f, HalfX - 0.7f);
             float zmin = inGap ? wallZ - 1.2f : wallZ + 0.9f;
-            if (prev.z < wallZ + 0.9f) p.x = Mathf.Clamp(p.x, doorX - 0.74f, doorX + 0.74f);   // 문간에서는 옆으로 못 감
+            if (prev.z < wallZ + 0.9f) p.x = Mathf.Clamp(p.x, doorX - 0.74f, doorX + 0.74f);   // 현관 문간에서는 옆으로 못 감
+            else p = ClampInside(prev, p);
             p.z = Mathf.Clamp(p.z, zmin, HalfZ - 0.5f);
         }
         else                   // 실외
         {
-            p.x = Mathf.Clamp(p.x, -HalfX - 14f, HalfX + 14f);
+            p.x = Mathf.Clamp(p.x, -HouseHalf - 14f, HouseHalf + 14f);
             float zmax = inGap ? wallZ + 1.2f : wallZ - 0.9f;
             if (prev.z > wallZ - 0.9f) p.x = Mathf.Clamp(p.x, doorX - 0.74f, doorX + 0.74f);
             p.z = Mathf.Clamp(p.z, -HalfZ - 21f, zmax);
@@ -341,13 +346,13 @@ public partial class AcRoom
         var flake = SnowFlakeMesh();
         var mat = new Material(AcmLoader.Mat) { name = "Snow" };
         mat.SetFloat("_Emit", 0.55f); mat.SetFloat("_HasTint", 0);
-        float wx = 2 * HalfX + 40;
+        float wx = 2 * HouseHalf + 40;
         // (중심, 크기, 개수/초)
         var boxes = new[]
         {
-            (new Vector3(0, 8, -HalfZ - 14f), new Vector3(wx, 0.1f, 23f), 240f),            // 뒤 (현관 밖)
-            (new Vector3(-HalfX - 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f), // 왼쪽
-            (new Vector3(HalfX + 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f),  // 오른쪽
+            (new Vector3(0, 8, -HalfZ - 14f), new Vector3(wx, 0.1f, 23f), 900f),            // 뒤 (현관 밖)
+            (new Vector3(-HouseHalf - 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f), // 왼쪽
+            (new Vector3(HouseHalf + 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f),  // 오른쪽
         };
         foreach (var (c, size, rate) in boxes)
         {

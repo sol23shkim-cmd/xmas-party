@@ -30,7 +30,7 @@ public partial class AcRoom : MonoBehaviour
 
     // ===== 방 크기 (벽 조각 1.6배 = 3.2m 단위) =====
     const float S = 1.6f, SEG = 2f * S;
-    const int NX = 6, NZ = 4;                        // 가로 6칸(19.2m), 세로 4칸(12.8m)
+    const int NX = 8, NZ = 5;                        // 트리 거실: 가로 8칸(25.6m), 세로 5칸(16m)
     static float HalfX => NX * SEG / 2f;
     static float HalfZ => NZ * SEG / 2f;
     static readonly Vector3 TreePos = new Vector3(0, 0, -1.6f);
@@ -79,6 +79,8 @@ public partial class AcRoom : MonoBehaviour
     {
         Application.targetFrameRate = 60;
         Application.runInBackground = true;   // 창을 내려도 동기화 계속
+        if (!Application.isEditor && Screen.fullScreenMode != FullScreenMode.Windowed)
+            Screen.SetResolution(Mathf.Min(1600, Display.main.systemWidth - 80), Mathf.Min(900, Display.main.systemHeight - 120), FullScreenMode.Windowed);
         foreach (var c in FindObjectsByType<Camera>()) if (c.gameObject.name != "AcCam") c.gameObject.SetActive(false);
         foreach (var l in FindObjectsByType<Light>()) l.gameObject.SetActive(false);
         foreach (var v in FindObjectsByType<Volume>()) v.enabled = false;   // 템플릿 톤매핑이 색을 바래게 해서 끔
@@ -88,6 +90,7 @@ public partial class AcRoom : MonoBehaviour
         SetupCamera();
         SetupLights();
         BuildRoom();
+        BuildHouse();
         BuildOutdoors();
         BuildFurniture();
 
@@ -104,6 +107,7 @@ public partial class AcRoom : MonoBehaviour
         yaw = 0;
         foreach (var it in AcCatalog.ByCat("ornament")) ornTypes.Add(it.name);
         ornTypes.Sort((a, b) => OrnOrder(a).CompareTo(OrnOrder(b)));
+        ornTypes.Insert(0, BeadsId); ornTypes.Insert(0, TinselId);   // 두르는 줄은 맨 앞
         UpdateCamera(0, true);
     }
 
@@ -215,7 +219,7 @@ public partial class AcRoom : MonoBehaviour
         // 뒷벽 (창 2개 + 문 1개)
         for (int ix = 0; ix < NX; ix++)
         {
-            string w = ix == 1 || ix == 4 ? "wall_window" : ix == 5 ? "wall_door" : "wall_plain";
+            string w = ix == NX - 1 ? "wall_door" : ix == 1 || ix == 3 || ix == 5 ? "wall_window" : "wall_plain";
             var g = Put(w, new Vector3(-HalfX + SEG * (ix + 0.5f), 0, -HalfZ), 0, S, null, room);
             if (w == "wall_window") { HidePart(g, "glass"); Put("curtain", new Vector3(g.transform.position.x, 2.72f * S - 2.02f * S * 0.85f, -HalfZ + 0.16f), 0, S * 0.85f, null, room); }   // 커튼 봉이 창틀 바로 위
             if (w == "wall_door")
@@ -225,17 +229,6 @@ public partial class AcRoom : MonoBehaviour
                 var shell = AcmLoader.Find(g, "wall"); // 문 뒤는 바깥이 보이게 둠
             }
         }
-        // 옆벽
-        for (int iz = 0; iz < NZ; iz++)
-        {
-            float z = -HalfZ + SEG * (iz + 0.5f);
-            var gl = Put(iz == 1 ? "wall_window" : "wall_plain", new Vector3(-HalfX, 0, z), 90, S, null, room);
-            var gr = Put(iz == 2 ? "wall_window" : "wall_plain", new Vector3(HalfX, 0, z), -90, S, null, room);
-            if (iz == 1) HidePart(gl, "glass");
-            if (iz == 2) HidePart(gr, "glass");
-        }
-        Put("wall_corner", new Vector3(-HalfX, 0, -HalfZ), 0, S, null, room);
-        Put("wall_corner", new Vector3(HalfX, 0, -HalfZ), 0, S, null, room);
         // 벽 위 전구 줄
         for (int ix = 0; ix < NX; ix += 1)
             Put("string_lights", new Vector3(-HalfX + SEG * (ix + 0.5f), 3.35f * S, -HalfZ + 0.15f), 0, S * 0.62f, null, room);
@@ -244,22 +237,27 @@ public partial class AcRoom : MonoBehaviour
     void BuildOutdoors()
     {
         var o = new GameObject("Outdoors").transform; o.SetParent(world, false);
-        for (int ix = -3; ix <= 3; ix++)
+        int gx = Mathf.CeilToInt((HouseHalf + 20f) / 8f);
+        for (int ix = -gx; ix <= gx; ix++)
             for (int iz = 0; iz < 4; iz++)
             {
                 Put("ground_snow", new Vector3(ix * 8f, -0.05f, -HalfZ - 4f - iz * 8f), Random.Range(0, 4) * 90, 2f, null, o);
-                Put("ground_snow", new Vector3(-HalfX - 4f - iz * 8f, -0.05f, ix * 8f), 0, 2f, null, o);
-                Put("ground_snow", new Vector3(HalfX + 4f + iz * 8f, -0.05f, ix * 8f), 0, 2f, null, o);
                 Put("ground_snow", new Vector3(ix * 8f, -0.05f, HalfZ + 4f + iz * 8f), 0, 2f, null, o);
+            }
+        for (int iz = -2; iz <= 2; iz++)
+            for (int k = 0; k < 3; k++)
+            {
+                Put("ground_snow", new Vector3(-HouseHalf - 4f - k * 8f, -0.05f, iz * 8f), 0, 2f, null, o);
+                Put("ground_snow", new Vector3(HouseHalf + 4f + k * 8f, -0.05f, iz * 8f), 0, 2f, null, o);
             }
         string[] trees = { "pine_snowy", "pine_tall", "pine_small", "bare_tree", "birch", "palm_cedar", "round_tree" };
         var rnd = new System.Random(5);
-        for (int i = 0; i < 46; i++)
+        for (int i = 0; i < 150; i++)
         {
-            float side = rnd.Next(3);
-            Vector3 p = side == 0 ? new Vector3(-HalfX - 12 + (float)rnd.NextDouble() * (2 * HalfX + 24), 0, -HalfZ - 5 - (float)rnd.NextDouble() * 22)
-                      : side == 1 ? new Vector3(-HalfX - 4 - (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8))
-                                  : new Vector3(HalfX + 4 + (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8));
+            float side = rnd.Next(5);
+            Vector3 p = side <= 2 ? new Vector3(-HouseHalf - 12 + (float)rnd.NextDouble() * (2 * HouseHalf + 24), 0, -HalfZ - 4 - (float)rnd.NextDouble() * 24)
+                      : side == 3 ? new Vector3(-HouseHalf - 4 - (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8))
+                                  : new Vector3(HouseHalf + 4 + (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8));
             if (Mathf.Abs(p.x) < 6 && p.z > -HalfZ - 9 && p.z < -HalfZ - 2) continue;   // 창밖 눈사람 자리
             if (Mathf.Abs(p.x - DoorPos.x) < 3.5f && p.z > -HalfZ - 12) continue;          // 현관 앞 길
             Put(trees[rnd.Next(trees.Length)], p, rnd.Next(360), 0.9f + (float)rnd.NextDouble() * 0.6f, null, o);
@@ -273,6 +271,14 @@ public partial class AcRoom : MonoBehaviour
         Put("sled", new Vector3(5.6f, 0, -HalfZ - 4.6f), 70, 1.2f, null, o);
         Put("mailbox", new Vector3(DoorPos.x + 2.6f, 0, -HalfZ - 1.8f), 180, 1.2f, null, o);
         for (int i = -3; i <= 2; i++) Put("fence", new Vector3(i * 2.1f * 1.2f, 0, -HalfZ - 9.5f), 0, 1.2f, null, o);
+        // 각 방 창밖 풍경
+        var outs = new[] { "snowman_bucket", "lamp_post", "snow_pile", "igloo", "snowman_small", "sled", "bench", "snowball_pile" };
+        for (int i = 0; i < 8; i++)
+        {
+            float x = (i < 4 ? -HalfX - (i + 0.5f) * RoomW : HalfX + (i - 4 + 0.5f) * RoomW);
+            Put(outs[i], new Vector3(x + (i % 2 == 0 ? -2f : 2.5f), 0, -HalfZ - 4.5f - (i % 3)), i * 40, outs[i] == "igloo" ? 1.1f : 1.15f, null, o);
+            Put("lamp_post", new Vector3(x + 4.5f, 0, -HalfZ - 2.6f), 0, 1.1f, null, o);
+        }
         Put("igloo", new Vector3(10f, 0, -HalfZ - 12f), -30, 1.5f, null, o);
         Put("bush_snowy", new Vector3(-6f, 0, -HalfZ - 2.5f), 0, 1.3f, null, o);
         Put("bush_holly", new Vector3(DoorPos.x - 2.4f, 0, -HalfZ - 1.5f), 0, 1.3f, null, o);
@@ -328,14 +334,14 @@ public partial class AcRoom : MonoBehaviour
         Put("side_table", new Vector3(fx + 1.8f, 0, fz + 4.9f), 0, 1.1f, null, f);
         Put("table_lamp", new Vector3(fx + 1.8f, 0.62f * 1.1f, fz + 4.9f), 0, 1.1f, null, f);
         Put("cushion", new Vector3(fx - 1.2f, 0, fz + 2.6f), 20, 1.3f, null, f);
-        Put("bookshelf", new Vector3(-HalfX + 0.3f, 0, 1.6f), 90, 1.25f, null, f);
-        Put("bookshelf", new Vector3(-HalfX + 0.3f, 0, 3.4f), 90, 1.25f, new Dictionary<string, Color> { { "wood", new Color(0.62f, 0.42f, 0.28f) } }, f);
-        Put("poinsettia", new Vector3(-HalfX + 0.6f, 0, -0.6f), 0, 1.3f, null, f);
+        Put("bookshelf", new Vector3(-HalfX + 0.45f, 0, 2.6f), 90, 1.25f, null, f);
+        Put("bookshelf", new Vector3(-HalfX + 0.45f, 0, 4.4f), 90, 1.25f, new Dictionary<string, Color> { { "wood", new Color(0.62f, 0.42f, 0.28f) } }, f);
+        Put("poinsettia", new Vector3(-HalfX + 0.7f, 0, -2.4f), 0, 1.3f, null, f);
 
         // 피아노·시계 (오른쪽 뒤)
         Put("piano", new Vector3(HalfX - SEG * 1.5f + 0.3f, 0, -HalfZ + 0.5f), 0, 1.2f, null, f);
-        Put("wall_clock", new Vector3(HalfX - SEG * 2.6f, 0, -HalfZ + 0.3f), 0, 1.25f, null, f);
-        Put("poinsettia", new Vector3(HalfX - SEG * 0.5f - 1.1f, 0, -HalfZ + 0.9f), 0, 1.3f, null, f);
+        Put("wall_clock", new Vector3(HalfX - SEG * 1.9f, 0, -HalfZ + 0.3f), 0, 1.25f, null, f);
+        Put("poinsettia", new Vector3(HalfX - 0.7f, 0, -HalfZ + 0.9f), 0, 1.3f, null, f);
         Put("snow_globe", new Vector3(HalfX - SEG * 1.5f + 0.9f, 1.4f * 1.2f, -HalfZ + 0.4f), 0, 1.2f, null, f);
 
         // 식탁 (오른쪽 앞)
@@ -349,13 +355,13 @@ public partial class AcRoom : MonoBehaviour
         Put("cookie_plate", dt + new Vector3(0, 0.8f * 1.15f, -0.3f), 0, 1.3f, null, f);
         Put("candle_set", dt + new Vector3(0, 0.8f * 1.15f, 0.4f), 90, 1.2f, null, f);
         PointLight(dt + new Vector3(0, 1.5f, 0.4f), new Color(1f, 0.8f, 0.5f), 4f, 0.8f);
-        Put("gingerbread_man", new Vector3(HalfX - 0.8f, 0, 4.6f), -110, 1.1f, null, f);
-        Put("gingerbread_woman", new Vector3(HalfX - 1.6f, 0, 5.3f), -140, 1.1f, null, f);
-        Put("reindeer_plush", new Vector3(HalfX - 0.8f, 0, -0.4f), -90, 1.2f, null, f);
-        Put("candy_cane_big", new Vector3(HalfX - 0.5f, 0, 0.8f), -90, 1.3f, null, f);
+        Put("gingerbread_man", new Vector3(HalfX - 3.4f, 0, 6.6f), -160, 1.1f, null, f);
+        Put("gingerbread_woman", new Vector3(HalfX - 4.6f, 0, 6.8f), -170, 1.1f, null, f);
+        Put("reindeer_plush", new Vector3(HalfX - 0.9f, 0, 5.2f), -110, 1.2f, null, f);
+        Put("candy_cane_big", new Vector3(HalfX - 0.6f, 0, 2.6f), -90, 1.3f, null, f);
         Put("mistletoe", new Vector3(HalfX - SEG * 0.5f, 3.2f * S, -HalfZ + 1.6f), 0, 1.4f, null, f);
-        Put("tv_retro", new Vector3(HalfX - 0.6f, 0, -2.6f), -90, 1.15f, null, f);
-        Put("ottoman", new Vector3(HalfX - 2.2f, 0, -2.6f), 0, 1.1f, null, f);
+        Put("tv_retro", new Vector3(HalfX - 0.7f, 0, 3.8f), -90, 1.15f, null, f);
+        Put("ottoman", new Vector3(HalfX - 2.2f, 0, 3.8f), 0, 1.1f, null, f);
         Put("bell_pair", new Vector3(HalfX - SEG * 0.5f, 2.55f * S, -HalfZ + 0.2f), 0, 1.3f, null, f);
     }
 
@@ -411,6 +417,7 @@ public partial class AcRoom : MonoBehaviour
             case "q": return kb.qKey.wasPressedThisFrame; case "e": return kb.eKey.wasPressedThisFrame;
             case "c": return kb.cKey.wasPressedThisFrame; case "f2": return kb.f2Key.wasPressedThisFrame;
             case "esc": return kb.escapeKey.wasPressedThisFrame;
+            case "f11": return kb.f11Key.wasPressedThisFrame;
             case "z": return kb.zKey.wasPressedThisFrame; case "x": return kb.xKey.wasPressedThisFrame; case "v": return kb.vKey.wasPressedThisFrame;
             case "enter": return kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
             case "left": return kb.leftArrowKey.wasPressedThisFrame; case "right": return kb.rightArrowKey.wasPressedThisFrame;
@@ -428,6 +435,7 @@ public partial class AcRoom : MonoBehaviour
             case "q": return Input.GetKeyDown(KeyCode.Q); case "e": return Input.GetKeyDown(KeyCode.E);
             case "c": return Input.GetKeyDown(KeyCode.C); case "f2": return Input.GetKeyDown(KeyCode.F2);
             case "esc": return Input.GetKeyDown(KeyCode.Escape);
+            case "f11": return Input.GetKeyDown(KeyCode.F11);
             case "z": return Input.GetKeyDown(KeyCode.Z); case "x": return Input.GetKeyDown(KeyCode.X); case "v": return Input.GetKeyDown(KeyCode.V);
             case "enter": return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
             case "left": return Input.GetKeyDown(KeyCode.LeftArrow); case "right": return Input.GetKeyDown(KeyCode.RightArrow);
@@ -509,6 +517,8 @@ public partial class AcRoom : MonoBehaviour
         if (decorating) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
 
         if (Time.time > nextPoll) { nextPoll = Time.time + 2f; PollOrnaments(false); }
+        CheckArea();
+        if (Key("f11")) Screen.fullScreenMode = Screen.fullScreenMode == FullScreenMode.Windowed ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
         if (sync != null) sync.SetMe(MyNet());
     }
 
@@ -703,6 +713,15 @@ public partial class AcRoom : MonoBehaviour
         }
         if (treeCol.Raycast(ray, out var hit, 100f))
         {
+            if (IsGarland(ornTypes[ornSel]))
+            {
+                float gy = hit.point.y + 0.08f;
+                GhostGarland(gy);
+                pointerFocus = hit.point;
+                FocusAt(hit.point, true);
+                if (MouseDown(0)) AddOrn(ornTypes[ornSel], CurColor, new Vector3(TreePos.x, gy, TreePos.z), 0);
+                return;
+            }
             if (ghost == null || ghost.name != ornTypes[ornSel]) RefreshGhost();
             ghost.SetActive(true);
             OrnPlacement(hit, out var pos, out var ry);
@@ -721,14 +740,15 @@ public partial class AcRoom : MonoBehaviour
     void RefreshGhost()
     {
         if (ghost) Destroy(ghost);
-        if (ornTypes.Count == 0) return;
+        ghost = null; ghostGarlandY = -99;
+        if (ornTypes.Count == 0 || IsGarland(ornTypes[ornSel])) return;
         ghost = AcCatalog.Spawn(ornTypes[ornSel], world, new Dictionary<string, Color> { { "orn", CurColor } });
         ghost.name = ornTypes[ornSel];
         ghost.transform.localScale = Vector3.one * OrnScale;
         foreach (var r in ghost.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
     }
 
-    const float OrnScale = 3.2f;
+    const float OrnScale = 2.4f;
 
     void AddOrn(string type, Color c, Vector3 pos, float ry)
     {
@@ -750,6 +770,7 @@ public partial class AcRoom : MonoBehaviour
     void ShowOrn(Orn o)
     {
         if (ornObjs.ContainsKey(o.id)) return;
+        if (IsGarland(o.type)) { ShowGarland(o); return; }
         ColorUtility.TryParseHtmlString("#" + o.color, out var c);
         var go = AcCatalog.Spawn(o.type, world, new Dictionary<string, Color> { { "orn", c } });
         go.transform.position = new Vector3(o.x, o.y, o.z);
@@ -964,7 +985,7 @@ public partial class AcRoom : MonoBehaviour
         }
         if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), "›", sLabel);
         var it = AcCatalog.Get(ornTypes[ornSel]);
-        GUI.Label(new Rect(26, y + 102, 300, 22), it != null ? it.desc : ornTypes[ornSel], sSmall);
+        GUI.Label(new Rect(26, y + 102, 420, 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " — 트리를 누른 높이에 한 바퀴 둘러요" : it != null ? it.desc : ornTypes[ornSel], sSmall);
         // 색: ◀ ■ 이름 ▶
         float cx = SW - 290, cy = y + 40;
         GUI.Label(new Rect(cx, cy - 6, 260, 22), "색", sSmall);
