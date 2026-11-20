@@ -700,7 +700,7 @@ public partial class AcRoom : MonoBehaviour
         if (phase == Phase.Lobby)
         {
             // 입장 화면: 캐릭터를 앞에서 가까이 (뒤로 현관문이 보임). 왼쪽 패널을 피해 캐릭터를 오른쪽에
-            if (Screen.height > Screen.width) { focus = me.transform.position + new Vector3(0, -0.3f, 0); dist = 5.2f; }   // 세로 화면: 캐릭터를 위쪽에, 아래는 패널
+            if (Screen.height > Screen.width) { focus = me.transform.position + new Vector3(0, -0.45f, 0); dist = 7.5f; }   // 세로 화면: 캐릭터를 위쪽에, 아래는 패널
             else { focus = me.transform.position + new Vector3(0.6f, 0.72f, 0); dist = 4.0f; }
             pitch = 8f; targetYaw = 180f;
             me.transform.rotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 0.6f) * 35f, 0);
