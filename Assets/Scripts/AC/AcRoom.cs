@@ -1,4 +1,4 @@
-// AcRoom.cs - 동물의 숲풍 크리스마스 거실 (모델 미리보기 + 트리 꾸미기)
+// AcRoom.cs - 동물의 숲풍 크리스마스 파티 (모델 미리보기 + 트리 꾸미기)
 // StreamingAssets/models/catalog.json 이 있으면 이 장면이 켜져요 (예전 디오라마 대신).
 //
 // 흐름: 입장 화면(캐릭터 꾸미기 + 공유 폴더/이름) → 현관문으로 들어옴 → 거실에서 함께 트리 꾸미기
@@ -105,7 +105,7 @@ public partial class AcRoom : MonoBehaviour
             using (var r = UnityWebRequest.Get(Application.streamingAssetsPath + "/models/models.pack"))
             {
                 var op = r.SendWebRequest();
-                while (!op.isDone) { loadingMsg = $"크리스마스 거실 불러오는 중... {Mathf.RoundToInt(r.downloadProgress * 100)}%"; yield return null; }
+                while (!op.isDone) { loadingMsg = $"크리스마스 파티 불러오는 중... {Mathf.RoundToInt(r.downloadProgress * 100)}%"; yield return null; }
                 if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; yield break; }
                 loadingMsg = "집 짓는 중...";
                 yield return null;
@@ -861,7 +861,7 @@ public partial class AcRoom : MonoBehaviour
         if (!Ready)
         {
             GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.12f, 0.2f, 0.17f)));
-            GUI.Label(new Rect(0, SH / 2 - 30, SW, 40), "<size=26><color=#fff3d6>크리스마스 거실</color></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(0, SH / 2 - 30, SW, 40), "<size=26><color=#fff3d6>크리스마스 파티</color></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
             GUI.Label(new Rect(0, SH / 2 + 14, SW, 30), "<color=#d8e8d0>" + loadingMsg + "</color>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
             return;
         }
@@ -968,7 +968,7 @@ public partial class AcRoom : MonoBehaviour
         var r = portrait ? new Rect((SW - lw) / 2, SH * 0.46f, lw, SH * 0.54f - 10) : new Rect(Mathf.Min(20, (SW - lw) / 2), 16, lw, SH - 32);
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 16, r.y + 10, r.width - 32, r.height - 20));
-        GUILayout.Label(portrait ? "<size=20>크리스마스 거실</size>" : "<size=24>크리스마스 거실</size>", sLabel);
+        GUILayout.Label(portrait ? "<size=20>크리스마스 파티</size>" : "<size=24>크리스마스 파티</size>", sLabel);
         if (!portrait) { GUILayout.Label("캐릭터를 꾸미고 현관으로 들어가세요. 다 함께 커다란 트리를 꾸며요!", sSmall); GUILayout.Space(8); }
         GUILayout.BeginHorizontal();
         GUILayout.Label("이름", sSmall, GUILayout.Width(60));

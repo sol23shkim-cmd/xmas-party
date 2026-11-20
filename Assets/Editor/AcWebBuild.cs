@@ -23,7 +23,7 @@ public static class AcWebBuild
         PlayerSettings.WebGL.template = "APPLICATION:Default";
         PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.Minimal);
         PlayerSettings.runInBackground = true;
-        PlayerSettings.productName = "크리스마스 거실";
+        PlayerSettings.productName = "크리스마스 파티";
         PlayerSettings.companyName = "xmas-plaza";
 
         var scene = EditorSceneManager.GetActiveScene().path;
