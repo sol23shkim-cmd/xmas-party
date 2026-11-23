@@ -122,6 +122,7 @@ public partial class AcRoom : MonoBehaviour
         BuildOutdoors();
         BuildFurniture();
         ClearPassages();
+        BuildNav();
 
         myId = PlayerPrefs.GetString("ac_id2", "");
         if (myId == "") { myId = "p" + Guid.NewGuid().ToString("N").Substring(0, 10); PlayerPrefs.SetString("ac_id2", myId); }

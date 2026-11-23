@@ -59,7 +59,7 @@ public partial class AcRoom
         if (MoveAxis().sqrMagnitude > 0.01f || (ptrDown && !ptrOnUI) || decorating || building || lettersOpen) { followId = null; return; }
         var tp = r.c.transform.position;
         if (Vector3.Distance(tp, me.transform.position) < 1.7f) { walkTarget = null; return; }
-        walkTarget = NextWaypoint(me.transform.position, tp);
+        walkTarget = FollowStep(me.transform.position, tp);
     }
 
     // 벽을 돌아서 가는 다음 지점
