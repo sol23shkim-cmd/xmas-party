@@ -88,7 +88,25 @@ public partial class AcRoom
 
     static float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
 
-    Vector3 IndoorStep(Vector3 a, Vector3 b)
+    // 가는 길이 트리를 지나가면 트리 옆으로 돌아감
+    Vector3 AvoidTree(Vector3 a, Vector3 b)
+    {
+        var t = new Vector3(TreePos.x, 0, TreePos.z);
+        var ab = b - a; ab.y = 0; float len = ab.magnitude;
+        if (len < 0.01f) return b;
+        var d = ab / len;
+        float along = Mathf.Clamp(Vector3.Dot(t - a, d), 0, len);
+        var closest = a + d * along; closest.y = 0;
+        var off = closest - t; off.y = 0;
+        if (off.magnitude > 3.1f || along <= 0.01f || along >= len - 0.01f) return b;
+        if (off.magnitude < 0.05f) off = new Vector3(-d.z, 0, d.x);
+        var w = t + off.normalized * 3.7f;
+        return Flat(a, w) < 0.8f ? b : w;
+    }
+
+    Vector3 IndoorStep(Vector3 a, Vector3 b) => AvoidTree(a, IndoorStepRaw(a, b));
+
+    Vector3 IndoorStepRaw(Vector3 a, Vector3 b)
     {
         var bx = Bounds(); int n = bx.Count;
         int ka = 0, kb = 0;
