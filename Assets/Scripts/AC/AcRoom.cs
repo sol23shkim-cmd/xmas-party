@@ -313,7 +313,7 @@ public partial class AcRoom : MonoBehaviour
         Put("lantern_ground", new Vector3(DoorPos.x - 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
         Put("mailbox", new Vector3(FrontDoorPos.x + 2.4f, 0, HalfZ + 1.8f), 0, 1.2f, null, o);
         // 입구(현관문) 옆 우편함: 가까이 가면 '편지함' 버튼
-        mailPos = new Vector3(HalfX - 0.45f, 0, -HalfZ + 1.5f);   // 현관문 바로 안쪽, 문 옆 벽가
+        mailPos = new Vector3(HalfX - 0.5f, 0, -HalfZ + 2.9f);   // 현관문 안쪽 벽가 (문 통로 1.9m 밖: ClearPassages가 지우지 않게)
         Put("mailbox", mailPos, -90, 1.3f, new Dictionary<string, Color> { { "box", new Color(0.86f, 0.22f, 0.24f) } }, o);
         mailPos2 = new Vector3(FrontDoorPos.x + 2.4f, 0, HalfZ + 1.8f);
         Put("snowman_big", new Vector3(DoorPos.x - 3.2f, 0, -HalfZ - 3.4f), 15, 1.1f, null, o);
