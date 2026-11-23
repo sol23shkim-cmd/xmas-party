@@ -11,7 +11,7 @@ public class AcAudioImport : AssetPostprocessor
         bool sfx = assetPath.Contains("/Sfx/");
         var s = imp.defaultSampleSettings;
         s.compressionFormat = AudioCompressionFormat.Vorbis;
-        s.quality = sfx ? 0.6f : 0.45f;
+        s.quality = sfx ? 0.6f : 0.3f;
         s.loadType = sfx ? AudioClipLoadType.DecompressOnLoad : AudioClipLoadType.CompressedInMemory;
         s.sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate;
         imp.defaultSampleSettings = s;

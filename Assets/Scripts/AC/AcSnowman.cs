@@ -433,16 +433,21 @@ public partial class AcRoom
         var box = new Rect(10, y, SW - 20, h);
         GUI.Box(R(box), "", sBox);
         string[] tabs = { "눈덩이", "장식 붙이기", "모자·목도리" };
-        float tw = narrow ? 92 : 120;
+        float tw = narrow ? (SW - 44 - 12) / 3f : 120;
         for (int i = 0; i < tabs.Length; i++)
         {
             var tr = new Rect(22 + i * (tw + 6), y + 8, tw, 30);
             if (i == snowTab) GUI.DrawTexture(new Rect(tr.x - 2, tr.y - 2, tr.width + 4, tr.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
             if (GUI.Button(tr, tabs[i], sBtn)) snowTab = i;
         }
-        float bw = narrow ? 70 : 90;
-        if (GUI.Button(new Rect(SW - 20 - bw * 2 - 18, y + 8, bw, 30), "취소", sBtn)) { StopBuilding(); return; }
-        if (GUI.Button(new Rect(SW - 20 - bw - 8, y + 8, bw, 30), "<b>완성!</b>", sBtn)) { FinishSnowman(); return; }
+        float bw = narrow ? 84 : 90;
+        // 좁은 화면: 취소·완성은 패널 위 오른쪽에 따로 (탭과 겹치지 않게)
+        float by = narrow ? y - 48 : y + 8, bh = narrow ? 38 : 30;
+        var cr = new Rect(SW - 20 - bw * 2 - 18, by, bw, bh); var fr = new Rect(SW - 20 - bw - 8, by, bw, bh);
+        if (narrow) GUI.Box(R(new Rect(cr.x - 6, by - 5, bw * 2 + 22, bh + 10)), "", sBox);
+        R(cr); R(fr);
+        if (GUI.Button(cr, "취소", sBtn)) { StopBuilding(); return; }
+        if (GUI.Button(fr, "<b>완성!</b>", sBtn)) { FinishSnowman(); return; }
 
         float cy = y + 48, lx = 26, labelW = narrow ? 100 : 130, valW = narrow ? 140 : 170;
         bool changed = false;

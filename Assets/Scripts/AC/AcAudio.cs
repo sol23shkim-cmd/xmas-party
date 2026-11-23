@@ -4,13 +4,13 @@ using UnityEngine;
 
 public partial class AcRoom
 {
-    static readonly string[] Carols = { "carol_jingle", "carol_wish", "carol_deck", "carol_joy", "carol_hark", "carol_angels" };
+    static readonly string[] Carols = { "carol_silent", "carol_tree", "carol_noel" };   // 잔잔한 로맨틱 캐럴 3곡
     AudioSource musicA, musicB;      // 두 개로 겹쳐서 부드럽게 바꿈
     readonly List<AudioSource> sfxPool = new List<AudioSource>();
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     bool musicOn = true, inGameMusic;
     int lastCarol = -1; float musicGap;
-    float musicVol = 0.55f, fade = 1f;
+    float musicVol = 0.5f, fade = 1f;
 
     void InitAudio()
     {
