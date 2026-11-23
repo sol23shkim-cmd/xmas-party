@@ -323,7 +323,8 @@ public partial class AcRoom
         if (ptrDown) longUsed = false;
         me.speed = 0;
         bool over = !OverUI(ptrPos) && snowTab == 1;
-        bool hit = over && PickTier(ptrPos, out int tier, out var dir, out float dist);
+        int tier = -1; Vector3 dir = Vector3.forward; float dist = 0;
+        bool hit = over && PickTier(ptrPos, out tier, out dir, out dist);
         // 미리보기 장식 (가리키는 곳)
         string key = CurDeco + snowColSel + snowSizeSel;
         if (hit && !IsMobileTouchIdle())
