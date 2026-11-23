@@ -84,6 +84,19 @@ public partial class AcRoom
             return;
         }
         if (ptrDown) longUsed = false;
+        // 눈싸움: 톡 누르면 그곳(또는 누른 친구)으로 눈덩이를 던짐 (끌면 걸어감)
+        if (snowMode && Tap)
+        {
+            var ray = cam.ScreenPointToRay(ptrPos); Vector3? tgt = null;
+            foreach (var kv in remotes)
+            {
+                if (!kv.Value.c) continue;
+                var c = kv.Value.c.transform.position + Vector3.up * 0.6f;
+                if (Vector3.Cross(ray.direction, c - ray.origin).magnitude < 0.7f) { tgt = kv.Value.c.transform.position; break; }
+            }
+            if (!tgt.HasValue && GroundAt(ptrPos, out var gp)) tgt = gp;
+            if (tgt.HasValue) { ThrowSnowball(tgt.Value); walkTarget = null; return; }
+        }
         // 꾸미는 중에 트리를 누른 것이면 이동하지 않음
         bool onTree = decorating && treeCol != null && treeCol.Raycast(cam.ScreenPointToRay(ptrPos), out _, 100f);
         if (ptrDown) onTreeAtDown = onTree;

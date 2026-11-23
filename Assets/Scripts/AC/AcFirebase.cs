@@ -33,7 +33,7 @@ public class AcFirebase : MonoBehaviour
 
     // 서버 시계 맞추기: 내 기록에 서버 시각을 넣고 다시 읽어서 비교
     double serverT; float serverAt = -1;
-    double ServerNow => serverAt < 0 ? 0 : serverT + (Time.realtimeSinceStartup - serverAt) * 1000.0;
+    public double ServerNow => serverAt < 0 ? 0 : serverT + (Time.realtimeSinceStartup - serverAt) * 1000.0;
 
     string Base => DbUrl + "/rooms/" + UnityWebRequest.EscapeURL(room);
     string MyUrl => Base + "/players/" + UnityWebRequest.EscapeURL(myId) + ".json";
@@ -147,6 +147,8 @@ public class AcFirebase : MonoBehaviour
         if (p[0] == "msg" && p.Length == 3) return "orn/x~msg~" + p[1] + "~" + p[2];
         if (p[0] == "members" && p.Length == 2) return "orn/x~member~" + p[1];
         if (p[0] == "scores" && p.Length == 2) return "orn/x~score~" + p[1];
+        if (p[0] == "quiz" && p.Length == 2) return "orn/x~quiz~" + p[1];
+        if (p[0] == "sbf" && p.Length == 2) return "orn/x~sbf~" + p[1];
         return path;
     }
 
@@ -154,7 +156,7 @@ public class AcFirebase : MonoBehaviour
     {
         var p = path.Split('/');
         string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~"
-                      : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : null;
+                      : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : p[0] == "quiz" ? "x~quiz~" : p[0] == "sbf" ? "x~sbf~" : null;
         if (prefix != null)
         {
             var orn = Node("orn");
@@ -204,7 +206,7 @@ public class AcFirebase : MonoBehaviour
                 id = kv.Key, name = AcJson.S(d, "name"), look = AcJson.S(d, "look"),
                 x = AcJson.F(d, "x"), z = AcJson.F(d, "z"), ry = AcJson.F(d, "ry"), speed = AcJson.F(d, "speed"),
                 emote = AcJson.S(d, "emote"), emoteT = AcJson.D(d, "emoteT"), chat = AcJson.S(d, "chat"), chatT = AcJson.D(d, "chatT"),
-                decorating = AcJson.B(d, "decorating"), skate = AcJson.B(d, "skate"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
+                decorating = AcJson.B(d, "decorating"), skate = AcJson.B(d, "skate"), act = AcJson.S(d, "act"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
             };
             // 오래 안 바뀐 기록(꺼진 사람)은 빼기
             if (now > 0 && n.t > 0 && now - n.t > 10000) continue;

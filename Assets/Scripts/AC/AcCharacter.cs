@@ -210,6 +210,17 @@ public class AcCharacter : MonoBehaviour
                     if (armR) armR.localRotation = Quaternion.Euler(0, 0, 4f + k * 160f);
                     jump = emote == "cheer" ? Mathf.Abs(Mathf.Sin(et * 9f)) * 0.12f * k : 0;
                     break;
+                case "throw":     // 눈덩이 던지기: 오른팔을 뒤로 젖혔다가 앞으로
+                    {
+                        float a = et < 0.18f ? Mathf.Lerp(0, 150, et / 0.18f) : Mathf.Lerp(150, -70, Mathf.Clamp01((et - 0.18f) / 0.15f));
+                        if (armR) armR.localRotation = Quaternion.Euler(a * Mathf.Clamp01((1.8f - et) * 3), 0, 12f);
+                    }
+                    break;
+                case "hit":       // 눈덩이에 맞음: 팔 벌리고 움찔
+                    if (armL) armL.localRotation = Quaternion.Euler(0, 0, -80f * k);
+                    if (armR) armR.localRotation = Quaternion.Euler(0, 0, 80f * k);
+                    jump = Mathf.Abs(Mathf.Sin(et * 10f)) * 0.06f * k;
+                    break;
                 case "heart":     // 폴짝
                 case "gift":
                     jump = Mathf.Abs(Mathf.Sin(et * 7f)) * 0.15f * k;

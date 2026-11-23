@@ -19,6 +19,27 @@ def musicbox(f, dur, vel=1.0):
     x = np.sin(2*np.pi*f*t)*np.exp(-t*2.2) + 0.35*np.sin(2*np.pi*f*3.01*t)*np.exp(-t*5) + 0.12*np.sin(2*np.pi*f*5.4*t)*np.exp(-t*9)
     return x * np.minimum(1, t / 0.003) * vel * 0.42
 
+def epiano(f, dur, vel=1.0):     # 부드러운 전자 피아노 (띵띵거리지 않게 배음을 줄임)
+    n = int((dur + 1.0) * SR); t = np.arange(n) / SR
+    x = np.sin(2*np.pi*f*t) + 0.22*np.sin(2*np.pi*2*f*t)*np.exp(-t*3) + 0.05*np.sin(2*np.pi*3*f*t)*np.exp(-t*6)
+    rel = np.ones(n); k = int(dur * SR)
+    if k < n: rel[k:] = np.exp(-(t[k:] - t[k]) * 6)
+    return x * np.minimum(1, t / 0.012) * np.exp(-t * 0.9) * rel * vel * 0.3
+
+def flute(f, dur, vel=1.0):      # 숨결 섞인 플루트 느낌
+    n = int((dur + 0.25) * SR); t = np.arange(n) / SR
+    vib = 1 + 0.004 * np.sin(2*np.pi*5.2*t) * np.clip(t * 2 - 0.3, 0, 1)
+    ph = 2*np.pi*np.cumsum(f*vib)/SR
+    x = np.sin(ph) + 0.12*np.sin(2*ph) + 0.03*np.sin(3*ph)
+    nz = rng.standard_normal(n); nz = np.convolve(nz, np.ones(40)/40, 'same') * 0.15
+    return (x + nz) * env_adsr(n, 0.07, 0.1, 0.85, 0.18) * vel * 0.2
+
+def softpiano(f, dur, vel=1.0):
+    n = int((dur + 0.7) * SR)
+    x = additive(f, n, [1, 0.3, 0.1, 0.04], decay=1.8)
+    t = np.arange(n) / SR
+    return x * np.minimum(1, t / 0.006) * vel * 0.13
+
 def strings(f, dur, vel=1.0):
     n = int((dur + 0.8) * SR)
     amps = [1, 0.5, 0.33, 0.25, 0.18, 0.12, 0.08]
@@ -48,7 +69,7 @@ def arrange(name, sd, out):
     bpm, meter = sd['bpm'], sd['meter']; beat = 60 / bpm; bar = beat * meter
     notes, chords = sd['notes'], sd['chords']
     nb = len(chords)
-    form = [('musicbox', 0, 0), ('piano', 0, 1), ('piano', sd['lead2_up'], 1)]
+    form = [('flute', 0, 0), ('epiano', 0, 1), ('both', sd['lead2_up'], 1)]
     total = (4 + nb * len(form) + 3) * bar + 4
     mx = Mix(total)
     def comp(t, tr, energy):
@@ -58,32 +79,29 @@ def arrange(name, sd, out):
             if energy: mx.add(bass(hz(root - 12 + 7), beat * 0.9, 0.4), tb + 2 * beat, 0, 0.8, 0.05)
             # 피아노 왈츠 아르페지오 (8분음)
             arp = [root + 12, root + 12 + iv[1], root + 12 + iv[2], root + 24, root + 12 + iv[2], root + 12 + iv[1]]
-            for k in range(6): mx.add(piano(hz(arp[k]), beat * 0.6, 0.55 if k else 0.7), tb + k * beat / 2, 0.25, 0.75, 0.45)
+            for k in range(6): mx.add(softpiano(hz(arp[k] - 12 if k else arp[k]), beat * 0.8, 0.5 if k else 0.65), tb + k * beat / 2, 0.25, 0.7, 0.5)
             for i in iv: mx.add(strings(hz(root + 12 + i), bar, 1.0), tb, -0.3, 1.0, 0.55)
             if energy:
                 mx.add(soft_kick(0.8), tb, 0, 0.8, 0.05)
-                for k in (1, 2): mx.add(brush(1.0), tb + k * beat, 0.2, 0.9, 0.2)
-                mx.add(sleigh(0.35), tb + 2.5 * beat, -0.4, 0.5, 0.3)
+                for k in (1, 2): mx.add(brush(0.8), tb + k * beat, 0.2, 0.8, 0.2)
     def melody(t, inst, tr):
         tt = t
         for m, d in notes:
             if m is not None:
                 f = hz(m + tr)
-                if inst == 'musicbox': mx.add(musicbox(f * 2, d * beat, 1.0), tt, 0, 1.0, 0.5)
-                else:
-                    mx.add(piano(f * 2, d * beat * 0.95, 1.35), tt, -0.1, 1.0, 0.45)
-                    mx.add(celesta(f * 4, d * beat, 0.25), tt, 0.3, 0.5, 0.5)
+                if inst in ('flute', 'both'): mx.add(flute(f * 2, d * beat * 0.97, 1.0), tt, 0.05, 1.0, 0.45)
+                if inst in ('epiano', 'both'): mx.add(epiano(f * (1 if inst == 'both' else 2), d * beat, 1.0), tt, -0.15, 0.9, 0.45)
             tt += d * beat
     t = 0
     comp(t, 0, 0)
-    for k in range(8): mx.add(musicbox(hz(84 + [0, 4, 7, 12, 7, 4, 0, -5][k]), 0.4, 0.5), t + k * bar / 2, 0.2, 0.6, 0.5)
+    root0, iv0 = chord(chords[0])
+    for i in iv0: mx.add(strings(hz(root0 + 12 + i), bar * 4, 1.0), t, 0, 0.9, 0.5)
     t += 4 * bar
     for inst, tr, en in form:
         comp(t, tr, en); melody(t, inst, tr); t += nb * bar
     root, iv = chord(chords[-1], form[-1][1])
-    for m in [root + 12 + i for i in iv] + [root + 24]: mx.add(piano(hz(m), bar * 2.5, 0.9), t, 0.2, 1.1, 0.5); mx.add(strings(hz(m), bar * 2.5, 1.2), t, -0.2, 1, 0.5)
+    for m in [root + 12 + i for i in iv] + [root + 24]: mx.add(softpiano(hz(m), bar * 2.5, 0.9), t, 0.2, 1.1, 0.5); mx.add(strings(hz(m), bar * 2.5, 1.2), t, -0.2, 1, 0.5)
     mx.add(bass(hz(root - 12), bar * 2, 0.6), t)
-    for k in range(6): mx.add(musicbox(hz(root + 24 + [0, 4, 7, 12, 16, 19][k] % 24), 0.5, 0.45), t + k * 0.12, 0.3, 0.6, 0.6)
     L = t + bar * 3
     mx.render(L, out=out, fade=1.5)
     print(name, round(L, 1))

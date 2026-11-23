@@ -10,7 +10,7 @@ public partial class AcRoom
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     bool musicOn = true, inGameMusic;
     int lastCarol = -1; float musicGap;
-    float musicVol = 0.5f, fade = 1f;
+    float musicVol = 0.34f, fade = 1f;
 
     void InitAudio()
     {

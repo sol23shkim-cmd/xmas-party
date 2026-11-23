@@ -132,10 +132,13 @@ public partial class AcRoom
     {
         if (phase != Phase.Play || showCustom) return;
         string label = null; Action act = null;
+        bool piano = NearPiano(out bool musicRoom);
+        bool inLibrary = !Outside && AreaAt(me.transform.position) == "서재";
         if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
         else if (NearTree) { label = "트리 꾸미기"; act = StartDecorating; }
         else if (Outside) { label = "눈사람 만들기"; act = StartBuilding; }
         else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
+        else if (piano) { label = "피아노 치기"; act = OpenPiano; }
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
@@ -144,17 +147,25 @@ public partial class AcRoom
         GUI.DrawTexture(new Rect(r.x - 4, r.y - 4, r.width + 8, r.height + 8), AcPalette.Tex(Color.Lerp(new Color(0.85f, 0.3f, 0.3f), new Color(0.98f, 0.78f, 0.32f), pulse)));
         R(r);
         if (GUI.Button(r, "<b>" + label + "</b>", sBtnBig)) act();
-        if (Outside)   // 스케이트
+        // 작은 버튼들: 오른쪽에 자리가 있으면 옆으로, 없으면 큰 버튼 위 한 줄로
+        var extra = new List<(string label, Action act, float w)>();
+        if (Outside)
         {
-            var r3 = Side(r, IsMobile ? 140 : 128);
-            R(r3);
-            if (GUI.Button(r3, me.skating ? "스케이트 벗기" : "스케이트 타기", sBtn)) { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }
+            extra.Add((me.skating ? "스케이트 벗기" : "스케이트 타기", () => { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }, IsMobile ? 132 : 120));
+            extra.Add((snowMode ? "눈싸움 그만" : "눈싸움", ToggleSnowFight, IsMobile ? 112 : 100));
         }
-        if (NearTree && !InStudy)   // 트리 전경 보기 (근처에서)
+        if (NearTree && !InStudy) extra.Add(("트리 전경", () => { treeOverview = true; decoYaw = 180f; decoZoom = 1f; }, IsMobile ? 112 : 100));
+        if (inLibrary) extra.Add(("크리스마스 퀴즈", OpenQuiz, IsMobile ? 150 : 136));
+        if (piano && label != "피아노 치기") extra.Add(("피아노 치기", OpenPiano, IsMobile ? 112 : 100));
+        if (extra.Count == 0) return;
+        float bh = h - 12, total = extra.Sum(e => e.w) + 10 * (extra.Count - 1);
+        bool right = r.xMax + 14 + total <= SW - 8;
+        float x = right ? r.xMax + 14 : SW / 2 - total / 2, yy = right ? r.y + 6 : r.y - bh - 14;
+        foreach (var e in extra)
         {
-            var r2 = Side(r, IsMobile ? 120 : 110);
-            R(r2);
-            if (GUI.Button(r2, "트리 전경", sBtn)) { treeOverview = true; decoYaw = 180f; }
+            var b = new Rect(x, yy, e.w, bh); R(b);
+            if (GUI.Button(b, e.label, sBtn)) e.act();
+            x += e.w + 10;
         }
     }
 

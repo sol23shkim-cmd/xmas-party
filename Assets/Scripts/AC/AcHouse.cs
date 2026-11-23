@@ -236,7 +236,7 @@ public partial class AcRoom
             }
         foreach (var cp in corners)
         {
-            var g = Put("wall_corner", new Vector3(cp.x, 0, cp.y), 0, S, null, houseTr);
+            var g = Put("wall_corner", new Vector3(cp.x, 0, cp.y), 0, S, null, houseTr); frontPosts.Add(g);
             if (cp.y > HalfZ - 0.1f) g.transform.localScale = new Vector3(S, S * 0.32f, S);
         }
         foreach (var gx in new[] { FrontGapX0, FrontGapX1 })
@@ -283,7 +283,7 @@ public partial class AcRoom
         foreach (var w in walls)
         {
             float target = w.baseH;
-            if (overview && !w.exterior) target = 0f;
+            if (overview) target = 0f;   // 트리 전경: 바깥벽까지 모든 벽을 숨김
             else if (w.alongX && !w.lowBase && phase != Phase.Lobby)
             {
                 bool between = w.pos.z > p.z + 0.25f && w.pos.z < p.z + 15f && Mathf.Abs(w.pos.x - p.x) < 15f;
@@ -302,8 +302,7 @@ public partial class AcRoom
         foreach (var w in walls)
             foreach (var d in w.decos) if (d) { bool vis = !overview && w.cur > 0.92f; if (d.activeSelf != vis) d.SetActive(vis); }
         if (overview != decosHidden) { decosHidden = overview; foreach (var d in looseDecos) if (d) d.SetActive(!overview); }
-        bool posts = !(overview || decorating);
-        foreach (var g in frontPosts) if (g && g.activeSelf != posts) g.SetActive(posts);
+        foreach (var g in frontPosts) { if (!g) continue; bool gate = g.transform.position.z > HalfZ - 0.1f && g.transform.position.x > FrontGapX0 - 0.1f && g.transform.position.x < FrontGapX1 + 0.1f; bool vis = !(overview || (decorating && gate)); if (g.activeSelf != vis) g.SetActive(vis); }
     }
     bool decosHidden;
 
