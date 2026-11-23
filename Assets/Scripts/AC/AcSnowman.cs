@@ -603,8 +603,10 @@ public partial class AcRoom
         if (snowFocusId == null) return false;
         if (!snowObjs.TryGetValue(snowFocusId, out var o) || !o.go) { snowFocusId = null; return false; }
         bool portrait = Screen.height > Screen.width;
-        focus = o.go.transform.position + Vector3.up * (portrait ? 0.45f : 0.7f);
-        dist = (portrait ? 6.2f : 4.4f) * decoZoom; pitch = 12f; targetYaw = snowFocusYaw;
+        float vfov = cam.fieldOfView * Mathf.Deg2Rad;
+        float need = Mathf.Max(2.6f, 1.9f / Mathf.Max(0.3f, cam.aspect));    // 눈사람 전체(약 1.8m)가 위아래·좌우로 들어오게
+        focus = o.go.transform.position + Vector3.up * (portrait ? 0.55f : 0.8f);
+        dist = need / (2f * Mathf.Tan(vfov / 2f)) * decoZoom; pitch = 12f; targetYaw = snowFocusYaw;
         return true;
     }
 

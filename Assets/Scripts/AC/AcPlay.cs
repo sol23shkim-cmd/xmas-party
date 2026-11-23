@@ -501,7 +501,8 @@ public partial class AcRoom
                 if (reveal && i == qz.correct) border = new Color(0.3f, 0.7f, 0.35f);
                 else if (reveal && answered && mine == i) border = new Color(0.9f, 0.3f, 0.3f);
                 GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(border));
-                if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", sBtn) && !reveal && !answered)
+                var cs = new GUIStyle(sBtn) { wordWrap = true }; if (qz.choices[i].Length > 14) cs.fontSize = Mathf.Max(11, sBtn.fontSize - 3);
+                if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", cs) && !reveal && !answered)
                 { myQuizAnswer[round] = i; AddAct("q", round + ":" + i); Sfx("click", 0.6f); }
             }
             quizAnswers.TryGetValue(round, out var others);

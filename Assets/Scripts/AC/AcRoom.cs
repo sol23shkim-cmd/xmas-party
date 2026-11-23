@@ -804,7 +804,7 @@ public partial class AcRoom : MonoBehaviour
         }
         // 트리를 볼 때는 카메라와 트리 사이 기둥·벽을 잘라냄 (가까운 면을 트리 바로 앞까지 당김)
         bool treeView = decorating || treeOverview;
-        float wantNear = treeOverview ? Mathf.Max(0.3f, dist - TreeR - 4.5f) : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
+        float wantNear = building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? Mathf.Max(0.3f, dist - TreeR - 4.5f) : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
         cam.nearClipPlane = snap ? wantNear : Mathf.Lerp(cam.nearClipPlane, wantNear, 1 - Mathf.Exp(-dt * 4f));
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
