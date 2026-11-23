@@ -467,3 +467,53 @@ def build_scarf():
     sc.paint(lambda p: (np.abs(p[:, 1] - 0.315) - 0.012) + (p[:, 2] < 0.08) * 5, (0.85, 0.85, 0.85), 1.0, soft=0.004)
     m.build(LO, HI, STEP, ao_scene=False)
     return m
+
+
+# ---------------------------------------------------------------- 쿠키 달리기용 진저브레드 쿠키 (팔다리가 따로 움직임)
+COOKIE = (0.80, 0.52, 0.28)
+ICING = (1.0, 0.98, 0.95)
+
+
+def build_cookie():
+    """진저브레드 쿠키: 머리·몸은 굽은 쿠키색(fur 묶음), 하얀 아이싱 줄, 단추는 스웨터 색(sweater 묶음).
+    모자·목도리가 다른 캐릭터와 똑같이 맞도록 머리 중심·목 높이는 같게."""
+    m = Model("char_cookie")
+    t = COOKIE
+    hr = np.array([0.33, 0.31, 0.2])
+    head = m.part("head", tint=t, group="fur", k=0.035)
+    head.add(lambda p: sd_ellipsoid(p, HC, hr), WHITE, 1.0)
+    # 머리 둘레 아이싱 (앞면 가장자리를 따라 표면에 붙은 물결 줄)
+    pts = []
+    for i in range(49):
+        a = np.radians(i * 7.5); rr = 0.8 + 0.025 * np.sin(i * np.pi / 2)
+        pos, R = on_ellipsoid(HC, hr, HC[0] + hr[0] * rr * np.cos(a), HC[1] + hr[1] * rr * np.sin(a))
+        pts.append(pos + R[:, 2] * 0.004)
+    for pa, pb in zip(pts[:-1], pts[1:]):
+        head.add(lambda p, pa=pa, pb=pb: sd_capsule(p, pa, pb, 0.011), ICING, 0.0, k=0.003)
+    face = m.part("face", k=0.0, step=0.0055, box=FACE_BOX)
+    for s in (-1, 1):   # 초콜릿 눈 + 반짝
+        stamp(face, HC, hr, s * 0.11, 0.77, (0.04, 0.05), DARK, depth=0.02, out=0.01)
+        stamp(face, HC, hr, s * 0.11 - s * 0.012, 0.79, (0.013, 0.013), WHITE, out=0.016, depth=0.006)
+    curve(face, HC, hr, arc_xy(0, 0.69, 0.1, 0.06, n=9, a0=200, a1=340), 0.012, ICING)   # 아이싱 웃는 입
+    for s in (-1, 1):
+        head.paint(lambda p, s=s: sd_ellipsoid(p, (s * 0.21, 0.67, 0.15), (0.05, 0.03, 0.08)), (0.95, 0.5, 0.5), 0.0, soft=0.02)
+    # 몸통 (납작한 쿠키)
+    torso = m.part("torso", tint=t, group="fur", k=0.06)
+    torso.add(lambda p: sd_ellipsoid(p, (0, 0.27, 0), (0.2, 0.19, 0.13)), WHITE, 1.0)
+    torso.add(lambda p: sd_ellipsoid(p, (0, 0.39, 0), (0.15, 0.1, 0.11)), WHITE, 1.0)
+    buttons = m.part("buttons", tint=(0.86, 0.24, 0.24), group="sweater", k=0.01)
+    for y in (0.36, 0.27, 0.18):   # 젤리 단추 (스웨터 색)
+        buttons.add(lambda p, y=y: sd_ellipsoid(p, (0, y, 0.125), (0.033, 0.03, 0.022)), WHITE, 1.0)
+    for s, nm in ((-1, "L"), (1, "R")):
+        sh = (s * 0.13, 0.38, 0.0)
+        arm = m.part("arm" + nm, tint=t, group="fur", pivot=sh, k=0.04)
+        tip = (s * 0.31, 0.3, 0.0)
+        arm.add(lambda p, sh=sh, tip=tip: sd_roundcone(p, sh, tip, 0.085, 0.07), WHITE, 1.0)
+        # 손목 아이싱 물결 띠 (표면에 칠함)
+        arm.paint(lambda p, s=s: np.abs(s * p[:, 0] - 0.255 - 0.012 * np.sin(p[:, 1] * 90)) - 0.011, ICING, 0.0, soft=0.004)
+        hip = (s * 0.09, 0.17, 0.0)
+        leg = m.part("leg" + nm, tint=t, group="fur", pivot=hip, k=0.04)
+        leg.add(lambda p, s=s: sd_roundcone(p, (s * 0.09, 0.15, 0.0), (s * 0.12, 0.05, 0.01), 0.09, 0.075), WHITE, 1.0)
+        leg.paint(lambda p, s=s: np.abs(p[:, 1] - 0.075 - 0.012 * np.sin(p[:, 0] * 90)) - 0.011, ICING, 0.0, soft=0.004)
+    m.build(LO, HI, STEP)
+    return m, dict(top=1.04, tallEars=False, fur=t)

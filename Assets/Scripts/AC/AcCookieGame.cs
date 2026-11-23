@@ -48,6 +48,15 @@ public partial class AcRoom
     readonly Dictionary<string, (Vector3 size, float minY, float cx)> cgFit = new Dictionary<string, (Vector3, float, float)>();
     readonly List<(Vector3 w, string text, Color col, float t)> cgPops = new List<(Vector3, string, Color, float)>();
 
+    // 쿠키 모습: 몸은 진저브레드, 모자·모자색·목도리·단추(스웨터 색)는 내 캐릭터 그대로
+    static AcLook CookieLook(AcLook l)
+    {
+        var c = AcLook.Decode(l.Encode());
+        c.species = "cookie"; c.fur = new Color(0.8f, 0.52f, 0.28f); c.hair = ""; c.female = true;
+        return c;
+    }
+    static AcLook CookieLook(string look) => CookieLook(AcLook.Decode(look));
+
     const float CgGrav = 30f, CgJump1 = 10.2f, CgJump2 = 9.4f, HeroH = 1.05f;
 
     // ========================================================
@@ -59,7 +68,7 @@ public partial class AcRoom
         cgRoot.gameObject.SetActive(true);
         cam.enabled = false; cgCam.enabled = true;
         RenderSettings.fog = false;   // 게임 하늘은 안개 없이
-        cgHero.Rebuild(me.look);
+        cgHero.Rebuild(CookieLook(me.look));   // 달리는 건 쿠키, 모자·목도리·단추 색은 내 캐릭터와 같게
         ResetRun();
         SetCg(CgState.Menu);
         net?.Get("scores");
@@ -121,8 +130,8 @@ public partial class AcRoom
         // 공용 메시
         cgTileMesh = TileMesh(); cgPoleMesh = PoleMesh(16f, 0.11f); cgRingMesh = CgRingMesh(0.62f, 0.06f); cgBoxMesh = BoxMesh(Vector3.one, Color.white, new Color(0.85f, 0.85f, 0.9f));
         // 주인공 + 쿠키 짝꿍
-        cgHero = AcCharacter.Create(me.look, cgRoot);
-        cgPet = AcCatalog.Spawn("gingerbread_man", cgRoot, null).transform; cgPet.localScale = Vector3.one * 0.55f;
+        cgHero = AcCharacter.Create(CookieLook(me.look), cgRoot);
+        cgPet = AcCatalog.Spawn("reindeer_plush", cgRoot, null).transform; cgPet.localScale = Vector3.one * 0.6f;   // 하늘을 나는 꼬마 순록 짝꿍
         // 반짝이 효과 4색 + 눈 + 꼬리 반짝이
         foreach (var col in new[] { new Color(1f, 0.85f, 0.3f), Color.white, new Color(1f, 0.55f, 0.75f), new Color(0.5f, 0.85f, 1f) }) cgFx.Add(MakeBurst(col));
         cgSnow = MakeSnow();

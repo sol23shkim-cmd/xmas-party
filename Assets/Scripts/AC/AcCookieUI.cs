@@ -414,7 +414,7 @@ public partial class AcRoom
             blk.transform.localPosition = new Vector3(bx, 0.3f + bh / 2, 0);
             if (rank < boardList.Count)
             {
-                var ch = AcCharacter.Create(AcLook.Decode(boardList[rank].look), podiumRoot);
+                var ch = AcCharacter.Create(CookieLook(boardList[rank].look), podiumRoot);
                 ch.transform.localPosition = new Vector3(bx, 0.3f + bh, 0); ch.transform.localRotation = Quaternion.Euler(0, 180 + (rank == 1 ? 15 : rank == 2 ? -15 : 0), 0);
                 ch.transform.localScale = Vector3.one * (rank == 0 ? 1.25f : 1.1f);
                 ch.SetRunPose(rank == 0 ? 7 : 8);
@@ -463,7 +463,7 @@ public partial class AcRoom
         if (string.IsNullOrEmpty(look)) look = "bear";
         if (cgPortraits.TryGetValue(look, out var rt) && rt) return rt;
         EnsureIconCam();
-        var ch = AcCharacter.Create(AcLook.Decode(look), null);
+        var ch = AcCharacter.Create(CookieLook(look), null);
         ch.transform.position = new Vector3(0, -500 - 0.74f, 0);
         foreach (var tr in ch.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = IconLayer;
         foreach (var r in ch.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
