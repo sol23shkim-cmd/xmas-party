@@ -191,11 +191,12 @@ public partial class AcRoom
         foreach (var o in cgObjs)
         {
             if (o.done && o.kind < 10) GUI.color = new Color(1, 1, 1, 0.5f);
-            var r = S(o.x - o.w / 2, o.y - o.h, o.w, o.h);
+            float gs = o.kind == 0 ? 1.7f : o.kind == 1 ? 1.25f : o.kind >= 10 ? 1.25f : 1f;   // 그림은 부딪힘 상자보다 조금 크게
+            var r = S(o.x - o.w * gs / 2, o.y - o.h * gs + (o.kind >= 10 ? o.h * (gs - 1) / 2 : 0), o.w * gs, o.h * gs);
             switch (o.kind)
             {
-                case 0: DrawIco(r, CgIco("candy_cane_big", Color.white), ScaleMode.ScaleToFit); break;
-                case 1: DrawIco(r, CgIco("snowman_small", Color.white), ScaleMode.ScaleToFit); break;
+                case 0: DrawIco(r, CgIco("candy_cane_big", Color.clear), ScaleMode.ScaleToFit); break;
+                case 1: DrawIco(r, CgIco("snowman_small", Color.clear), ScaleMode.ScaleToFit); break;
                 case 2:
                     GUI.DrawTexture(S(o.x - 3, 0, 6, o.y - o.h), AcPalette.Tex(new Color(0.85f, 0.25f, 0.3f)));
                     DrawIco(r, CgIco("gift_box", new Color(0.3f, 0.6f, 0.9f)), ScaleMode.ScaleToFit); break;
@@ -214,7 +215,7 @@ public partial class AcRoom
             var m = GUI.matrix;
             float ang = cgJumps == 2 ? (cgTime * 720) % 360 : cgSlide ? 0 : Mathf.Sin(cgTime * 16) * 6;
             GUIUtility.RotateAroundPivot(ang, cr.center);
-            DrawIco(cr, CgIco("gingerbread_man", Color.white), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
+            DrawIco(cr, CgIco("gingerbread_man", Color.clear), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
             GUI.matrix = m;
         }
         // 위쪽 정보
@@ -320,9 +321,9 @@ public partial class AcRoom
     void PrepareCgIcons()
     {
         if (cgIconsReady) return; cgIconsReady = true;
-        CgIcon("candy_cane_big", Color.white); CgIcon("snowman_small", Color.white); CgIcon("gift_box", new Color(0.3f, 0.6f, 0.9f));
+        CgIcon("candy_cane_big", Color.clear); CgIcon("snowman_small", Color.clear); CgIcon("gift_box", new Color(0.3f, 0.6f, 0.9f));
         for (int i = 0; i < 4; i++) CgIcon("orn_ball", JellyCol(i));
-        CgIcon("orn_star", new Color(1f, 0.82f, 0.25f)); CgIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)); CgIcon("gingerbread_man", Color.white);
+        CgIcon("orn_star", new Color(1f, 0.82f, 0.25f)); CgIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)); CgIcon("gingerbread_man", Color.clear);
     }
 
     Texture2D Circle()

@@ -397,7 +397,7 @@ public partial class AcRoom
         if (snowIcons.TryGetValue(key, out var rt) && rt) return rt;
         EnsureIconCam();
         var it = AcCatalog.Get(model);
-        var tints = it != null && it.groups != null && it.groups.Length > 0 ? new Dictionary<string, Color> { { it.groups[0], c } } : null;
+        var tints = c.a > 0 && it != null && it.groups != null && it.groups.Length > 0 ? new Dictionary<string, Color> { { it.groups[0], c } } : null;
         var obj = AcCatalog.Spawn(model, null, tints);
         obj.transform.rotation = Quaternion.Euler(8, 25, 0);
         obj.transform.position = Vector3.zero;
