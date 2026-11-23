@@ -38,10 +38,13 @@ public class AcFirebase : MonoBehaviour
     string Base => DbUrl + "/rooms/" + UnityWebRequest.EscapeURL(room);
     string MyUrl => Base + "/players/" + UnityWebRequest.EscapeURL(myId) + ".json";
 
-    public void Begin(string roomCode, string id, AcNet init)
+    public bool Offline;   // 혼자 둘러보기: 서버 없이 이 기기 안에서만 (눈사람·편지도 똑같은 코드로)
+
+    public void Begin(string roomCode, string id, AcNet init, bool offline = false)
     {
         room = string.IsNullOrWhiteSpace(roomCode) ? "xmas" : roomCode.Trim();
-        myId = id; me = init; me.id = id; started = true;
+        myId = id; me = init; me.id = id; started = true; Offline = offline;
+        if (offline) { Status = ""; return; }
 #if UNITY_WEBGL && !UNITY_EDITOR
         AcWeb_Stream(Base + ".json", gameObject.name);
         AcWeb_LeaveOnClose(MyUrl);
@@ -52,7 +55,7 @@ public class AcFirebase : MonoBehaviour
 
     void Update()
     {
-        if (!started) return;
+        if (!started || Offline) return;
         if (!writing && Time.unscaledTime >= nextWrite)
         {
             nextWrite = Time.unscaledTime + 0.2f;
@@ -133,6 +136,54 @@ public class AcFirebase : MonoBehaviour
 
     Dictionary<string, object> Node(string k) => tree.TryGetValue(k, out var v) ? v as Dictionary<string, object> : null;
 
+    // ===== 눈사람·편지·쪽지 =====
+    // 지금 데이터베이스 규칙은 rooms/<방>/players 와 rooms/<방>/orn 아래만 쓸 수 있어서,
+    // 겉으로는 "snow/<id>", "letters/<id>", "msg/<받는id>/<id>"로 쓰고 실제로는 orn 아래 "x~종류~..." 이름으로 저장함
+    static string Phys(string path)
+    {
+        var p = path.Split('/');
+        if (p[0] == "snow" && p.Length == 2) return "orn/x~snow~" + p[1];
+        if (p[0] == "letters" && p.Length == 2) return "orn/x~letter~" + p[1];
+        if (p[0] == "msg" && p.Length == 3) return "orn/x~msg~" + p[1] + "~" + p[2];
+        return path;
+    }
+
+    public Dictionary<string, object> Get(string path)
+    {
+        var p = path.Split('/');
+        string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~" : null;
+        if (prefix != null)
+        {
+            var orn = Node("orn");
+            if (orn == null) return null;
+            var res = new Dictionary<string, object>();
+            foreach (var kv in orn) if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) res[kv.Key.Substring(prefix.Length)] = kv.Value;
+            return res;
+        }
+        object cur = tree;
+        foreach (var part in path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!(cur is Dictionary<string, object> d) || !d.TryGetValue(part, out cur)) return null;
+        }
+        return cur as Dictionary<string, object>;
+    }
+
+    public void Put(string path, string json)
+    {
+        path = Phys(path);
+        SetAt(path, AcJson.Parse(json));   // 내 화면에 바로 반영
+        if (!Offline) StartCoroutine(Send("PUT", Base + "/" + EscPath(path) + ".json", json));
+    }
+
+    public void Delete(string path)
+    {
+        path = Phys(path);
+        SetAt(path, null);
+        if (!Offline) StartCoroutine(Send("DELETE", Base + "/" + EscPath(path) + ".json", null));
+    }
+
+    static string EscPath(string p) => string.Join("/", Array.ConvertAll(p.Split('/'), UnityWebRequest.EscapeURL));
+
     // ===== 다른 참가자 =====
     readonly Dictionary<string, (long seq, float at)> seen = new Dictionary<string, (long, float)>();
     public List<AcNet> Peers()
@@ -169,6 +220,7 @@ public class AcFirebase : MonoBehaviour
         if (os == null) return res;
         foreach (var kv in os)
         {
+            if (kv.Key.StartsWith("x~", StringComparison.Ordinal)) continue;   // 눈사람·편지·쪽지
             if (!(kv.Value is Dictionary<string, object> d)) continue;
             res[kv.Key] = new AcRoom.Orn
             {
@@ -182,13 +234,13 @@ public class AcFirebase : MonoBehaviour
     public void PutOrn(AcRoom.Orn o)
     {
         SetAt("orn/" + o.id, AcJson.Parse(JsonUtility.ToJson(o)));   // 내 화면에 바로 반영
-        StartCoroutine(Send("PUT", Base + "/orn/" + UnityWebRequest.EscapeURL(o.id) + ".json", JsonUtility.ToJson(o)));
+        if (!Offline) StartCoroutine(Send("PUT", Base + "/orn/" + UnityWebRequest.EscapeURL(o.id) + ".json", JsonUtility.ToJson(o)));
     }
 
     public void DeleteOrn(string id)
     {
         SetAt("orn/" + id, null);
-        StartCoroutine(Send("DELETE", Base + "/orn/" + UnityWebRequest.EscapeURL(id) + ".json", null));
+        if (!Offline) StartCoroutine(Send("DELETE", Base + "/orn/" + UnityWebRequest.EscapeURL(id) + ".json", null));
     }
 
     void OnApplicationQuit() => Leave();
@@ -196,7 +248,7 @@ public class AcFirebase : MonoBehaviour
     bool left;
     void Leave()
     {
-        if (!started || left) return;
+        if (!started || left || Offline) return;
         left = true;
 #if UNITY_WEBGL && !UNITY_EDITOR
         AcWeb_StopStream();

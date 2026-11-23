@@ -101,6 +101,11 @@ function modelMat(pos, rotY, scale) {
   return new Float32Array([c*k,0,s*k,0, 0,k,0,0, s*k,0,-c*k,0, pos[0],pos[1],-pos[2],1]);
 }
 
+// 임의 회전: R = Unity 3x3 (행 우선, 열 = 로컬 x,y,z 축), sc = 축별 크기. GL = F·M·F (F = z 뒤집기)
+function modelMatR(pos, R, sc) {
+  const m = (i, j) => R[i][j] * sc[j] * (i == 2 ? -1 : 1) * (j == 2 ? -1 : 1);
+  return new Float32Array([m(0,0),m(1,0),m(2,0),0, m(0,1),m(1,1),m(2,1),0, m(0,2),m(1,2),m(2,2),0, pos[0],pos[1],-pos[2],1]);
+}
 async function main() {
   const cache = {};
   for (const inst of scene.items) if (!cache[inst.model]) cache[inst.model] = parseACM(await (await fetch('models/' + inst.model + '.acm')).arrayBuffer());
@@ -144,7 +149,7 @@ async function main() {
   const Lu = scene.light || [-0.5, 0.85, 0.55];
   gl.uniform3fv(gl.getUniformLocation(P,'uLight'), [Lu[0], Lu[1], -Lu[2]]);
   for (const it of scene.items) {
-    gl.uniformMatrix4fv(gl.getUniformLocation(P,'uModel'), false, modelMat(it.pos, it.rotY, it.scale));
+    gl.uniformMatrix4fv(gl.getUniformLocation(P,'uModel'), false, it.R ? modelMatR(it.pos, it.R, it.sc || [it.scale||1, it.scale||1, it.scale||1]) : modelMat(it.pos, it.rotY, it.scale));
     for (const p of cache[it.model]) {
       if (it.hide && it.hide.includes(p.name)) continue;
       if (it.only && !it.only.includes(p.name)) continue;

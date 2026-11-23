@@ -1,0 +1,254 @@
+// AcSocial.cs - 참가자 목록(따라가기·쪽지), 받은 쪽지, 상황별 버튼(트리 꾸미기 / 눈사람 만들기 / 편지함)
+// 쪽지: rooms/<방>/msg/<받는사람id>/<쪽지id> = {from, fromName, text, ct}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+
+public partial class AcRoom
+{
+    bool showPeople;
+    string selPeer;                 // 목록에서 고른 사람
+    string followId;                // 따라가는 사람
+    Vector2 peopleScroll;
+    double joinedAt;
+
+    class Note { public string id, from, fromName, text; public double ct; public bool read; }
+    readonly List<Note> inbox = new List<Note>();
+    readonly HashSet<string> seenNotes = new HashSet<string>();
+    bool notesPrimed; float nextNotePoll;
+
+    // ===== 쪽지 =====
+    void SendNote(string toId, string toName, string text)
+    {
+        if (net == null) return;
+        text = text.Trim(); if (text == "") return;
+        if (text.Length > 200) text = text.Substring(0, 200);
+        string id = "n" + Guid.NewGuid().ToString("N").Substring(0, 10);
+        string json = "{\"from\":" + AcJson.Esc(myId) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"text\":" + AcJson.Esc(text) + ",\"ct\":" + AcSync.UnixMs.ToString("0") + "}";
+        net.Put("msg/" + toId + "/" + id, json);
+        Toast(toName + " 님에게 쪽지를 보냈어요");
+    }
+
+    void PollNotes()
+    {
+        if (net == null || Time.unscaledTime < nextNotePoll) return;
+        nextNotePoll = Time.unscaledTime + 0.5f;
+        var box = net.Get("msg/" + myId);
+        if (box != null)
+            foreach (var kv in box)
+            {
+                if (seenNotes.Contains(kv.Key) || !(kv.Value is Dictionary<string, object> d)) continue;
+                seenNotes.Add(kv.Key);
+                var n = new Note { id = kv.Key, from = AcJson.S(d, "from"), fromName = AcJson.S(d, "fromName"), text = AcJson.S(d, "text"), ct = AcJson.D(d, "ct") };
+                inbox.Add(n);
+                if (notesPrimed) { Toast(n.fromName + " 님의 쪽지: " + Short(n.text, 24)); Log("[쪽지] " + n.fromName + ": " + n.text); }
+            }
+        notesPrimed = true;   // 들어오기 전에 온 쪽지는 조용히 "새 쪽지"로만
+        inbox.Sort((a, b) => b.ct.CompareTo(a.ct));
+    }
+
+    static string Short(string s, int n) => s == null ? "" : s.Length > n ? s.Substring(0, n) + "..." : s;
+    int UnreadNotes => inbox.Count(n => !n.read);
+
+    // ===== 따라가기 =====
+    void UpdateFollow()
+    {
+        if (followId == null) return;
+        if (!remotes.TryGetValue(followId, out var r) || r.c == null) { followId = null; Toast("따라가던 친구가 나갔어요"); return; }
+        if (MoveAxis().sqrMagnitude > 0.01f || (ptrDown && !ptrOnUI) || decorating || building || lettersOpen) { followId = null; return; }
+        var tp = r.c.transform.position;
+        if (Vector3.Distance(tp, me.transform.position) < 1.7f) { walkTarget = null; return; }
+        walkTarget = NextWaypoint(me.transform.position, tp);
+    }
+
+    // 벽을 돌아서 가는 다음 지점
+    Vector3 NextWaypoint(Vector3 a, Vector3 b)
+    {
+        bool ai = InHouse(a), bi = InHouse(b);
+        var backIn = new Vector3(DoorPos.x, 0, -HalfZ + 1.3f); var backOut = new Vector3(DoorPos.x, 0, -HalfZ - 1.6f);
+        var frontIn = new Vector3(FrontDoorPos.x, 0, HalfZ - 1.3f); var frontOut = new Vector3(FrontDoorPos.x, 0, HalfZ + 1.6f);
+        if (ai && bi) return IndoorStep(a, b);
+        if (ai)   // 나가기
+        {
+            bool useBack = Vector3.Distance(a, backIn) + Vector3.Distance(backOut, b) < Vector3.Distance(a, frontIn) + Vector3.Distance(frontOut, b);
+            var inn = useBack ? backIn : frontIn; var outp = useBack ? backOut : frontOut;
+            if (Flat(a, inn) < 0.7f || (useBack ? a.z < -HalfZ + 0.9f : a.z > HalfZ - 0.7f)) return outp;
+            return IndoorStep(a, inn);
+        }
+        if (bi)   // 들어가기
+        {
+            bool useBack = Vector3.Distance(a, backOut) + Vector3.Distance(backIn, b) < Vector3.Distance(a, frontOut) + Vector3.Distance(frontIn, b);
+            var inn = useBack ? backIn : frontIn; var outp = useBack ? backOut : frontOut;
+            if (Flat(a, outp) < 0.7f) return inn;
+            return OutdoorStep(a, outp);
+        }
+        return OutdoorStep(a, b);
+    }
+
+    static float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
+
+    Vector3 IndoorStep(Vector3 a, Vector3 b)
+    {
+        var bx = Bounds(); int n = bx.Count;
+        int ka = 0, kb = 0;
+        for (int i = 0; i < n - 1; i++) { if (a.x >= bx[i]) ka = i; if (b.x >= bx[i]) kb = i; }
+        if (ka == kb) return b;
+        float x = ka < kb ? bx[ka + 1] : bx[ka]; float dir = ka < kb ? 1 : -1;
+        var near = new Vector3(x - dir * 1.0f, 0, ArchZ); var far = new Vector3(x + dir * 1.0f, 0, ArchZ);
+        if (Flat(a, near) < 0.6f || Mathf.Abs(a.x - x) < 0.9f) return far;
+        return near;
+    }
+
+    Vector3 OutdoorStep(Vector3 a, Vector3 b)
+    {
+        float ex = HouseHalf + 1.1f, ez = HalfZ + 1.1f;
+        if (!SegHitsRect(a, b, ex, ez)) return b;
+        float cx = HouseHalf + 1.6f, cz = HalfZ + 1.6f;
+        var corners = new[] { new Vector3(-cx, 0, -cz), new Vector3(cx, 0, -cz), new Vector3(-cx, 0, cz), new Vector3(cx, 0, cz) };
+        Vector3 best = b; float bd = float.MaxValue;
+        foreach (var c in corners)
+        {
+            if (Flat(a, c) < 0.8f || SegHitsRect(a, c, ex, ez)) continue;
+            float d = Flat(a, c) + Flat(c, b) + (SegHitsRect(c, b, ex, ez) ? 2 * (cx + cz) : 0);
+            if (d < bd) { bd = d; best = c; }
+        }
+        return best;
+    }
+
+    static bool SegHitsRect(Vector3 a, Vector3 b, float hx, float hz)
+    {
+        float t0 = 0, t1 = 1, dx = b.x - a.x, dz = b.z - a.z;
+        float[] p = { -dx, dx, -dz, dz }, q = { a.x + hx, hx - a.x, a.z + hz, hz - a.z };
+        for (int i = 0; i < 4; i++)
+        {
+            if (Mathf.Abs(p[i]) < 1e-6f) { if (q[i] < 0) return false; continue; }
+            float t = q[i] / p[i];
+            if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+            else { if (t < t0) return false; if (t < t1) t1 = t; }
+        }
+        return t0 < t1;
+    }
+
+    // ===== 상황별 버튼 =====
+    float TreeDist => Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
+    bool NearTree => phase == Phase.Play && !Outside && TreeDist < 5.6f;
+    bool InStudy => phase == Phase.Play && !Outside && AreaAt(me.transform.position.x) == "서재";
+
+    void ContextButtons()
+    {
+        if (phase != Phase.Play || showCustom) return;
+        string label = null; Action act = null;
+        if (NearTree) { label = "트리 꾸미기"; act = () => { decorating = true; walkTarget = null; followId = null; }; }
+        else if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
+        else if (Outside) { label = "눈사람 만들기"; act = StartBuilding; }
+        if (label == null) return;
+        float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
+        float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
+        var r = new Rect(SW / 2 - w / 2, y, w, h);
+        float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 3f);
+        GUI.DrawTexture(new Rect(r.x - 4, r.y - 4, r.width + 8, r.height + 8), AcPalette.Tex(Color.Lerp(new Color(0.85f, 0.3f, 0.3f), new Color(0.98f, 0.78f, 0.32f), pulse)));
+        R(r);
+        if (GUI.Button(r, "<b>" + label + "</b>", sBtnBig)) act();
+    }
+
+    GUIStyle sBtnBig;
+
+    // ===== 참가자 목록 (오른쪽 위) =====
+    void PeopleUI()
+    {
+        if (phase != Phase.Play) return;
+        int count = 1 + remotes.Count;
+        int unread = UnreadNotes;
+        float bw = 130, bh = IsMobile ? 40 : 32;
+        var br = new Rect(SW - bw - 12, 12, bw, bh);
+        string bl = $"참가자 {count}명" + (unread > 0 ? $"  <color=#d03030>쪽지 {unread}</color>" : "");
+        if (unread > 0) br.width = bw + 60;
+        br.x = SW - br.width - 12;
+        R(br);
+        if (GUI.Button(br, bl, sBtn)) showPeople = !showPeople;
+        if (followId != null && remotes.TryGetValue(followId, out var fr) && fr.net != null)
+        {
+            var fb = new Rect(SW - 232, br.yMax + 6, 220, bh);
+            R(fb);
+            if (GUI.Button(fb, fr.net.name + " 님 따라가는 중 (그만)", sBtn)) { followId = null; walkTarget = null; }
+        }
+        if (!showPeople) return;
+
+        float w = Mathf.Min(300, SW - 24), top = br.yMax + (followId != null ? bh + 12 : 6);
+        float h = Mathf.Min(SH - top - (IsMobile ? 90 : 70), 520);
+        var panel = new Rect(SW - w - 12, top, w, h);
+        GUI.Box(R(panel), "", sBox);
+        GUILayout.BeginArea(new Rect(panel.x + 10, panel.y + 8, panel.width - 20, panel.height - 16));
+        peopleScroll = BeginDragScroll("people", peopleScroll);
+        GUILayout.Label("참가자", sLabel);
+        PersonRow(myId, uiName.Trim() + " (나)", true);
+        foreach (var kv in remotes.OrderBy(k => k.Value.net?.name ?? ""))
+            if (kv.Value.net != null) PersonRow(kv.Key, kv.Value.net.name, false);
+        if (remotes.Count == 0) GUILayout.Label("<size=13>아직 다른 사람이 없어요. 같은 방 코드로 들어오면 여기에 보여요.</size>", sSmallWrap);
+        GUILayout.Space(10);
+        GUILayout.Label("받은 쪽지" + (inbox.Count > 0 ? $" ({inbox.Count})" : ""), sLabel);
+        if (inbox.Count == 0) GUILayout.Label("<size=13>받은 쪽지가 없어요</size>", sSmall);
+        foreach (var n in inbox.Take(30))
+        {
+            GUILayout.BeginVertical(sCard);
+            GUILayout.Label((n.read ? "" : "<color=#d03030>새 쪽지</color>  ") + "<b>" + n.fromName + "</b>  <size=11>" + Ago(n.ct) + "</size>", sSmall);
+            GUILayout.Label(n.text, sSmallWrap);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("답장", sBtn, GUILayout.Width(70), GUILayout.Height(26)) && !Dragging)
+            {
+                var nn = n; nn.read = true;
+                Ask(nn.fromName + " 님에게 답장", "", false, t => SendNote(nn.from, nn.fromName, t));
+            }
+            if (!n.read && GUILayout.Button("읽음", sBtn, GUILayout.Width(60), GUILayout.Height(26)) && !Dragging) n.read = true;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+        EndDragScroll("people");
+        GUILayout.EndArea();
+    }
+
+    void PersonRow(string id, string name, bool isMe)
+    {
+        bool sel = selPeer == id;
+        GUILayout.BeginVertical(sel ? sCardSel : sCard);
+        bool following = followId == id;
+        if (GUILayout.Button((following ? "> " : "") + name, sel ? sLabelSel : sSmall, GUILayout.Height(28)) && !Dragging) selPeer = sel ? null : id;
+        if (sel && !isMe)
+        {
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(following ? "그만 따라가기" : "따라가기", sBtn, GUILayout.Height(30)) && !Dragging)
+            {
+                followId = following ? null : id; walkTarget = null;
+                if (!following) { Toast(name + " 님을 따라가요"); showPeople = !IsMobile && showPeople; }
+            }
+            if (GUILayout.Button("쪽지 보내기", sBtn, GUILayout.Height(30)) && !Dragging)
+            {
+                string nm = name;
+                Ask(nm + " 님에게 쪽지", "", false, t => SendNote(id, nm, t));
+            }
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.EndVertical();
+    }
+
+    static string Ago(double ct)
+    {
+        double s = (AcSync.UnixMs - ct) / 1000.0;
+        if (ct <= 0 || s < 0) return "";
+        if (s < 60) return "방금";
+        if (s < 3600) return (int)(s / 60) + "분 전";
+        if (s < 86400) return (int)(s / 3600) + "시간 전";
+        return (int)(s / 86400) + "일 전";
+    }
+
+    GUIStyle sCard, sCardSel, sSmallWrap;
+    void SocialStyles()
+    {
+        if (sCard != null) return;
+        sCard = new GUIStyle(GUIStyle.none) { padding = new RectOffset(8, 8, 4, 6), margin = new RectOffset(0, 0, 2, 4), normal = { background = AcPalette.Tex(new Color(0.99f, 0.96f, 0.9f)) } };
+        sCardSel = new GUIStyle(sCard) { normal = { background = AcPalette.Tex(new Color(1f, 0.9f, 0.78f)) } };
+        sSmallWrap = new GUIStyle(sSmall) { wordWrap = true };
+        sBtnBig = new GUIStyle(sBtn) { fontSize = 18 };
+    }
+}

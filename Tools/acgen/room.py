@@ -81,6 +81,28 @@ def wall_window(m):
     return dict(emissiveParts=["glass"])
 
 
+@R("wall_window_big", (-1.02, -0.02, -0.15), (1.02, 3.52, 0.2), 0.016, "큰 창 벽 2m (밖이 잘 보임)", tile=2.0)
+def wall_window_big(m):
+    wall(m)
+    hole = lambda p: sd_roundbox(p, (0, 1.95, 0), (0.86, 1.22, 0.3), 0.02)
+    for p_ in m.parts:
+        if p_.name in ("wall", "wainscot"):
+            p_.cut(hole, 0.0)
+    fr = m.part("frame", tint=(0.98, 0.96, 0.92), group="trim", k=0.01)
+    fr.add(lambda p: sd_roundbox(p, (0, 1.95, -0.03), (0.93, 1.29, 0.06), 0.03), WHITE, 1.0)
+    for x in (-0.43, 0.43):
+        for y in (1.35, 2.55):
+            fr.cut(lambda p, x=x, y=y: sd_roundbox(p, (x, y, 0), (0.4, 0.57, 0.2), 0.02), 0.0)
+    fr.add(lambda p: sd_roundbox(p, (0, 0.7, 0.06), (0.98, 0.035, 0.11), 0.02), WHITE, 1.0)
+    g = m.part("glass", gloss=1.0, k=0.0)
+    g.add(lambda p: sd_box(p, (0, 1.95, -0.06), (0.86, 1.22, 0.008)), (0.75, 0.87, 0.97), 0.0)
+    sn = m.part("snow", k=0.02)
+    for x in (-0.43, 0.43):
+        for y in (0.8, 2.0):
+            sn.add(lambda p, x=x, y=y: sd_ellipsoid(p, (x, y, -0.04), (0.38, 0.035, 0.03)), SNOW, 0.0)
+    return dict(emissiveParts=["glass"])
+
+
 @R("wall_door", (-1.02, -0.02, -0.2), (1.02, 3.52, 0.25), 0.016, "현관문 벽 2m (둥근 나무문, 리스 자리)", tile=2.0, attach_wreath=[0, 1.75, 0.12])
 def wall_door(m):
     wall(m)

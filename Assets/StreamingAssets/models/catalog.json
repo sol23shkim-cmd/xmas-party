@@ -1393,6 +1393,432 @@
    "transparentParts": []
   },
   {
+   "name": "wall_window_big",
+   "cat": "room",
+   "desc": "큰 창 벽 2m (밖이 잘 보임)",
+   "groups": [
+    "trim",
+    "wainscot",
+    "wall"
+   ],
+   "size": [
+    2.04,
+    3.54,
+    0.35
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 2.0,
+   "emissiveParts": [
+    "glass"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_carrot",
+   "cat": "snowman",
+   "desc": "당근 코",
+   "groups": [],
+   "size": [
+    0.12,
+    0.12,
+    0.3
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_coal",
+   "cat": "snowman",
+   "desc": "숯 (눈·단추)",
+   "groups": [],
+   "size": [
+    0.1,
+    0.1,
+    0.08
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_button",
+   "cat": "snowman",
+   "desc": "단추",
+   "groups": [
+    "button"
+   ],
+   "size": [
+    0.1,
+    0.1,
+    0.05
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_arm",
+   "cat": "snowman",
+   "desc": "나뭇가지 팔",
+   "groups": [],
+   "size": [
+    0.24,
+    0.28,
+    0.54
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_bucket",
+   "cat": "snowman",
+   "desc": "양동이 모자",
+   "groups": [
+    "hat"
+   ],
+   "size": [
+    0.48,
+    0.32,
+    0.44
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_pipe",
+   "cat": "snowman",
+   "desc": "파이프",
+   "groups": [],
+   "size": [
+    0.1,
+    0.18,
+    0.24
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_mitten",
+   "cat": "snowman",
+   "desc": "벙어리장갑",
+   "groups": [
+    "mitten"
+   ],
+   "size": [
+    0.16,
+    0.2,
+    0.1
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_broom",
+   "cat": "snowman",
+   "desc": "빗자루",
+   "groups": [],
+   "size": [
+    0.28,
+    1.2,
+    0.2
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_bowtie",
+   "cat": "snowman",
+   "desc": "나비넥타이",
+   "groups": [
+    "bow"
+   ],
+   "size": [
+    0.2,
+    0.12,
+    0.07
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_glasses",
+   "cat": "snowman",
+   "desc": "동그란 안경",
+   "groups": [
+    "frame"
+   ],
+   "size": [
+    0.3,
+    0.12,
+    0.08
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_mustache",
+   "cat": "snowman",
+   "desc": "콧수염",
+   "groups": [
+    "hair"
+   ],
+   "size": [
+    0.24,
+    0.1,
+    0.06
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_smile",
+   "cat": "snowman",
+   "desc": "숯 웃는 입",
+   "groups": [],
+   "size": [
+    0.2,
+    0.09,
+    0.08
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_nose_round",
+   "cat": "snowman",
+   "desc": "동그란 코",
+   "groups": [
+    "nose"
+   ],
+   "size": [
+    0.1,
+    0.1,
+    0.1
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_twig_hair",
+   "cat": "snowman",
+   "desc": "나뭇가지 머리",
+   "groups": [],
+   "size": [
+    0.28,
+    0.24,
+    0.18
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_flower",
+   "cat": "snowman",
+   "desc": "꽃",
+   "groups": [
+    "flower"
+   ],
+   "size": [
+    0.14,
+    0.14,
+    0.06
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_blush",
+   "cat": "snowman",
+   "desc": "볼 터치",
+   "groups": [
+    "blush"
+   ],
+   "size": [
+    0.12,
+    0.08,
+    0.04
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_scarf",
+   "cat": "snowman",
+   "desc": "목도리",
+   "groups": [
+    "scarf"
+   ],
+   "size": [
+    0.6,
+    0.46,
+    0.62
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_star",
+   "cat": "snowman",
+   "desc": "별 배지",
+   "groups": [
+    "star"
+   ],
+   "size": [
+    0.12,
+    0.12,
+    0.06
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_heart",
+   "cat": "snowman",
+   "desc": "하트",
+   "groups": [
+    "heart"
+   ],
+   "size": [
+    0.12,
+    0.12,
+    0.06
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_holly",
+   "cat": "snowman",
+   "desc": "호랑가시 잎",
+   "groups": [],
+   "size": [
+    0.2,
+    0.13,
+    0.07
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "sm_snowball",
+   "cat": "snowman",
+   "desc": "눈덩이",
+   "groups": [],
+   "size": [
+    1.12,
+    1.12,
+    1.12
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
    "name": "gingerbread_man",
    "cat": "xmas",
    "desc": "진저브레드맨 (큰 쿠키 인형)",
@@ -2647,6 +3073,121 @@
    "tile": 0.0,
    "emissiveParts": [],
    "transparentParts": []
+  },
+  {
+   "name": "ice_sculpture",
+   "cat": "yard",
+   "desc": "얼음 별 조각상",
+   "groups": [],
+   "size": [
+    1.2,
+    1.92,
+    1.2
+   ],
+   "footprint": [
+    0.5,
+    0.5
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "reindeer_light",
+   "cat": "yard",
+   "desc": "반짝이 철사 순록",
+   "groups": [],
+   "size": [
+    1.5,
+    1.77,
+    0.6
+   ],
+   "footprint": [
+    0.5,
+    0.2
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "lights"
+   ],
+   "transparentParts": []
+  },
+  {
+   "name": "frozen_pond",
+   "cat": "yard",
+   "desc": "꽁꽁 언 연못",
+   "groups": [],
+   "size": [
+    5.2,
+    0.3,
+    3.8
+   ],
+   "footprint": [
+    0,
+    0
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "bird_feeder",
+   "cat": "yard",
+   "desc": "새 모이집",
+   "groups": [
+    "bird",
+    "roof",
+    "wood"
+   ],
+   "size": [
+    0.8,
+    1.72,
+    0.8
+   ],
+   "footprint": [
+    0.15,
+    0.15
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
+   "name": "light_arch",
+   "cat": "yard",
+   "desc": "전구 아치",
+   "groups": [
+    "frame"
+   ],
+   "size": [
+    3.2,
+    2.92,
+    0.5
+   ],
+   "footprint": [
+    0,
+    0
+   ],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [
+    "lights"
+   ],
+   "transparentParts": []
   }
  ],
  "species": [
@@ -2739,17 +3280,35 @@
   "f4",
   "f5"
  ],
+ "hairs": [
+  "long",
+  "bob",
+  "twin",
+  "pony",
+  "bun",
+  "wavy",
+  "short",
+  "spiky",
+  "sidepart",
+  "slick",
+  "curly",
+  "buzz"
+ ],
  "hairFemale": [
   "long",
   "bob",
   "twin",
   "pony",
-  "bun"
- ],
- "hairMale": [
+  "bun",
+  "wavy",
   "short",
-  "spiky"
+  "spiky",
+  "sidepart",
+  "slick",
+  "curly",
+  "buzz"
  ],
+ "hairMale": [],
  "hats": [
   "antlers",
   "beanie",

@@ -33,10 +33,10 @@ public partial class AcRoom : MonoBehaviour
 
     // ===== 방 크기 (벽 조각 1.6배 = 3.2m 단위) =====
     const float S = 1.6f, SEG = 2f * S;
-    const int NX = 8, NZ = 5;                        // 트리 거실: 가로 8칸(25.6m), 세로 5칸(16m)
+    const int NX = 6, NZ = 4;                        // 트리 거실: 가로 6칸(19.2m), 세로 4칸(12.8m)
     static float HalfX => NX * SEG / 2f;
     static float HalfZ => NZ * SEG / 2f;
-    static readonly Vector3 TreePos = new Vector3(0, 0, -1.6f);
+    static readonly Vector3 TreePos = new Vector3(0, 0, -0.9f);
     const float TreeScale = 0.82f;
 
     Camera cam;
@@ -157,7 +157,13 @@ public partial class AcRoom : MonoBehaviour
             net = gameObject.AddComponent<AcFirebase>();
             net.Begin(code, myId, MyNet());
         }
-        else { LoadMine(); PollOrnaments(true); SpawnDemoNpcs(); }
+        else
+        {
+            LoadMine(); PollOrnaments(true); SpawnDemoNpcs();
+            net = gameObject.AddComponent<AcFirebase>();   // 서버 없이 눈사람·편지를 이 기기 안에서만
+            net.Begin("solo", myId, MyNet(), true);
+        }
+        joinedAt = AcSync.UnixMs;
         showCustom = false;
         GUIUtility.keyboardControl = 0;
         // 현관 문간에서 걸어 들어오기
@@ -243,9 +249,9 @@ public partial class AcRoom : MonoBehaviour
         // 뒷벽 (창 2개 + 문 1개)
         for (int ix = 0; ix < NX; ix++)
         {
-            string w = ix == NX - 1 ? "wall_door" : ix == 1 || ix == 3 || ix == 5 ? "wall_window" : "wall_plain";
+            string w = ix == NX - 1 ? "wall_door" : ix == 1 || ix == 3 ? "wall_window_big" : "wall_plain";
             var g = Put(w, new Vector3(-HalfX + SEG * (ix + 0.5f), 0, -HalfZ), 0, S, null, room);
-            if (w == "wall_window") { HidePart(g, "glass"); Put("curtain", new Vector3(g.transform.position.x, 2.72f * S - 2.02f * S * 0.85f, -HalfZ + 0.16f), 0, S * 0.85f, null, room); }   // 커튼 봉이 창틀 바로 위
+            if (w == "wall_window_big") HidePart(g, "glass");
             if (w == "wall_door")
             {
                 Put("wreath", new Vector3(g.transform.position.x, 1.75f * S + 1.2f, -HalfZ + 0.16f), 0, 1.1f, null, room);
@@ -258,63 +264,89 @@ public partial class AcRoom : MonoBehaviour
             Put("string_lights", new Vector3(-HalfX + SEG * (ix + 0.5f), 3.35f * S, -HalfZ + 0.15f), 0, S * 0.62f, null, room);
     }
 
+    // 마당 크기 (집 둘레 사방)
+    const float YardW = 16f, YardBack = 20f, YardFront = 16f;
+    static float WorldX0 => -HouseHalf - YardW;
+    static float WorldX1 => HouseHalf + YardW;
+    static float WorldZ0 => -HalfZ - YardBack;
+    static float WorldZ1 => HalfZ + YardFront;
+
     void BuildOutdoors()
     {
         var o = new GameObject("Outdoors").transform; o.SetParent(world, false);
-        int gx = Mathf.CeilToInt((HouseHalf + 20f) / 8f);
-        for (int ix = -gx; ix <= gx; ix++)
-            for (int iz = 0; iz < 4; iz++)
+        // 눈 바닥 (집 바닥과 겹치지 않게 집 둘레에만)
+        for (float x = WorldX0 - 4; x <= WorldX1 + 4; x += 8f)
+        {
+            for (int k = 0; k < 4; k++) Put("ground_snow", new Vector3(x, -0.05f, -HalfZ - 4f - k * 8f), Random.Range(0, 4) * 90, 2f, null, o);
+            for (int k = 0; k < 3; k++) Put("ground_snow", new Vector3(x, -0.05f, HalfZ + 4f + k * 8f), Random.Range(0, 4) * 90, 2f, null, o);
+        }
+        for (int k = 0; k < 3; k++)
+            foreach (float z in new[] { -HalfZ + 4f, HalfZ - 1f })
             {
-                Put("ground_snow", new Vector3(ix * 8f, -0.05f, -HalfZ - 4f - iz * 8f), Random.Range(0, 4) * 90, 2f, null, o);
-                Put("ground_snow", new Vector3(ix * 8f, -0.05f, HalfZ + 4f + iz * 8f), 0, 2f, null, o);
+                Put("ground_snow", new Vector3(-HouseHalf - 4f - k * 8f, -0.05f, z), 0, 2f, null, o);
+                Put("ground_snow", new Vector3(HouseHalf + 4f + k * 8f, -0.05f, z), 0, 2f, null, o);
             }
-        for (int iz = -2; iz <= 2; iz++)
-            for (int k = 0; k < 3; k++)
-            {
-                Put("ground_snow", new Vector3(-HouseHalf - 4f - k * 8f, -0.05f, iz * 8f), 0, 2f, null, o);
-                Put("ground_snow", new Vector3(HouseHalf + 4f + k * 8f, -0.05f, iz * 8f), 0, 2f, null, o);
-            }
+
+        // 바깥 띠에 나무 (집에서 9m 넘게 떨어진 곳 — 가까운 마당은 눈사람 만들 자리로 비워 둠)
         string[] trees = { "pine_snowy", "pine_tall", "pine_small", "bare_tree", "birch", "palm_cedar", "round_tree" };
         var rnd = new System.Random(5);
-        for (int i = 0; i < (IsMobile ? 45 : 150); i++)
+        int want = IsMobile ? 60 : 170, made = 0;
+        for (int tries = 0; tries < want * 6 && made < want; tries++)
         {
-            float side = rnd.Next(5);
-            Vector3 p = side <= 2 ? new Vector3(-HouseHalf - 12 + (float)rnd.NextDouble() * (2 * HouseHalf + 24), 0, -HalfZ - 4 - (float)rnd.NextDouble() * 24)
-                      : side == 3 ? new Vector3(-HouseHalf - 4 - (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8))
-                                  : new Vector3(HouseHalf + 4 + (float)rnd.NextDouble() * 16, 0, -HalfZ - 4 + (float)rnd.NextDouble() * (2 * HalfZ + 8));
-            if (Mathf.Abs(p.x) < 6 && p.z > -HalfZ - 9 && p.z < -HalfZ - 2) continue;   // 창밖 눈사람 자리
-            if (Mathf.Abs(p.x - DoorPos.x) < 3.5f && p.z > -HalfZ - 12) continue;          // 현관 앞 길
+            var p = new Vector3(Mathf.Lerp(WorldX0 - 6, WorldX1 + 6, (float)rnd.NextDouble()), 0, Mathf.Lerp(WorldZ0 - 6, WorldZ1 + 6, (float)rnd.NextDouble()));
+            float gx = Mathf.Max(0, Mathf.Abs(p.x) - HouseHalf), gz = p.z < 0 ? Mathf.Max(0, -HalfZ - p.z) : Mathf.Max(0, p.z - HalfZ);
+            if (Mathf.Max(gx, gz) < 9f) continue;
+            if (Mathf.Abs(p.x - DoorPos.x) < 3f && p.z < -HalfZ) continue;           // 뒷문 길
+            if (Mathf.Abs(p.x - FrontDoorPos.x) < 3f && p.z > HalfZ) continue;        // 앞문 길
             Put(trees[rnd.Next(trees.Length)], p, rnd.Next(360), 0.9f + (float)rnd.NextDouble() * 0.6f, null, o);
+            made++;
         }
-        Put("house_cottage", new Vector3(-4f, 0, -HalfZ - 16f), 15, 1.2f, null, o);
-        Put("snowman_big", new Vector3(-3.6f, 0, -HalfZ - 4.2f), 15, 1.1f, null, o);
-        Put("snowman_small", new Vector3(-2.3f, 0, -HalfZ - 3.6f), -10, 1.1f, null, o);
-        Put("lamp_post", new Vector3(3.2f, 0, -HalfZ - 3.0f), 0, 1.2f, null, o);
-        Put("snow_pile", new Vector3(1.2f, 0, -HalfZ - 5f), 0, 1.4f, null, o);
-        Put("snowball_pile", new Vector3(-1.0f, 0, -HalfZ - 3.2f), 0, 1.2f, null, o);
-        Put("sled", new Vector3(5.6f, 0, -HalfZ - 4.6f), 70, 1.2f, null, o);
-        Put("mailbox", new Vector3(DoorPos.x + 2.6f, 0, -HalfZ - 1.8f), 180, 1.2f, null, o);
-        for (int i = -3; i <= 2; i++) Put("fence", new Vector3(i * 2.1f * 1.2f, 0, -HalfZ - 9.5f), 0, 1.2f, null, o);
-        // 각 방 창밖 풍경
-        var outs = new[] { "snowman_bucket", "lamp_post", "snow_pile", "igloo", "snowman_small", "sled", "bench", "snowball_pile" };
-        for (int i = 0; i < 8; i++)
-        {
-            float x = (i < 4 ? -HalfX - (i + 0.5f) * RoomW : HalfX + (i - 4 + 0.5f) * RoomW);
-            Put(outs[i], new Vector3(x + (i % 2 == 0 ? -2f : 2.5f), 0, -HalfZ - 4.5f - (i % 3)), i * 40, outs[i] == "igloo" ? 1.1f : 1.15f, null, o);
-            Put("lamp_post", new Vector3(x + 4.5f, 0, -HalfZ - 2.6f), 0, 1.1f, null, o);
-        }
-        Put("igloo", new Vector3(10f, 0, -HalfZ - 12f), -30, 1.5f, null, o);
-        Put("bush_snowy", new Vector3(-6f, 0, -HalfZ - 2.5f), 0, 1.3f, null, o);
-        Put("bush_holly", new Vector3(DoorPos.x - 2.4f, 0, -HalfZ - 1.5f), 0, 1.3f, null, o);
-        for (int i = 0; i < 5; i++) Put("path_stones", new Vector3(DoorPos.x, 0.0f, -HalfZ - 1.6f - i * 2.0f), i * 37, 1.0f, null, o);
+
+        // 길
+        for (int i = 0; i < 6; i++) Put("path_stones", new Vector3(DoorPos.x, 0.0f, -HalfZ - 1.6f - i * 2.0f), i * 37, 1.0f, null, o);
+        for (int i = 0; i < 5; i++) Put("path_stones", new Vector3(FrontDoorPos.x, 0.0f, HalfZ + 1.6f + i * 2.0f), i * 53, 1.0f, null, o);
+        Put("light_arch", new Vector3(DoorPos.x, 0, -HalfZ - 4.2f), 0, 1.0f, null, o);
+        Put("light_arch", new Vector3(FrontDoorPos.x, 0, HalfZ + 4.2f), 0, 1.0f, null, o);
         Put("lantern_ground", new Vector3(DoorPos.x + 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
         Put("lantern_ground", new Vector3(DoorPos.x - 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
-        Put("bench", new Vector3(DoorPos.x - 4.5f, 0, -HalfZ - 6f), 30, 1.2f, null, o);
-        Put("signpost", new Vector3(DoorPos.x + 2.2f, 0, -HalfZ - 7f), -20, 1.2f, null, o);
-        Put("snowman_bucket", new Vector3(DoorPos.x + 4.5f, 0, -HalfZ - 9f), -30, 1.1f, null, o);
+        Put("mailbox", new Vector3(FrontDoorPos.x + 2.4f, 0, HalfZ + 1.8f), 0, 1.2f, null, o);
+        Put("snowman_big", new Vector3(DoorPos.x - 3.2f, 0, -HalfZ - 3.4f), 15, 1.1f, null, o);
+        Put("signpost", new Vector3(FrontDoorPos.x - 2.4f, 0, HalfZ + 2.2f), 20, 1.2f, null, o);
+
+        // 집 둘레 조형물·자연물 (뒤·앞·양옆을 돌아가며)
+        string[] props = { "lamp_post", "reindeer_light", "bench", "bush_snowy", "ice_sculpture", "bird_feeder", "lamp_post", "sled", "bush_holly",
+                           "snow_pile", "rock_big", "snowball_pile", "igloo", "reindeer_light", "bench", "lamp_post", "rock_small", "ice_sculpture" };
+        int pi = 0;
+        for (float x = -HouseHalf + 4f; x < HouseHalf - 2f; x += 8.5f)
+        {
+            foreach (int side in new[] { -1, 1 })
+            {
+                float baseZ = side < 0 ? -HalfZ - 3.2f : HalfZ + 3.0f;
+                if (Mathf.Abs(x - (side < 0 ? DoorPos.x : FrontDoorPos.x)) < 3.5f) continue;
+                string n = props[pi++ % props.Length];
+                float z = baseZ + side * (n == "igloo" ? 3.5f : (pi % 3) * 1.2f);
+                float ry = side < 0 ? 180 : 0;
+                Put(n, new Vector3(x + ((pi * 7) % 5 - 2) * 0.4f, 0, z), n == "bench" || n == "lamp_post" ? ry : ry + pi * 37, n == "igloo" ? 1.2f : 1.15f, null, o);
+                if (n == "lamp_post") PointLight(new Vector3(x, 2.7f, z), new Color(1f, 0.85f, 0.55f), 6f, 1.2f);
+            }
+        }
+        foreach (int sx in new[] { -1, 1 })
+        {
+            float x = sx * (HouseHalf + 4.5f);
+            Put("lamp_post", new Vector3(x, 0, -2f), 0, 1.2f, null, o);
+            Put(sx < 0 ? "igloo" : "reindeer_light", new Vector3(x + sx * 2.5f, 0, 3.5f), sx * 90, sx < 0 ? 1.3f : 1.2f, null, o);
+            Put("bush_snowy", new Vector3(x - sx * 1.5f, 0, HalfZ + 1.5f), 0, 1.2f, null, o);
+            Put("bush_holly", new Vector3(x - sx * 1.5f, 0, -HalfZ - 1.5f), 0, 1.2f, null, o);
+            Put("bird_feeder", new Vector3(x + sx * 1.5f, 0, -4.5f), 0, 1.2f, null, o);
+        }
+        Put("frozen_pond", new Vector3(-HouseHalf * 0.55f, 0, HalfZ + 10f), 10, 1.0f, null, o);
+        Put("frozen_pond", new Vector3(HouseHalf * 0.6f, 0, -HalfZ - 12f), -15, 1.0f, null, o);
+        Put("house_cottage", new Vector3(-6f, 0, -HalfZ - 15f), 15, 1.2f, null, o);
+        for (int i = -3; i <= 2; i++) Put("fence", new Vector3(-6f + i * 2.1f * 1.2f, 0, -HalfZ - 10.5f), 0, 1.2f, null, o);
         BuildSnow();
-        PointLight(new Vector3(3.2f, 2.7f, -HalfZ - 3.0f), new Color(1f, 0.85f, 0.55f), 6f, 1.5f);
     }
+
+    Vector3 FrontDoorPos => new Vector3((FrontGapX0 + FrontGapX1) / 2f, 0, HalfZ);
 
     void BuildFurniture()
     {
@@ -379,9 +411,9 @@ public partial class AcRoom : MonoBehaviour
         Put("cookie_plate", dt + new Vector3(0, 0.8f * 1.15f, -0.3f), 0, 1.3f, null, f);
         Put("candle_set", dt + new Vector3(0, 0.8f * 1.15f, 0.4f), 90, 1.2f, null, f);
         PointLight(dt + new Vector3(0, 1.5f, 0.4f), new Color(1f, 0.8f, 0.5f), 4f, 0.8f);
-        Put("gingerbread_man", new Vector3(HalfX - 3.4f, 0, 6.6f), -160, 1.1f, null, f);
-        Put("gingerbread_woman", new Vector3(HalfX - 4.6f, 0, 6.8f), -170, 1.1f, null, f);
-        Put("reindeer_plush", new Vector3(HalfX - 0.9f, 0, 5.2f), -110, 1.2f, null, f);
+        Put("gingerbread_man", new Vector3(HalfX - 3.4f, 0, HalfZ - 1.0f), -160, 1.1f, null, f);
+        Put("gingerbread_woman", new Vector3(HalfX - 4.6f, 0, HalfZ - 0.8f), -170, 1.1f, null, f);
+        Put("reindeer_plush", new Vector3(HalfX - 0.9f, 0, HalfZ - 1.4f), -110, 1.2f, null, f);
         Put("candy_cane_big", new Vector3(HalfX - 0.6f, 0, 2.6f), -90, 1.3f, null, f);
         Put("mistletoe", new Vector3(HalfX - SEG * 0.5f, 3.2f * S, -HalfZ + 1.6f), 0, 1.4f, null, f);
         Put("tv_retro", new Vector3(HalfX - 0.7f, 0, 3.8f), -90, 1.15f, null, f);
@@ -521,16 +553,16 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting) { MovePlayer(dt); TapMove(dt); }
+        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
         UpdateRemotes(dt);
         UpdateCamera(dt, false);
 
-        if (!chatting)
+        if (!chatting && !askOpen && !lettersOpen && !building)
         {
-            if (Key("c")) showCustom = !showCustom;
+            if (Key("c") && !decorating) showCustom = !showCustom;
             if (Key("f2")) { showNpcs = !showNpcs; foreach (var n in npcs) n.gameObject.SetActive(showNpcs); }
             if (Key("esc")) showCustom = false;
             if (Key("z")) Emote("wave");
@@ -539,9 +571,12 @@ public partial class AcRoom : MonoBehaviour
             if (Key("enter")) OpenChat();
         }
 
-        float treeDist = Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
-        decorating = phase == Phase.Play && treeDist < 5.2f && !showCustom && !chatting;
-        if (decorating) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
+        // 트리 꾸미기는 버튼으로 들어가고 '나오기'로 나옴 (멀어지면 저절로 나옴)
+        if (decorating && (phase != Phase.Play || TreeDist > 7f || Outside || showCustom || building || lettersOpen)) decorating = false;
+        if (decorating && !chatting && !askOpen && Key("esc")) decorating = false;
+        if (decorating && !chatting && !askOpen) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
+        if (building) BuildingUpdate();
+        if (phase == Phase.Play) { PollSnowmen(); PollNotes(); PollLetters(); }
 
         if (Time.time > nextPoll) { nextPoll = Time.time + (online ? 0.5f : 2f); PollOrnaments(false); }
         CheckArea();
@@ -636,7 +671,7 @@ public partial class AcRoom : MonoBehaviour
         // 카메라 방향 기준 (실내: 카메라가 -z를 봄, 실외: +z를 봄)
         Vector3 dir = Quaternion.Euler(0, Mathf.Round(camYawCur / 180f) * 180f, 0) * new Vector3(a.x, 0, a.y);
         if (dir.sqrMagnitude > 1) dir.Normalize();
-        float spd = 3.6f;
+        float spd = 4.4f;
         var prev = me.transform.position;
         var p = prev + dir * spd * dt;
         p = Collide(p, 0.36f);
@@ -689,8 +724,9 @@ public partial class AcRoom : MonoBehaviour
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
-        float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = Outside ? 0f : 180f;   // 실내: 방 앞(+z)에서, 실외: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
-        if (decorating)
+        float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = BackYard ? 0f : 180f;   // 실내·앞마당·옆마당: 남쪽(+z)에서, 뒷마당: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
+        if (SnowCamera(ref focus, ref dist, ref pitch)) { }
+        else if (decorating)
         {
             // 트리 전체(꼭대기 별까지)가 보이게
             focus = Vector3.Lerp(me.transform.position, TreePos, 0.8f) + new Vector3(0, 3.2f, 0);
@@ -845,7 +881,7 @@ public partial class AcRoom : MonoBehaviour
         sBox = new GUIStyle(GUI.skin.box) { normal = { background = bg }, padding = new RectOffset(14, 14, 10, 10) };
         sLabel = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.42f, 0.3f, 0.22f) }, richText = true };
         sSmall = new GUIStyle(sLabel) { fontSize = 13, fontStyle = FontStyle.Normal };
-        sBtn = new GUIStyle(GUI.skin.button) { fontSize = 14 };
+        sBtn = new GUIStyle(GUI.skin.button) { fontSize = 14, richText = true };
         sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.75f, 0.25f, 0.2f) } };
     }
 
@@ -856,7 +892,7 @@ public partial class AcRoom : MonoBehaviour
     void OnGUI()
     {
         GUI.matrix = Matrix4x4.Scale(new Vector3(UiK, UiK, 1));
-        Styles();
+        Styles(); SocialStyles();
         uiRects.Clear();
         if (!Ready)
         {
@@ -880,19 +916,23 @@ public partial class AcRoom : MonoBehaviour
             GUI.Box(R(lr), "", sBox);
             for (int i = 0; i < chatLog.Count; i++) GUI.Label(new Rect(26, 20 + i * 22, 340, 22), chatLog[i], sSmall);
         }
+        if (lettersOpen) { LettersWindow(); AskWindow(); return; }
         if (decorating) DecorateBar();
+        else if (building) SnowBar();
         else
         {
-            if (!IsMobile)
+            if (!IsMobile && SW > 900)
             {
-                GUI.Box(R(new Rect(14, SH - 46, 640, 34)), "", sBox);
-                GUI.Label(new Rect(28, SH - 40, 630, 24), "WASD/클릭 이동 / 트리 근처에서 꾸미기 / Enter 말하기 / Z 인사 / X 하트 / V 만세 / C 꾸미기", sSmall);
+                GUI.Box(R(new Rect(14, SH - 46, 520, 34)), "", sBox);
+                GUI.Label(new Rect(28, SH - 40, 510, 24), "WASD/클릭 이동 / Enter 말하기 / Z 인사 / X 하트 / V 만세 / C 캐릭터 꾸미기", sSmall);
             }
             ActionButtons();
+            ContextButtons();
         }
+        PeopleUI();
         // 친구 가까이: 함께 하기
         var near = NearestRemote(2.0f);
-        if (near != null && !decorating)
+        if (near != null && !decorating && !building && !NearTree && !InStudy && !Outside)
         {
             var r = new Rect(SW / 2 - 200, SH - (IsMobile ? 150 : 120) - (SW < 640 ? 10 : 0), 400, 60);
             GUI.Box(R(r), "", sBox);
@@ -903,7 +943,8 @@ public partial class AcRoom : MonoBehaviour
         }
         if (chatting) ChatBox();
         if (showCustom) CustomWindow();
-        if (net != null && net.Status != "") GUI.Label(new Rect(SW - 330, 14, 320, 24), net.Status, sSmall);
+        AskWindow();
+        if (net != null && net.Status != "") GUI.Label(new Rect(SW - 330, IsMobile ? 60 : 50, 320, 24), net.Status, sSmall);
     }
 
     void FaceTo(Vector3 p) { var d = p - me.transform.position; d.y = 0; if (d.sqrMagnitude > 0.001f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; } }
@@ -978,9 +1019,9 @@ public partial class AcRoom : MonoBehaviour
         GUILayout.Label("방 코드", sSmall, GUILayout.Width(60));
         uiPath = TextBox("방 코드 (같은 코드를 쓴 사람끼리 만나요)", uiPath, 20);
         GUILayout.EndHorizontal();
-        lobbyScroll = GUILayout.BeginScrollView(lobbyScroll, false, false);
+        lobbyScroll = BeginDragScroll("lobby", lobbyScroll);
         CustomControls();
-        GUILayout.EndScrollView();
+        EndDragScroll("lobby");
         if (lobbyMsg != "") GUILayout.Label("<color=#b03030>" + lobbyMsg + "</color>", sSmall);
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("입장하기", sBtn, GUILayout.Height(38))) Enter(false);
@@ -995,6 +1036,7 @@ public partial class AcRoom : MonoBehaviour
         float h = narrow ? 216 : 150, y = SH - h - 8;
         GUI.Box(R(new Rect(10, y, SW - 20, h)), "", sBox);
         GUI.Label(new Rect(26, y + 6, SW - 60, 24), IsMobile ? "트리 꾸미기  <size=13>트리를 눌러 달기 / 장식을 길게 눌러 떼기</size>" : "트리 꾸미기  <size=13>클릭 달기 / 오른쪽 클릭 떼기 / 위아래/휠 모양 / 좌우 색</size>", sLabel);
+        if (GUI.Button(new Rect(SW - 20 - 96, y + 6, 86, 30), "<b>나오기</b>", sBtn)) { decorating = false; return; }
         // 모양 (실제 오너먼트 그림)
         float x = 26, size = 62;
         int perRow = Mathf.Max(1, (int)((SW - (narrow ? 52 : 330)) / (size + 6)));
@@ -1027,7 +1069,7 @@ public partial class AcRoom : MonoBehaviour
             var c = AcPalette.Vivid[Wrap(colSel + k, AcPalette.Vivid.Length)];
             GUI.DrawTexture(new Rect(cx + 82 + k * 22, cy + 66, 18, 12), AcPalette.Tex(c));
         }
-        GUI.Label(narrow ? new Rect(SW - 120, cy - 6, 110, 22) : new Rect(SW - 150, y + 6, 130, 22), $"장식 {ornObjs.Count}개", sSmall);
+        GUI.Label(narrow ? new Rect(SW - 120, cy - 6, 110, 22) : new Rect(SW - 250, y + 10, 120, 22), $"장식 {ornObjs.Count}개", sSmall);
     }
 
     // 캐릭터 꾸미기
@@ -1044,9 +1086,9 @@ public partial class AcRoom : MonoBehaviour
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
         GUILayout.Label("캐릭터 꾸미기", sLabel);
-        customScroll = GUILayout.BeginScrollView(customScroll, false, false, GUILayout.Height(r.height - 100));
+        customScroll = BeginDragScroll("custom", customScroll, GUILayout.Height(r.height - 100));
         CustomControls();
-        GUILayout.EndScrollView();
+        EndDragScroll("custom");
         GUILayout.Space(8);
         if (GUILayout.Button("완료", sBtn, GUILayout.Height(30))) showCustom = false;
         GUILayout.EndArea();

@@ -1,4 +1,5 @@
 // AcMobile.cs - 휴대폰(터치)/웹용 조작: 눌러서/끌어서 이동, 화면 버튼, 길게 눌러 떼기, 브라우저 입력창, 가벼운 화질
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -131,6 +132,79 @@ public partial class AcRoom
             return;
         }
         chatting = true; chatText = ""; chatOpenedAt = Time.unscaledTime;
+    }
+
+    // ===== 끌어서 스크롤 (휴대폰처럼 손가락으로 위아래로 밀기) =====
+    readonly Dictionary<string, Rect> scrollRects = new Dictionary<string, Rect>();
+    string dragKey; Vector2 dragLast, dragStart; bool dragMoved;
+
+    Vector2 BeginDragScroll(string key, Vector2 scroll, params GUILayoutOption[] opts)
+    {
+        DragScrollEvents(key, ref scroll);
+        return GUILayout.BeginScrollView(scroll, false, false, opts);
+    }
+    void EndDragScroll(string key)
+    {
+        GUILayout.EndScrollView();
+        if (Event.current.type == EventType.Repaint) scrollRects[key] = GUILayoutUtility.GetLastRect();
+    }
+    // GUILayout 밖(직접 그리는 목록)에서 쓰는 버전: 보이는 영역 r을 직접 알려줌
+    void DragScrollArea(string key, Rect r, ref Vector2 scroll) { scrollRects[key] = r; DragScrollEvents(key, ref scroll); }
+
+    void DragScrollEvents(string key, ref Vector2 scroll)
+    {
+        var e = Event.current;
+        if (!scrollRects.TryGetValue(key, out var r)) return;
+        if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) { dragKey = key; dragLast = dragStart = e.mousePosition; dragMoved = false; }
+        else if (e.type == EventType.MouseDrag && dragKey == key)
+        {
+            var d = e.mousePosition - dragLast; dragLast = e.mousePosition;
+            if (!dragMoved && (e.mousePosition - dragStart).magnitude > 7f) { dragMoved = true; GUIUtility.hotControl = 0; }
+            if (dragMoved) { scroll.y = Mathf.Max(0, scroll.y - d.y); e.Use(); }
+        }
+        else if ((e.type == EventType.MouseUp || e.rawType == EventType.MouseUp) && dragKey == key)
+        {
+            dragKey = null;
+            if (dragMoved) { GUIUtility.hotControl = 0; if (e.type == EventType.MouseUp) e.Use(); }
+        }
+    }
+    bool Dragging => dragKey != null && dragMoved;
+
+    // ===== 글 입력 창 (웹: 브라우저 입력창 / PC: 화면 창) =====
+    string askTitle, askText = ""; bool askMulti; Action<string> askDone; bool askOpen;
+    void Ask(string title, string def, bool multiline, Action<string> done)
+    {
+        if (Web)
+        {
+            var r = AcWeb_Prompt(title, def ?? "");
+            if (r != null && r != "\u0000" && r.Trim() != "") done(r);
+            return;
+        }
+        askTitle = title; askText = def ?? ""; askMulti = multiline; askDone = done; askOpen = true;
+    }
+
+    void AskWindow()
+    {
+        if (!askOpen) return;
+        float w = Mathf.Min(520, SW - 30), h = askMulti ? 300 : 140;
+        var r = new Rect(SW / 2 - w / 2, SH / 2 - h / 2 - 40, w, h);
+        GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0, 0, 0, 0.25f)));
+        R(new Rect(0, 0, SW, SH));
+        GUI.Box(r, "", sBox);
+        GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 24), askTitle, sLabel);
+        GUI.SetNextControlName("ask");
+        if (askMulti) askText = GUI.TextArea(new Rect(r.x + 16, r.y + 40, w - 32, h - 96), askText, 600, sHandArea ?? GUI.skin.textArea);
+        else askText = GUI.TextField(new Rect(r.x + 16, r.y + 42, w - 32, 30), askText, 60);
+        GUI.FocusControl("ask");
+        var e = Event.current;
+        bool enter = !askMulti && e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+        if (GUI.Button(new Rect(r.xMax - 196, r.yMax - 44, 86, 32), "취소", sBtn) || (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)) { askOpen = false; GUIUtility.keyboardControl = 0; }
+        if (GUI.Button(new Rect(r.xMax - 102, r.yMax - 44, 86, 32), "확인", sBtn) || enter)
+        {
+            askOpen = false; GUIUtility.keyboardControl = 0;
+            if (askText.Trim() != "") askDone?.Invoke(askText);
+            if (enter) e.Use();
+        }
     }
 
     // ===== 화면 버튼 (말하기/인사/하트/만세/꾸미기) =====

@@ -52,10 +52,9 @@ public partial class AcRoom
     int custRow;
     class CRow { public string label, value; public Color? swatch; public Action<int> step; }
 
-    static readonly string[] HairF = { "long", "bob", "twin", "pony", "bun" }, HairFKo = { "긴머리", "단발", "양갈래", "포니테일", "올림머리" };
-    static readonly string[] HairM = { "short", "spiky" }, HairMKo = { "짧은머리", "덥수룩" };
-    static readonly string[] FaceF = { "f1", "f2", "f3", "f4", "f5" }, FaceFKo = { "또랑또랑", "방긋", "반짝반짝", "졸린 눈", "속눈썹" };
-    static readonly string[] FaceM = { "f1", "f2" }, FaceMKo = { "또랑또랑", "방긋" };
+    static readonly string[] HairAll = { "short", "spiky", "sidepart", "slick", "curly", "buzz", "wavy", "long", "bob", "twin", "pony", "bun" };
+    static readonly string[] HairAllKo = { "짧은머리", "덥수룩", "가르마", "올백", "곱슬", "까까머리", "웨이브", "긴머리", "단발", "양갈래", "포니테일", "올림머리" };
+    static readonly string[] FaceAll = { "f1", "f2", "f3", "f4", "f5" }, FaceAllKo = { "또랑또랑", "방긋", "반짝반짝", "졸린 눈", "속눈썹" };
 
     static int Wrap(int i, int n) => ((i % n) + n) % n;
 
@@ -64,13 +63,10 @@ public partial class AcRoom
         var rows = new List<CRow>();
         if (l.species == "human")
         {
-            rows.Add(new CRow { label = "성별", value = l.female ? "여자" : "남자", step = d => { l.female = !l.female; l.hair = l.female ? "long" : "short"; l.face = "f1"; } });
-            var hs = l.female ? HairF : HairM; var hk = l.female ? HairFKo : HairMKo;
-            int hi = Mathf.Max(0, Array.IndexOf(hs, l.hair));
-            rows.Add(new CRow { label = "헤어", value = hk[hi], step = d => l.hair = hs[Wrap(hi + d, hs.Length)] });
-            var fs = l.female ? FaceF : FaceM; var fk = l.female ? FaceFKo : FaceMKo;
-            int fi = Mathf.Max(0, Array.IndexOf(fs, l.face));
-            rows.Add(new CRow { label = "얼굴", value = fk[fi], step = d => l.face = fs[Wrap(fi + d, fs.Length)] });
+            int hi = Mathf.Max(0, Array.IndexOf(HairAll, l.hair));
+            rows.Add(new CRow { label = "헤어", value = HairAllKo[hi], step = d => l.hair = HairAll[Wrap(hi + d, HairAll.Length)] });
+            int fi = Mathf.Max(0, Array.IndexOf(FaceAll, l.face));
+            rows.Add(new CRow { label = "얼굴", value = FaceAllKo[fi], step = d => l.face = FaceAll[Wrap(fi + d, FaceAll.Length)] });
         }
         int ti = Mathf.Max(0, Array.IndexOf(HatId, l.hat));
         rows.Add(new CRow { label = "모자", value = HatKo[ti], step = d => l.hat = HatId[Wrap(ti + d, HatId.Length)] });
@@ -160,21 +156,7 @@ public partial class AcRoom
     {
         if (iconsColor == c && icons.Count == ornTypes.Count) return;
         iconsColor = c;
-        if (iconCam == null)
-        {
-            var go = new GameObject("IconCam");
-            iconCam = go.AddComponent<Camera>();
-            iconCam.enabled = false;
-            iconCam.orthographic = true; iconCam.orthographicSize = 0.17f;
-            iconCam.clearFlags = CameraClearFlags.SolidColor;
-            iconCam.backgroundColor = new Color(1f, 0.97f, 0.9f, 1f);
-            iconCam.cullingMask = 1 << IconLayer;
-            iconCam.nearClipPlane = 0.1f; iconCam.farClipPlane = 5f;
-            go.transform.position = new Vector3(0, -500.135f, 1.2f);
-            go.transform.rotation = Quaternion.Euler(0, 180, 0);
-            var ad = go.AddComponent<UniversalAdditionalCameraData>(); ad.renderShadows = false; ad.renderPostProcessing = false;
-            cam.cullingMask &= ~(1 << IconLayer);
-        }
+        EnsureIconCam();
         foreach (var t in ornTypes)
         {
             GameObject obj;
@@ -200,13 +182,32 @@ public partial class AcRoom
         }
     }
 
+    void EnsureIconCam()
+    {
+        if (iconCam == null)
+        {
+            var go = new GameObject("IconCam");
+            iconCam = go.AddComponent<Camera>();
+            iconCam.enabled = false;
+            iconCam.orthographic = true; iconCam.orthographicSize = 0.17f;
+            iconCam.clearFlags = CameraClearFlags.SolidColor;
+            iconCam.backgroundColor = new Color(1f, 0.97f, 0.9f, 1f);
+            iconCam.cullingMask = 1 << IconLayer;
+            iconCam.nearClipPlane = 0.1f; iconCam.farClipPlane = 5f;
+            go.transform.position = new Vector3(0, -500.135f, 1.2f);
+            go.transform.rotation = Quaternion.Euler(0, 180, 0);
+            var ad = go.AddComponent<UniversalAdditionalCameraData>(); ad.renderShadows = false; ad.renderPostProcessing = false;
+            cam.cullingMask &= ~(1 << IconLayer);
+        }
+    }
+
     // ========================================================
     // 부딪히기: 가구/소품마다 바닥 위 상자(회전 포함)를 만들어 캐릭터를 밀어냄
     struct Obb { public Vector3 c; public Vector2 h; public Quaternion rot, inv; }
     readonly List<Obb> obstacles = new List<Obb>();
     static readonly string[] NonSolid = { "rug", "floor", "wall_", "ceiling", "string_lights", "garland", "wreath", "stocking", "mistletoe", "bell_pair",
         "picture", "curtain", "window", "ground", "path", "orn_", "tree_star", "tree_skirt", "tree_giant", "cookie_plate", "cocoa", "candle", "star_lantern",
-        "snow_globe", "holly", "table_lamp", "skates" };
+        "snow_globe", "holly", "table_lamp", "skates", "pond", "light_arch", "sm_" };
 
     void AddObstacle(string name, Vector3 pos, float rotY, float scale)
     {
@@ -242,32 +243,51 @@ public partial class AcRoom
             }
             var w = o.c + o.rot * l; p.x = w.x; p.z = w.z;
         }
+        foreach (var c in snowCircles)   // 마당의 눈사람
+        {
+            var d = new Vector2(p.x - c.x, p.z - c.y); float rr = c.z + r;
+            if (d.sqrMagnitude < rr * rr && d.sqrMagnitude > 1e-8f) { d = d.normalized * rr; p.x = c.x + d.x; p.z = c.y + d.y; }
+        }
         return p;
     }
 
-    // 실내/실외 이동 범위 (뒷벽은 문으로만 통과)
+    // 실내/실외 이동 범위: 집 안에서는 방과 아치로만, 바깥으로는 뒷문·앞 출입구로만 오감
+    static bool InHouse(Vector3 p) => Mathf.Abs(p.x) < HouseHalf && p.z > -HalfZ && p.z < HalfZ;
+
     Vector3 ClampRegion(Vector3 prev, Vector3 p)
     {
-        float doorX = DoorPos.x, wallZ = -HalfZ;
-        bool inGap = Mathf.Abs(p.x - doorX) < 0.75f;
-        if (prev.z >= wallZ)   // 실내
+        float backX = DoorPos.x, wallZ = -HalfZ;
+        float fx0 = FrontGapX0 + 0.5f, fx1 = FrontGapX1 - 0.5f;
+        if (InHouse(prev))
         {
-            float zmin = inGap ? wallZ - 1.2f : wallZ + 0.9f;
-            if (prev.z < wallZ + 0.9f) p.x = Mathf.Clamp(p.x, doorX - 0.74f, doorX + 0.74f);   // 현관 문간에서는 옆으로 못 감
+            bool backLane = prev.z < wallZ + 0.9f, frontLane = prev.z > HalfZ - 0.7f;
+            if (backLane && Mathf.Abs(prev.x - backX) < 0.8f) p.x = Mathf.Clamp(p.x, backX - 0.74f, backX + 0.74f);   // 뒷문 문간
+            else if (frontLane && prev.x > fx0 - 0.05f && prev.x < fx1 + 0.05f) p.x = Mathf.Clamp(p.x, fx0, fx1);   // 앞 출입구
             else p = ClampInside(prev, p);
-            p.z = Mathf.Clamp(p.z, zmin, HalfZ - 0.5f);
+            bool inBack = Mathf.Abs(p.x - backX) < 0.75f, inFront = p.x >= fx0 && p.x <= fx1;
+            p.z = Mathf.Clamp(p.z, inBack ? wallZ - 1.2f : wallZ + 0.9f, inFront ? HalfZ + 1.2f : HalfZ - 0.7f);
+            return p;
         }
-        else                   // 실외
+        // 바깥
+        p.x = Mathf.Clamp(p.x, WorldX0, WorldX1);
+        p.z = Mathf.Clamp(p.z, WorldZ0, WorldZ1);
+        const float m = 0.6f;
+        if (Mathf.Abs(p.x) < HouseHalf + m && p.z > -HalfZ - m && p.z < HalfZ + m)
         {
-            p.x = Mathf.Clamp(p.x, -HouseHalf - 14f, HouseHalf + 14f);
-            float zmax = inGap ? wallZ + 1.2f : wallZ - 0.9f;
-            if (prev.z > wallZ - 0.9f) p.x = Mathf.Clamp(p.x, doorX - 0.74f, doorX + 0.74f);
-            p.z = Mathf.Clamp(p.z, -HalfZ - 21f, zmax);
+            bool viaBack = prev.z <= -HalfZ - 0.0f && Mathf.Abs(p.x - backX) < 0.74f;
+            bool viaFront = prev.z >= HalfZ && p.x > fx0 && p.x < fx1;
+            if (viaBack) p.x = Mathf.Clamp(p.x, backX - 0.74f, backX + 0.74f);
+            else if (viaFront) p.x = Mathf.Clamp(p.x, fx0, fx1);
+            else if (prev.z <= -HalfZ - m + 0.01f) p.z = Mathf.Min(p.z, -HalfZ - m);
+            else if (prev.z >= HalfZ + m - 0.01f) p.z = Mathf.Max(p.z, HalfZ + m);
+            else if (prev.x < 0) p.x = Mathf.Min(p.x, -HouseHalf - m);
+            else p.x = Mathf.Max(p.x, HouseHalf + m);
         }
         return p;
     }
 
-    bool Outside => me != null && me.transform.position.z < -HalfZ - 0.1f;
+    bool Outside => me != null && !InHouse(me.transform.position);
+    bool BackYard => me != null && me.transform.position.z < -HalfZ - 0.1f && Mathf.Abs(me.transform.position.x) < HouseHalf + 0.5f;
 
     // ========================================================
     // 오너먼트 놓을 자리: 몸통이 트리 표면 밖으로 살짝 나오게 (깊은 곳은 살짝 묻히고, 튀어나온 곳은 그대로)
@@ -346,13 +366,14 @@ public partial class AcRoom
         var flake = SnowFlakeMesh();
         var mat = new Material(AcmLoader.Mat) { name = "Snow" };
         mat.SetFloat("_Emit", 0.55f); mat.SetFloat("_HasTint", 0);
-        float wx = 2 * HouseHalf + 40;
+        float wx = 2 * HouseHalf + 2 * YardW + 8;
         // (중심, 크기, 개수/초)
         var boxes = new[]
         {
-            (new Vector3(0, 8, -HalfZ - 14f), new Vector3(wx, 0.1f, 23f), 900f),            // 뒤 (현관 밖)
-            (new Vector3(-HouseHalf - 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f), // 왼쪽
-            (new Vector3(HouseHalf + 11f, 8, -2f), new Vector3(20f, 0.1f, 2 * HalfZ + 4), 80f),  // 오른쪽
+            (new Vector3(0, 8, -HalfZ - YardBack / 2 - 1f), new Vector3(wx, 0.1f, YardBack + 2f), 800f),     // 뒤
+            (new Vector3(0, 8, HalfZ + YardFront / 2 + 1f), new Vector3(wx, 0.1f, YardFront + 2f), 650f),    // 앞
+            (new Vector3(-HouseHalf - YardW / 2 - 1f, 8, 0), new Vector3(YardW + 2f, 0.1f, 2 * HalfZ), 90f),  // 왼쪽
+            (new Vector3(HouseHalf + YardW / 2 + 1f, 8, 0), new Vector3(YardW + 2f, 0.1f, 2 * HalfZ), 90f),   // 오른쪽
         };
         foreach (var (c, size, rate) in boxes)
         {

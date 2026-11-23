@@ -341,6 +341,7 @@ def build_face(key):
 
 
 # ---------------------------------------------------------------- 머리카락
+HAIRS = ["long", "bob", "twin", "pony", "bun", "wavy", "short", "spiky", "sidepart", "slick", "curly", "buzz"]
 def build_hair(style):
     m = Model("hair_" + style)
     h = m.part("hair", tint=(0.45, 0.28, 0.18), group="hair", k=0.035)
@@ -371,7 +372,34 @@ def build_hair(style):
         for x, y, z, rz in [(-0.16, 0.9, 0.16, 25), (-0.02, 0.93, 0.2, 10), (0.13, 0.91, 0.18, -5), (0.25, 0.85, 0.1, -20)]:
             h.add(lambda p, x=x, y=y, z=z, rz=rz: sd_ellipsoid(p, (x, y, z), (0.1, 0.06, 0.09), rot(z=rz, x=-10)), WHITE, 1.0)
         h.add(lambda p: sd_roundcone(p, (0.05, 1.03, 0.0), (0.12, 1.1, 0.05), 0.05, 0.02), WHITE, 1.0)   # 삐친 머리
+    elif style == "buzz":    # 아주 짧게 깎은 머리 (얇은 층)
+        pass
+    elif style == "sidepart":   # 2:8 가르마, 옆으로 넘긴 앞머리
+        h.add(lambda p: sd_ellipsoid(p, (0.05, 0.93, 0.12), (0.27, 0.09, 0.2), rot(z=-12)), WHITE, 1.0)
+        h.add(lambda p: sd_ellipsoid(p, (0.2, 0.86, 0.17), (0.12, 0.08, 0.1), rot(z=-30)), WHITE, 1.0)
+        h.paint(lambda p: sd_capsule(p, (-0.12, 1.06, 0.18), (-0.12, 1.06, -0.25), 0.008), (0.7, 0.7, 0.7), 1.0, soft=0.01)
+    elif style == "curly":   # 동글동글 곱슬
+        for i in range(16):
+            a_ = np.radians(i * 360 / 16)
+            for ring, (yy, rr) in enumerate(((0.95, 0.27), (0.82, 0.33))):
+                if ring == 1 and np.sin(a_) > 0.45: continue   # 이마 쪽은 비움
+                x, z = rr * np.cos(a_), rr * np.sin(a_) - 0.03
+                h.add(lambda p, x=x, yy=yy, z=z: sd_sphere(p, (x, yy, z), 0.085), WHITE, 1.0)
+        h.add(lambda p: sd_sphere(p, (0, 1.05, -0.02), 0.13), WHITE, 1.0)
+    elif style == "slick":   # 뒤로 넘긴 머리 + 볼륨
+        h.add(lambda p: sd_ellipsoid(p, (0, 0.95, 0.02), (0.3, 0.14, 0.3), rot(x=-10)), WHITE, 1.0)
+        h.add(lambda p: sd_ellipsoid(p, (0, 0.98, 0.16), (0.2, 0.09, 0.12), rot(x=-25)), WHITE, 1.0)
+        for x in (-0.12, 0.0, 0.12):
+            h.paint(lambda p, x=x: np.abs(p[:, 0] - x - 0.02 * p[:, 2]) - 0.006 + 5 * (p[:, 1] < 0.9), (0.75, 0.75, 0.75), 1.0, soft=0.01)
+    elif style == "wavy":    # 귀를 덮는 중간 길이 웨이브
+        h.add(lambda p: sd_ellipsoid(p, (0, 0.7, -0.05), (0.37, 0.25, 0.3)), WHITE, 1.0)
+        h.add(lambda p: sd_ellipsoid(p, (-0.04, 0.9, 0.17), (0.25, 0.08, 0.12), rot(z=8)), WHITE, 1.0)
+        for s_ in (-1, 1):
+            h.add(lambda p, s_=s_: sd_ellipsoid(p, (s_ * 0.31, 0.6, 0.04), (0.08, 0.13, 0.09)), WHITE, 1.0)
     h.cut(face_hole, 0.04)
+    if style == "buzz":
+        h.cut(lambda p: sd_ellipsoid(p, (0, 0.6, 0.27), (0.33, 0.27, 0.2)), 0.03)   # 이마를 넓게
+        h.cut(lambda p: -sd_ellipsoid(p, (0, 0.75, -0.005), (0.34, 0.335, 0.31)), 0.01)   # 두피에 딱 붙게 얇게
     h.paint(lambda p: sd_ellipsoid(p, (0.06, 0.99, 0.06), (0.14, 0.03, 0.22), rot(z=-10)), (1, 1, 1), 0.5, soft=0.025)
     m.build(LO, HI, STEP, ao_scene=False)
     return m

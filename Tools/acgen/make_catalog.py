@@ -13,9 +13,9 @@ for f in sorted(glob.glob("models/catalog_*.json")):
         items.append(it)
 ci = json.load(open(sorted(glob.glob("models/char_info_*human*.json"))[-1]))
 species = [dict(name=k, top=v["top"], fur=v["fur"]) for k, v in ci.items()]
-from characters import FACES, HAT_TINTS
+from characters import FACES, HAT_TINTS, HAIRS
 out = dict(items=items, species=species,
-           faces=sorted(FACES), hairFemale=["long", "bob", "twin", "pony", "bun"], hairMale=["short", "spiky"],
+           faces=sorted(FACES), hairs=HAIRS, hairFemale=HAIRS, hairMale=[],
            hats=sorted(HAT_TINTS), hatTop=1.04,
            palette=[[0.9,0.2,0.22],[0.98,0.78,0.32],[0.25,0.5,0.85],[0.6,0.35,0.8],[0.3,0.66,0.42],[0.95,0.5,0.65],[0.86,0.88,0.92],
                     [0.98,0.6,0.25],[0.4,0.8,0.85],[0.98,0.97,0.94],[0.2,0.2,0.24],[0.55,0.36,0.24],[0.98,0.9,0.4],[0.7,0.85,0.4],[0.45,0.3,0.6],[0.9,0.4,0.4]])
