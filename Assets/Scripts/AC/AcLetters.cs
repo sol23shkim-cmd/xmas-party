@@ -28,11 +28,12 @@ public partial class AcRoom
         if (sHand != null) return;
         if (handFont == null) handFont = Resources.Load<Font>("Fonts/NanumPenScript-Regular");
         var ink = new Color(0.27f, 0.18f, 0.13f);
-        sHand = new GUIStyle(GUI.skin.label) { font = handFont, fontSize = 24, wordWrap = true, richText = false, normal = { textColor = ink } };
-        sHandTitle = new GUIStyle(sHand) { fontSize = 32, wordWrap = true };
-        sHandSmall = new GUIStyle(sHand) { fontSize = 20, wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.UpperCenter };
-        sHandArea = new GUIStyle(GUI.skin.textArea) { font = handFont, fontSize = 24, wordWrap = true, normal = { textColor = ink, background = AcPalette.Tex(new Color(1f, 0.99f, 0.95f)) }, focused = { textColor = ink, background = AcPalette.Tex(new Color(1f, 0.99f, 0.95f)) } };
-        sHandField = new GUIStyle(GUI.skin.textField) { font = handFont, fontSize = 24, normal = { textColor = ink, background = AcPalette.Tex(new Color(1f, 0.99f, 0.95f)) }, focused = { textColor = ink, background = AcPalette.Tex(new Color(1f, 0.99f, 0.95f)) } };
+        sHand = new GUIStyle(GUI.skin.label) { font = handFont, fontSize = 28, wordWrap = true, richText = false, normal = { textColor = ink } };
+        sHandTitle = new GUIStyle(sHand) { fontSize = 38, wordWrap = true };
+        sHandSmall = new GUIStyle(sHand) { fontSize = 24, wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.UpperCenter };
+        var paperBg = AcPalette.Tex(new Color(1f, 0.99f, 0.95f));
+        sHandArea = new GUIStyle(GUI.skin.textArea) { font = handFont, fontSize = 28, wordWrap = true, normal = { textColor = ink, background = paperBg }, focused = { textColor = ink, background = paperBg }, hover = { textColor = ink, background = paperBg }, active = { textColor = ink, background = paperBg } };
+        sHandField = new GUIStyle(GUI.skin.textField) { font = handFont, fontSize = 28, normal = { textColor = ink, background = paperBg }, focused = { textColor = ink, background = paperBg }, hover = { textColor = ink, background = paperBg }, active = { textColor = ink, background = paperBg } };
         envTex = EnvelopeTex(false); envTexNew = EnvelopeTex(true);
         woodTex = WoodTex(); paperTex = PaperTex();
     }
@@ -74,7 +75,7 @@ public partial class AcRoom
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                float g = Mathf.Sin(y * 0.35f + Mathf.Sin(x * 0.03f) * 2.5f) * 0.5f + 0.5f;
+                float g = Mathf.Sin(y * 0.35f + Mathf.Sin(x * Mathf.PI * 2f / w * 3f) * 2.5f) * 0.5f + 0.5f;   // 가로로 이어 붙여도 이음새가 안 보이게
                 float plank = (y % 32) < 1 ? 0.6f : 1f;
                 var c = Color.Lerp(new Color(0.55f, 0.34f, 0.2f), new Color(0.66f, 0.43f, 0.27f), g) * plank;
                 c.a = 1; t.SetPixel(x, y, c);
@@ -203,7 +204,7 @@ public partial class AcRoom
             if (GUI.Button(new Rect(area.center.x - 70, area.y + 90, 140, 36), "편지 쓰기", sBtn)) letterTab = 3;
             return;
         }
-        float cw = SW < 640 ? 150 : 170, ch = 170, gap = 14;
+        float cw = SW < 640 ? 160 : 200, ch = SW < 640 ? 185 : 215, gap = 16;
         int cols = Mathf.Max(1, (int)((area.width + gap) / (cw + gap)));
         float startX = area.x + (area.width - (cols * (cw + gap) - gap)) / 2;
         int rows = (list.Count + cols - 1) / cols;
@@ -229,8 +230,8 @@ public partial class AcRoom
             var paperR = new Rect(x, er.yMax + 6, cw, ch - er.height - 14);
             GUI.DrawTexture(paperR, AcPalette.Tex(new Color(1f, 0.97f, 0.9f, 0.92f)));
             string who = letterTab == 2 ? "To. " + (l.to == "all" ? "모두" : l.toName) : "From. " + l.fromName;
-            GUI.Label(new Rect(paperR.x + 4, paperR.y + 2, paperR.width - 8, 26), who, sHandSmall);
-            GUI.Label(new Rect(paperR.x + 4, paperR.y + 26, paperR.width - 8, 26), Short(l.title, 12), new GUIStyle(sHandSmall) { fontSize = 22, normal = { textColor = new Color(0.6f, 0.18f, 0.2f) } });
+            GUI.Label(new Rect(paperR.x + 4, paperR.y + 2, paperR.width - 8, 30), who, sHandSmall);
+            GUI.Label(new Rect(paperR.x + 4, paperR.y + 30, paperR.width - 8, 32), Short(l.title, 12), new GUIStyle(sHandSmall) { fontSize = 27, normal = { textColor = new Color(0.6f, 0.18f, 0.2f) } });
             if (GUI.Button(new Rect(x, y, cw, ch), "", GUIStyle.none) && !Dragging) { openLetter = l; readScroll = Vector2.zero; MarkRead(l); }
         }
         GUI.EndGroup();
@@ -245,10 +246,10 @@ public partial class AcRoom
         GUI.DrawTextureWithTexCoords(paper, paperTex, new Rect(0, 0, paper.width / 8f, paper.height / 40f));
         GUI.DrawTexture(new Rect(paper.x, paper.y, 6, paper.height), AcPalette.Tex(new Color(0.9f, 0.5f, 0.5f)));
         float ix = paper.x + 26, iw = paper.width - 46;
-        GUI.Label(new Rect(ix, paper.y + 12, iw, 42), l.title, sHandTitle);
+        GUI.Label(new Rect(ix, paper.y + 10, iw, 48), l.title, sHandTitle);
         string to = l.to == "all" ? "모두에게" : l.toName;
-        GUI.Label(new Rect(ix, paper.y + 56, iw, 30), "To. " + to + (l.to == "all" ? "  (공개 편지)" : "  (비밀 편지)"), new GUIStyle(sHand) { fontSize = 22 });
-        var bodyR = new Rect(ix, paper.y + 92, iw, paper.height - 92 - 56);
+        GUI.Label(new Rect(ix, paper.y + 60, iw, 34), "To. " + to + (l.to == "all" ? "  (공개 편지)" : "  (비밀 편지)"), new GUIStyle(sHand) { fontSize = 25 });
+        var bodyR = new Rect(ix, paper.y + 100, iw, paper.height - 100 - 56);
         float bh = sHand.CalcHeight(new GUIContent(l.body), iw - 10);
         DragScrollArea("read", bodyR, ref readScroll);
         readScroll.y = Mathf.Clamp(readScroll.y, 0, Mathf.Max(0, bh - bodyR.height + 20));
