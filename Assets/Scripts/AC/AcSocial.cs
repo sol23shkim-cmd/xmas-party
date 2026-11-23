@@ -121,6 +121,13 @@ public partial class AcRoom
     bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "쿠키 공방";
     bool InStudy => phase == Phase.Play && !Outside && (AreaAt(me.transform.position) == "서재" || NearFireplace);
 
+    // 큰 버튼 옆 작은 버튼: 오른쪽에 자리가 없으면 큰 버튼 위에 둠 (화면 밖으로 나가거나 겹치지 않게)
+    Rect Side(Rect r, float w)
+    {
+        if (r.xMax + 14 + w <= SW - 8) return new Rect(r.xMax + 14, r.y + 6, w, r.height - 12);
+        return new Rect(r.center.x - w / 2, r.y - (r.height - 12) - 14, w, r.height - 12);
+    }
+
     void ContextButtons()
     {
         if (phase != Phase.Play || showCustom) return;
@@ -139,13 +146,13 @@ public partial class AcRoom
         if (GUI.Button(r, "<b>" + label + "</b>", sBtnBig)) act();
         if (Outside)   // 스케이트
         {
-            var r3 = new Rect(r.xMax + 14, r.y + 6, IsMobile ? 140 : 128, r.height - 12);
+            var r3 = Side(r, IsMobile ? 140 : 128);
             R(r3);
             if (GUI.Button(r3, me.skating ? "스케이트 벗기" : "스케이트 타기", sBtn)) { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }
         }
         if (NearTree && !InStudy)   // 트리 전경 보기 (근처에서)
         {
-            var r2 = new Rect(r.xMax + 14, r.y + 6, IsMobile ? 120 : 110, r.height - 12);
+            var r2 = Side(r, IsMobile ? 120 : 110);
             R(r2);
             if (GUI.Button(r2, "트리 전경", sBtn)) { treeOverview = true; decoYaw = 180f; }
         }
