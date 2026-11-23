@@ -849,14 +849,15 @@ public partial class AcRoom
         if (cgHp <= 0) { cgHp = 0; Die(); }
     }
 
+    float cgPickSfxT;   // 먹는 소리는 작게, 너무 자주 겹치지 않게
     void Collect(CgThing t)
     {
         t.dead = true; Give(t.pool, t.go); t.go = null;
         int v = t.value * (cgFeverT > 0 ? 2 : 1);
         cgJelly += v;
         if (cgFeverT <= 0) cgFever = Mathf.Min(100, cgFever + (t.kind == 3 ? 6 : t.kind == 0 ? 0.45f : 1.5f));
-        if (t.kind == 3) { Sfx("star", 0.9f); Burst(0, t.p, 18, 5); }
-        else { Sfx(t.kind == 0 ? "jelly" : "coin", 0.5f, 1f + Mathf.Repeat(cgJelly * 0.013f, 0.5f)); Burst(t.kind == 2 ? 0 : (cgRnd.Next(2) + 1), t.p, 4, 2.5f); }
+        if (t.kind == 3) { Sfx("star", 0.5f); Burst(0, t.p, 18, 5); }
+        else { if (Time.time >= cgPickSfxT) { cgPickSfxT = Time.time + 0.12f; Sfx(t.kind == 0 ? "jelly" : "coin", t.kind == 0 ? 0.14f : 0.2f, 0.92f + (float)cgRnd.NextDouble() * 0.08f); } Burst(t.kind == 2 ? 0 : (cgRnd.Next(2) + 1), t.p, 4, 2.5f); }
         if (t.kind > 0) cgPops.Add((CgO + t.p, "+" + v, t.kind == 3 ? new Color(1f, 0.85f, 0.2f) : Color.white, 0));
         if (cgFever >= 100 && cgFeverT <= 0) StartFever();
     }

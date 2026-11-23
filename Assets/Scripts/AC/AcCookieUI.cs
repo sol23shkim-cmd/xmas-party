@@ -163,7 +163,17 @@ public partial class AcRoom
         st.normal.textColor = keep;
     }
 
-    void Pill(Rect r, Color c) { if (Event.current.type != EventType.Repaint) return; var k = GUI.color; GUI.color = c.linear; cgPillStyle.Draw(r, false, false, false, false); GUI.color = k; }
+    // 둥근 알약 모양: 양 끝 반원 + 가운데 (어떤 높이에서도 네모로 깨지지 않게)
+    void Pill(Rect r, Color c)
+    {
+        if (Event.current.type != EventType.Repaint || r.width <= 0 || r.height <= 0) return;
+        var k = GUI.color; GUI.color = c.linear;
+        float cap = Mathf.Min(r.height / 2f, r.width / 2f);
+        GUI.DrawTextureWithTexCoords(new Rect(r.x, r.y, cap, r.height), cgPill, new Rect(0, 0, 0.25f, 1));
+        GUI.DrawTextureWithTexCoords(new Rect(r.xMax - cap, r.y, cap, r.height), cgPill, new Rect(0.75f, 0, 0.25f, 1));
+        if (r.width > cap * 2) GUI.DrawTextureWithTexCoords(new Rect(r.x + cap, r.y, r.width - cap * 2, r.height), cgPill, new Rect(0.45f, 0, 0.1f, 1));
+        GUI.color = k;
+    }
 
     bool CgButton(Rect r, string label, Color col, int size = 22)
     {
@@ -271,19 +281,26 @@ public partial class AcRoom
         {
             var hc = hp > 0.35f ? Color.Lerp(new Color(1f, 0.55f, 0.25f), new Color(0.95f, 0.25f, 0.35f), hp) : (Mathf.Repeat(Time.time * 4, 1) < 0.5f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.6f, 0.2f));
             Pill(new Rect(bar.x + 2, bar.y + 2, Mathf.Max(26, (bar.width - 4) * hp), bar.height - 4), hc);
-            Pill(new Rect(bar.x + 8, bar.y + 4, Mathf.Max(14, (bar.width - 16) * hp), 7), new Color(1, 1, 1, 0.35f));
+            Pill(new Rect(bar.x + 10, bar.y + 5, Mathf.Max(10, (bar.width - 4) * hp - 16), 6), new Color(1, 1, 1, 0.3f));
         }
-        GUI.color = (new Color(0.3f, 0.08f, 0.08f, 0.8f)).linear; GUI.DrawTexture(new Rect(x0 - 1, top + 3, 42, 42), cgHeart);
+        // 하트: 진한 테두리 + 빨간 하트 + 작은 반짝임 (같은 중심에서 뛰는 듯)
         float beat = 1 + 0.08f * Mathf.Max(0, Mathf.Sin(Time.time * (hp < 0.35f ? 14 : 6)));
-        GUI.color = (new Color(0.95f, 0.22f, 0.32f)).linear; GUI.DrawTexture(new Rect(x0 + 20 - 19 * beat, top + 21 - 19 * beat, 38 * beat, 38 * beat), cgHeart); GUI.color = Color.white;
+        Vector2 hc0 = new Vector2(x0 + 20, top + 21);
+        void HeartAt(float sz, Color c) { GUI.color = c.linear; GUI.DrawTexture(new Rect(hc0.x - sz / 2, hc0.y - sz / 2, sz, sz), cgHeart); }
+        HeartAt(46 * beat, new Color(0.35f, 0.1f, 0.08f, 0.95f));
+        HeartAt(38 * beat, new Color(0.95f, 0.22f, 0.32f));
+        GUI.color = new Color(1, 1, 1, 0.7f).linear; GUI.DrawTexture(new Rect(hc0.x - 11 * beat, hc0.y - 9 * beat, 7 * beat, 6 * beat), cgDisc);
+        GUI.color = Color.white;
         // 피버 게이지
-        Rect fb = new Rect(bar.x, bar.yMax + 8, bar.width * 0.85f, 14);
-        Pill(new Rect(fb.x - 2, fb.y - 2, fb.width + 4, fb.height + 4), new Color(0.2f, 0.1f, 0.06f, 0.7f));
+        Rect fb = new Rect(bar.x + 8, bar.yMax + 8, bar.width * 0.8f, 16);
+        Pill(fb, new Color(0.2f, 0.1f, 0.06f, 0.75f));
         float fv = cgFeverT > 0 ? cgFeverT / 7f : cgFever / 100f;
         if (fv > 0.02f)
         {
             var fc = Color.HSVToRGB(Mathf.Repeat(Time.time * (cgFeverT > 0 ? 1.2f : 0.25f), 1f), 0.6f, 1f);
-            Pill(new Rect(fb.x + 1, fb.y + 1, Mathf.Max(12, (fb.width - 2) * Mathf.Clamp01(fv)), fb.height - 2), fc);
+            float fw = Mathf.Max(fb.height - 4, (fb.width - 4) * Mathf.Clamp01(fv));
+            Pill(new Rect(fb.x + 2, fb.y + 2, fw, fb.height - 4), fc);
+            Pill(new Rect(fb.x + 6, fb.y + 4, Mathf.Max(4, fw - 8), 3), new Color(1, 1, 1, 0.35f));
         }
         CgText(new Rect(fb.xMax + 6, fb.y - 6, 80, 26), cgFeverT > 0 ? "피버!" : "피버", 15, cgFeverT > 0 ? new Color(1f, 0.85f, 0.3f) : Color.white, TextAnchor.MiddleLeft, 1.5f);
         // 점수

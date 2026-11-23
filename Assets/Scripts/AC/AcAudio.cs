@@ -34,7 +34,7 @@ public partial class AcRoom
         AudioSource src = null;
         foreach (var s in sfxPool) if (!s.isPlaying) { src = s; break; }
         if (src == null) src = sfxPool[Random.Range(0, sfxPool.Count)];
-        src.clip = c; src.pitch = pitch; src.volume = vol * (sfxOn ? 0.9f : 0f); src.Play();
+        src.clip = c; src.pitch = pitch; src.volume = vol * (sfxOn ? 0.9f : 0f) * (playingGame ? 0.55f : 1f); src.Play();   // 쿠키 달리기 중엔 효과음 작게
     }
     bool sfxOn = true;
 
@@ -54,8 +54,8 @@ public partial class AcRoom
             else { NextCarol(); }
         }
         fade = Mathf.MoveTowards(fade, 1, dt / 1.2f);
-        musicA.volume = target * fade * (inGameMusic ? 0.85f : 1f);
-        musicB.volume = target * (1 - fade) * (inGameMusic ? 1f : 0.85f);
+        musicA.volume = target * fade * (inGameMusic ? 0.62f : 1f);
+        musicB.volume = target * (1 - fade) * (inGameMusic ? 1f : 0.62f);
         if (fade >= 1 && musicB.isPlaying) musicB.Stop();
         musicA.pitch = Mathf.MoveTowards(musicA.pitch, inGameMusic && cgFeverT > 0 ? 1.12f : 1f, dt * 0.5f);
         // 웹: 곡을 내려받는 중이거나 아직 소리가 풀리기 전엔 isPlaying이 false → 곡이 끝난 걸로 보지 않기

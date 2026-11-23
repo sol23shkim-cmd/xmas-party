@@ -119,7 +119,9 @@ public partial class AcRoom
     Vector3 firePos;
     bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f;
     bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "쿠키 공방";
-    bool InStudy => phase == Phase.Play && !Outside && (AreaAt(me.transform.position) == "서재" || NearFireplace);
+    Vector3 mailPos = new Vector3(9999, 0, 9999), mailPos2 = new Vector3(9999, 0, 9999);
+    // 편지함: 입구 우편함·앞마당 우편함·거실 벽난로 옆
+    bool InStudy => phase == Phase.Play && (Flat(me.transform.position, mailPos) < 2.8f || Flat(me.transform.position, mailPos2) < 2.4f || NearFireplace);
 
     // 큰 버튼 옆 작은 버튼: 오른쪽에 자리가 없으면 큰 버튼 위에 둠 (화면 밖으로 나가거나 겹치지 않게)
     Rect Side(Rect r, float w)
@@ -136,9 +138,11 @@ public partial class AcRoom
         bool inLibrary = !Outside && AreaAt(me.transform.position) == "서재";
         if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
         else if (NearTree) { label = "트리 꾸미기"; act = StartDecorating; }
-        else if (Outside) { label = "눈사람 만들기"; act = StartBuilding; }
+        else if (Outside && !snowMode) { label = "눈사람 만들기"; act = StartBuilding; }
+        else if (Outside) { label = "눈싸움 그만"; act = ToggleSnowFight; }
         else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
         else if (piano) { label = "피아노 치기"; act = OpenPiano; }
+        else if (inLibrary) { label = "크리스마스 퀴즈"; act = OpenQuiz; }
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
@@ -152,10 +156,11 @@ public partial class AcRoom
         if (Outside)
         {
             extra.Add((me.skating ? "스케이트 벗기" : "스케이트 타기", () => { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }, IsMobile ? 132 : 120));
-            extra.Add((snowMode ? "눈싸움 그만" : "눈싸움", ToggleSnowFight, IsMobile ? 112 : 100));
+            if (!snowMode && label != "눈싸움 그만") extra.Add(("눈싸움", ToggleSnowFight, IsMobile ? 112 : 100));
+            if (snowMode && label != "눈싸움 그만") extra.Add(("눈싸움 그만", ToggleSnowFight, IsMobile ? 112 : 100));
         }
         if (NearTree && !InStudy) extra.Add(("트리 전경", () => { treeOverview = true; decoYaw = 180f; decoZoom = 1f; }, IsMobile ? 112 : 100));
-        if (inLibrary) extra.Add(("크리스마스 퀴즈", OpenQuiz, IsMobile ? 150 : 136));
+        if (inLibrary && label != "크리스마스 퀴즈") extra.Add(("크리스마스 퀴즈", OpenQuiz, IsMobile ? 150 : 136));
         if (piano && label != "피아노 치기") extra.Add(("피아노 치기", OpenPiano, IsMobile ? 112 : 100));
         if (extra.Count == 0) return;
         float bh = h - 12, total = extra.Sum(e => e.w) + 10 * (extra.Count - 1);

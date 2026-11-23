@@ -312,6 +312,10 @@ public partial class AcRoom : MonoBehaviour
         Put("lantern_ground", new Vector3(DoorPos.x + 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
         Put("lantern_ground", new Vector3(DoorPos.x - 1.3f, 0, -HalfZ - 0.9f), 0, 1.3f, null, o);
         Put("mailbox", new Vector3(FrontDoorPos.x + 2.4f, 0, HalfZ + 1.8f), 0, 1.2f, null, o);
+        // 입구(현관문) 옆 우편함: 가까이 가면 '편지함' 버튼
+        mailPos = new Vector3(DoorPos.x - 2.3f, 0, -HalfZ - 1.3f);
+        Put("mailbox", mailPos, 180, 1.45f, new Dictionary<string, Color> { { "box", new Color(0.86f, 0.22f, 0.24f) } }, o);
+        mailPos2 = new Vector3(FrontDoorPos.x + 2.4f, 0, HalfZ + 1.8f);
         Put("snowman_big", new Vector3(DoorPos.x - 3.2f, 0, -HalfZ - 3.4f), 15, 1.1f, null, o);
         Put("signpost", new Vector3(FrontDoorPos.x - 2.4f, 0, HalfZ + 2.2f), 20, 1.2f, null, o);
 
@@ -761,6 +765,7 @@ public partial class AcRoom : MonoBehaviour
 
     Vector3? pointerFocus;
 
+    bool orbitOn; Vector3 orbFocus; float orbDist, orbPitch;
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
@@ -801,6 +806,23 @@ public partial class AcRoom : MonoBehaviour
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);
         if (snap) { cam.transform.position = want; cam.transform.rotation = rotq; return; }
+        // 트리를 볼 때: 트리 중심축을 기준으로 궤도처럼 돌기 (트리가 항상 화면 가운데)
+        if (treeView)
+        {
+            if (!orbitOn)
+            {
+                orbitOn = true;
+                var f = cam.transform.forward; float d0 = Vector3.Distance(cam.transform.position, focus);
+                orbFocus = cam.transform.position + f * d0; orbDist = d0;
+                camYawCur = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg; orbPitch = Mathf.Asin(Mathf.Clamp(-f.y, -1, 1)) * Mathf.Rad2Deg;
+            }
+            float k = 1 - Mathf.Exp(-dt * 5f);
+            orbFocus = Vector3.Lerp(orbFocus, focus, k); orbDist = Mathf.Lerp(orbDist, dist, k); orbPitch = Mathf.LerpAngle(orbPitch, pitch, k);
+            var oq = Quaternion.Euler(orbPitch, camYawCur, 0);
+            cam.transform.position = orbFocus + oq * new Vector3(0, 0, -orbDist); cam.transform.rotation = oq; camVel = Vector3.zero;
+            return;
+        }
+        orbitOn = false;
         float smooth = phase == Phase.Entering ? 0.6f : 0.25f;
         cam.transform.position = Vector3.SmoothDamp(cam.transform.position, want, ref camVel, smooth);
         cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, rotq, 1 - Mathf.Exp(-dt * (phase == Phase.Entering ? 2.5f : 6f)));
@@ -913,7 +935,7 @@ public partial class AcRoom : MonoBehaviour
             decoH -= d.y * 0.012f;
         }
         lastPtr = ptrPos;
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 3.5f);   // 휠: 확대·축소
+        float sc = OverUI(ptrPos) ? 0 : Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 3.5f);   // 휠: 확대·축소 (장식 줄 위에선 장식 스크롤)
         var a = MoveAxis();
         decoYaw -= a.x * 70f * dt; decoH += a.y * 3f * dt;
         if (decoButtons != 0) { decoYaw -= (decoButtons == 3 ? 1 : decoButtons == 4 ? -1 : 0) * 80f * dt; decoH += (decoButtons == 1 ? 1 : decoButtons == 2 ? -1 : 0) * 3.2f * dt; }
@@ -921,6 +943,7 @@ public partial class AcRoom : MonoBehaviour
     }
     int decoButtons;   // 화면의 위/아래/왼쪽/오른쪽 버튼을 누르고 있는 동안
     bool ornPicked = true, dragOrn; int dragCand = -1;
+    float ornScroll, barX0, barY0, barS0; bool barDrag, barMoved; int ornSelSeen = -1;
     readonly List<(Rect r, int i)> decoIconRects = new List<(Rect, int)>();
 
     void StartDecorating()
@@ -1212,21 +1235,38 @@ public partial class AcRoom : MonoBehaviour
         CamPad(SW - 20 - 2 * 66 - 6, y - 2 * 44 - 18, true);
         // 모양 (실제 오너먼트 그림) — 누르면 고르기, 다시 누르면 해제, 끌어서 트리에 놓기
         if (Event.current.type == EventType.Repaint) decoIconRects.Clear();
-        float x = 26, size = 62;
-        int perRow = Mathf.Max(1, (int)((SW - (narrow ? 52 : 330)) / (size + 6)));
-        int start = Mathf.Clamp(ornSel - perRow / 2, 0, Mathf.Max(0, ornTypes.Count - perRow));
-        if (start > 0) GUI.Label(new Rect(x - 14, y + 52, 14, 24), "<", sLabel);
-        for (int i = start; i < Mathf.Min(ornTypes.Count, start + perRow); i++)
+        float size = 62, step = size + 6;
+        int perRow = Mathf.Max(1, (int)((SW - (narrow ? 52 : 330)) / step));
+        float viewW = Mathf.Min(perRow, ornTypes.Count) * step, contentW = ornTypes.Count * step;
+        var view = new Rect(23, y + 37, viewW + 6, size + 6);
+        float maxScroll = Mathf.Max(0, contentW - viewW);
+        // 장식 줄 스크롤: 옆으로 끌기 · 휠
+        var e = Event.current;
+        if (e.type == EventType.ScrollWheel && view.Contains(e.mousePosition)) { ornScroll += (Mathf.Abs(e.delta.x) > Mathf.Abs(e.delta.y) ? e.delta.x : e.delta.y) * 22f; e.Use(); }
+        if (e.type == EventType.MouseDown && view.Contains(e.mousePosition)) { barDrag = true; barMoved = false; barX0 = e.mousePosition.x; barY0 = e.mousePosition.y; barS0 = ornScroll; }
+        if (e.type == EventType.MouseDrag && barDrag && !dragOrn)
         {
-            var r = new Rect(x, y + 40, size, size);
+            float dx = e.mousePosition.x - barX0, dy = e.mousePosition.y - barY0;
+            if (!barMoved && Mathf.Abs(dx) > 10 && Mathf.Abs(dx) > Mathf.Abs(dy)) { barMoved = true; dragCand = -1; }
+            if (barMoved) ornScroll = barS0 - dx;
+        }
+        if (e.type == EventType.MouseUp) barDrag = false;
+        if (ornSel != ornSelSeen) { ornSelSeen = ornSel; if (ornSel * step < ornScroll) ornScroll = ornSel * step; else if ((ornSel + 1) * step > ornScroll + viewW) ornScroll = (ornSel + 1) * step - viewW; }   // 키로 고르면 보이게
+        ornScroll = Mathf.Clamp(ornScroll, 0, maxScroll);
+        if (ornScroll > 1) GUI.Label(new Rect(9, y + 52, 14, 24), "<", sLabel);
+        if (ornScroll < maxScroll - 1) GUI.Label(new Rect(view.xMax + 1, y + 52, 14, 24), ">", sLabel);
+        GUI.BeginGroup(view);
+        int first = Mathf.Max(0, (int)(ornScroll / step)), last = Mathf.Min(ornTypes.Count - 1, (int)((ornScroll + viewW) / step) + 1);
+        for (int i = first; i <= last; i++)
+        {
+            var r = new Rect(3 + i * step - ornScroll, 3, size, size);
             bool sel = i == ornSel && ornPicked;
             GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(sel ? new Color(0.85f, 0.3f, 0.3f) : new Color(0.86f, 0.8f, 0.72f)));
             if (icons.TryGetValue(ornTypes[i], out var rt) && rt != null) GUI.DrawTexture(r, rt, ScaleMode.ScaleToFit, false);
-            if (Event.current.type == EventType.Repaint) decoIconRects.Add((r, i));
-            if (GUI.Button(r, "", GUIStyle.none) && !dragOrn) { if (sel) ornPicked = false; else { SetSel(i); ornPicked = true; } }
-            x += size + 6;
+            if (e.type == EventType.Repaint) { var ar = new Rect(r.x + view.x, r.y + view.y, r.width, r.height); ar = Rect.MinMaxRect(Mathf.Max(ar.xMin, view.xMin), ar.yMin, Mathf.Min(ar.xMax, view.xMax), ar.yMax); if (ar.width > 4) decoIconRects.Add((ar, i)); }
+            if (GUI.Button(r, "", GUIStyle.none) && !dragOrn && !barMoved) { if (sel) ornPicked = false; else { SetSel(i); ornPicked = true; } }
         }
-        if (start + perRow < ornTypes.Count) GUI.Label(new Rect(x - 2, y + 52, 14, 24), ">", sLabel);
+        GUI.EndGroup();
         var it = AcCatalog.Get(ornTypes[ornSel]);
         if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "장식을 고르면 달 수 있어요 (지금은 둘러보기만)", sSmall);
         else
