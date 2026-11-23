@@ -12,7 +12,8 @@ public partial class AcRoom
     static float ArchZ => -HalfZ + SEG * 2.5f;                // 방 사이 아치 문 위치
     const int ArchIz = 2;
     // 앞쪽(+z) 낮은 벽의 출입구: 트리 거실 앞 한 칸
-    static float FrontGapX0 => -HalfX + SEG * 3, FrontGapX1 => -HalfX + SEG * 4;
+    static float FrontGapX0 => -HalfX + SEG * 3;
+    static float FrontGapX1 => -HalfX + SEG * 4;
 
     // 방 꾸미기 좌표는 예전 큰 방(12.8 x 16m) 기준으로 적혀 있어서, 벽 가까운 것은 벽과의 거리를 지키고 가운데는 살짝 모아 줌
     const float OldHW = 6.4f, OldHZ = 8f;
