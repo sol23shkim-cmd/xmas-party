@@ -792,7 +792,7 @@ public partial class AcRoom : MonoBehaviour
         }
         // 스케이트를 타면 조금 멀리서 (빨리 다니니까 넓게 보이게)
         bool special = building || snowFocusId != null || treeOverview || decorating;
-        skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && me.skating ? 1.45f : 1f, dt * 0.9f);
+        skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && (me.skating || snowMode) ? 1.45f : 1f, dt * 0.9f);   // 스케이트·눈싸움: 넓게
         if (!special) dist *= skateZoom;
         if (phase == Phase.Lobby)
         {
@@ -1204,11 +1204,29 @@ public partial class AcRoom : MonoBehaviour
 
     // 입장 화면
     Vector2 lobbyScroll;
+    // 처음 온 사람만 이름·꾸미기 화면. 한 번 들어온 적이 있으면 저장된 이름·모습으로 바로 입장 (바꾸고 싶을 때만 '꾸미기·이름 바꾸기')
+    bool lobbyEdit, lobbyEditInit;
     void LobbyGUI()
     {
-        if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
+        if (!lobbyEditInit) { lobbyEditInit = true; lobbyEdit = string.IsNullOrWhiteSpace(uiName); }
         float lw = Mathf.Min(440, SW - 20);
         bool portrait = Screen.height > Screen.width;
+        if (!lobbyEdit)
+        {
+            float h = 196;
+            var q = portrait ? new Rect((SW - lw) / 2, SH - h - 24, lw, h) : new Rect(Mathf.Min(20, (SW - lw) / 2), SH / 2 - h / 2, lw, h);
+            GUI.Box(R(q), "", sBox);
+            GUI.Label(new Rect(q.x + 18, q.y + 12, q.width - 36, 32), "<size=22>크리스마스 파티</size>", sLabel);
+            GUI.Label(new Rect(q.x + 18, q.y + 48, q.width - 36, 26), "<b>" + uiName.Trim() + "</b> 님, 다시 오셨네요!", sSmall);
+            GUI.Label(new Rect(q.x + 18, q.y + 72, q.width - 36, 22), "<size=12>방 코드: " + uiPath + "</size>", sSmall);
+            float bw = (q.width - 36 - 10) / 2;
+            if (lobbyMsg != "") GUI.Label(new Rect(q.x + 18, q.y + 92, q.width - 36, 22), "<color=#b03030>" + lobbyMsg + "</color>", sSmall);
+            if (GUI.Button(new Rect(q.x + 18, q.y + 112, bw, 42), "<b>입장하기</b>", sBtn)) Enter(false);
+            if (GUI.Button(new Rect(q.x + 18 + bw + 10, q.y + 112, bw, 42), "혼자 둘러보기", sBtn)) Enter(true);
+            if (GUI.Button(new Rect(q.x + 18, q.y + 160, q.width - 36, 28), "꾸미기 · 이름 바꾸기", sBtn)) lobbyEdit = true;
+            return;
+        }
+        if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
         var r = portrait ? new Rect((SW - lw) / 2, SH * 0.46f, lw, SH * 0.54f - 10) : new Rect(Mathf.Min(20, (SW - lw) / 2), 16, lw, SH - 32);
         GUI.Box(R(r), "", sBox);
         GUILayout.BeginArea(new Rect(r.x + 16, r.y + 10, r.width - 32, r.height - 20));
