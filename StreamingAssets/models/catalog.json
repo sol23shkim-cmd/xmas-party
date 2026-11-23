@@ -1819,6 +1819,27 @@
    "transparentParts": []
   },
   {
+   "name": "skate_boot",
+   "cat": "snowman",
+   "desc": "스케이트 한 짝",
+   "groups": [
+    "boot",
+    "cuff"
+   ],
+   "size": [
+    0.24,
+    0.29,
+    0.36
+   ],
+   "footprint": [],
+   "hang": [],
+   "light": [],
+   "wall": false,
+   "tile": 0.0,
+   "emissiveParts": [],
+   "transparentParts": []
+  },
+  {
    "name": "gingerbread_man",
    "cat": "xmas",
    "desc": "진저브레드맨 (큰 쿠키 인형)",
