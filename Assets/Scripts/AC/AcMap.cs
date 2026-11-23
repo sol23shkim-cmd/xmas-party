@@ -20,7 +20,9 @@ public partial class AcRoom
         CgTextures();
         R(new Rect(0, 0, SW, SH));
         GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.05f, 0.07f, 0.12f, 0.5f)));
-        float W = WorldX1 - WorldX0, H = WorldZ1 - WorldZ0;
+        // 집 둘레 8m까지만 크게 보여 줌
+        float MX0 = -HouseHalf - 8, MX1 = HouseHalf + 8, MZ0 = HouseZ0 - 8, MZ1 = HalfZ + 8;
+        float W = MX1 - MX0, H = MZ1 - MZ0;
         float pw = Mathf.Min(SW - 20, 1000), mh = pw * H / W;
         if (mh > SH - 110) { mh = SH - 110; pw = mh * W / H; }
         var panel = new Rect(SW / 2 - pw / 2 - 10, SH / 2 - mh / 2 - 30, pw + 20, mh + 58);
@@ -33,10 +35,10 @@ public partial class AcRoom
         // 화면과 같은 방향: 화면 왼쪽 = +x, 위쪽 = 뒤(-z)
         Rect WR(float x0, float x1, float z0, float z1)
         {
-            float u0 = (WorldX1 - x1) / W, u1 = (WorldX1 - x0) / W, v0 = (z0 - WorldZ0) / H, v1 = (z1 - WorldZ0) / H;
+            float u0 = (MX1 - Mathf.Min(x1, MX1)) / W, u1 = (MX1 - Mathf.Max(x0, MX0)) / W, v0 = (Mathf.Max(z0, MZ0) - MZ0) / H, v1 = (Mathf.Min(z1, MZ1) - MZ0) / H;
             return new Rect(mr.x + u0 * mr.width, mr.y + v0 * mr.height, (u1 - u0) * mr.width, (v1 - v0) * mr.height);
         }
-        Vector2 WP(float x, float z) => new Vector2(mr.x + (WorldX1 - x) / W * mr.width, mr.y + (z - WorldZ0) / H * mr.height);
+        Vector2 WP(float x, float z) => new Vector2(mr.x + (MX1 - x) / W * mr.width, mr.y + (z - MZ0) / H * mr.height);
         float k = mr.width / W;   // 1m 당 화면 크기
 
         GUI.DrawTexture(mr, AcPalette.Tex(new Color(0.9f, 0.94f, 0.99f)));
@@ -79,20 +81,20 @@ public partial class AcRoom
         }
         MapLabel(WR(-HalfX, HalfX, -HalfZ, -HalfZ + 4), "트리 거실", fs, here == "트리 거실");
         MapLabel(WR(-HalfX, HalfX, HouseZ0, -HalfZ), "안뜰", fs, false);
-        MapLabel(WR(-HouseHalf, HouseHalf, WorldZ0, HouseZ0 - 1), "뒷마당", fs + 2, false);
-        MapLabel(WR(-HouseHalf, HouseHalf, HalfZ + 1, WorldZ1), "앞마당", fs + 2, false);
-        MapLabel(WR(HouseHalf, WorldX1, HouseZ0, HalfZ), "옆마당", fs, false);
-        MapLabel(WR(WorldX0, -HouseHalf, HouseZ0, HalfZ), "옆마당", fs, false);
+        MapLabel(WR(-HouseHalf, HouseHalf, MZ0, HouseZ0), "뒷마당", fs + 2, false);
+        MapLabel(WR(-HouseHalf, HouseHalf, HalfZ, MZ1), "앞마당", fs + 2, false);
+        MapLabel(WR(HouseHalf, MX1, HouseZ0, HalfZ), "옆마당", fs, false);
+        MapLabel(WR(MX0, -HouseHalf, HouseZ0, HalfZ), "옆마당", fs, false);
         // 눈사람·친구·나
         foreach (var c in snowCircles) { var p = WP(c.x, c.y); GUI.DrawTexture(new Rect(p.x - 4, p.y - 4, 8, 8), cgDisc); }
         foreach (var r in remotes.Values)
         {
             if (r.c == null) continue;
-            var p = WP(r.c.transform.position.x, r.c.transform.position.z);
+            var p = WP(Mathf.Clamp(r.c.transform.position.x, MX0, MX1), Mathf.Clamp(r.c.transform.position.z, MZ0, MZ1));
             GUI.color = (new Color(0.2f, 0.45f, 0.9f)).linear; GUI.DrawTexture(new Rect(p.x - 7, p.y - 7, 14, 14), cgDisc); GUI.color = Color.white;
             if (r.net != null) CgText(new Rect(p.x - 60, p.y - 28, 120, 20), Short(r.net.name, 8), 14, new Color(0.75f, 0.85f, 1f), TextAnchor.MiddleCenter, 1.5f, new Color(0.1f, 0.15f, 0.35f));
         }
-        var mp = WP(me.transform.position.x, me.transform.position.z);
+        var mp = WP(Mathf.Clamp(me.transform.position.x, MX0, MX1), Mathf.Clamp(me.transform.position.z, MZ0, MZ1));
         float pulse = 8 + Mathf.Sin(Time.time * 6f) * 2.5f;
         GUI.color = (new Color(0.95f, 0.25f, 0.25f, 0.35f)).linear; GUI.DrawTexture(new Rect(mp.x - pulse * 1.6f, mp.y - pulse * 1.6f, pulse * 3.2f, pulse * 3.2f), cgDisc);
         GUI.color = (new Color(0.9f, 0.2f, 0.2f)).linear; GUI.DrawTexture(new Rect(mp.x - 7, mp.y - 7, 14, 14), cgDisc); GUI.color = Color.white;
@@ -101,8 +103,8 @@ public partial class AcRoom
         var e = Event.current;
         if (e.type == EventType.MouseUp && mr.Contains(e.mousePosition))
         {
-            float x = WorldX1 - (e.mousePosition.x - mr.x) / mr.width * W;
-            float z = WorldZ0 + (e.mousePosition.y - mr.y) / mr.height * H;
+            float x = MX1 - (e.mousePosition.x - mr.x) / mr.width * W;
+            float z = MZ0 + (e.mousePosition.y - mr.y) / mr.height * H;
             TeleportTo(new Vector3(x, 0, z));
             e.Use();
         }

@@ -992,7 +992,7 @@ public partial class AcRoom : MonoBehaviour
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(520, SW - 20);
-            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : 18;
+            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : SW < 700 ? 64 : 18;   // 좁은 화면: 위 버튼 줄 아래
             var r = new Rect(SW / 2 - tw / 2, ty, tw, 40);
             GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }

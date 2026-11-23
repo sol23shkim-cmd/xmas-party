@@ -929,14 +929,14 @@ public partial class AcRoom
         cgCam.rect = new Rect(0, 1 - (band.yMax / SH), 1, band.height / SH);
         float aspect = Mathf.Max(0.5f, band.width / Mathf.Max(1, band.height));
         float hfov = 2 * Mathf.Atan(Mathf.Tan(20 * Mathf.Deg2Rad) * aspect);
-        float wantW = cg == CgState.Board ? 10f : Mathf.Lerp(10.5f, 15f, Mathf.Clamp01((aspect - 0.8f) / 1.0f));
+        float wantW = cg == CgState.Board ? 10f : Mathf.Lerp(9f, 15f, Mathf.Clamp01((aspect - 0.8f) / 1.0f));
         float dist = Mathf.Clamp(wantW / 2 / Mathf.Tan(hfov / 2), 8f, 17f);
         float targetY = cg == CgState.Play ? Mathf.Clamp((cgY - 1.2f) * 0.45f, 0, 2.2f) : 0;
         cgCamY = snap ? targetY : Mathf.Lerp(cgCamY, targetY, 1 - Mathf.Exp(-dt * 3));
         cgShake = Mathf.Max(0, cgShake - dt);
         cgFlash = Mathf.Max(0, cgFlash - dt);
         var shake = cgShake > 0 ? (Vector3)(UnityEngine.Random.insideUnitCircle * cgShake * 0.35f) : Vector3.zero;
-        Vector3 look = new Vector3(cgX + wantW * 0.27f, 1.45f + cgCamY, 0);
+        Vector3 look = new Vector3(cgX + wantW * 0.27f, 1.45f + Mathf.Lerp(1.0f, 0.25f, Mathf.Clamp01((aspect - 0.8f) / 0.8f)) + cgCamY, 0);   // 세로에 가까우면 땅을 아래쪽에
         Vector3 pos = look + new Vector3(0, dist * 0.08f + 0.35f, -dist);
         if (cg == CgState.Menu || cg == CgState.Count && cgStateT < 0.6f) { look = new Vector3(cgX + 1.6f, 1.2f, 0); pos = look + new Vector3(-1.5f, 1.2f, -dist * 0.55f); }
         if (cg == CgState.Board) { look = PodiumPos + new Vector3(CgIsPortrait ? 0 : 2.6f, 1.7f, 0); pos = look + new Vector3(0, 1.0f, -dist); }
