@@ -61,6 +61,7 @@ public partial class AcRoom
     void CookieGameUpdate(float dt)
     {
         if (!playingGame) return;
+        PrepareCgIcons();
         if (Key("esc")) { if (cg == CgState.Play) cg = CgState.Over; else CloseCookieGame(); return; }
         if (cg != CgState.Play) { if (cg == CgState.Menu && JumpKey()) StartRun(); return; }
         dt = Mathf.Min(dt, 0.05f);
@@ -193,14 +194,14 @@ public partial class AcRoom
             var r = S(o.x - o.w / 2, o.y - o.h, o.w, o.h);
             switch (o.kind)
             {
-                case 0: GUI.DrawTexture(r, CgIcon("candy_cane_big", Color.white), ScaleMode.ScaleToFit); break;
-                case 1: GUI.DrawTexture(r, CgIcon("snowman_small", Color.white), ScaleMode.ScaleToFit); break;
+                case 0: DrawIco(r, CgIco("candy_cane_big", Color.white), ScaleMode.ScaleToFit); break;
+                case 1: DrawIco(r, CgIco("snowman_small", Color.white), ScaleMode.ScaleToFit); break;
                 case 2:
                     GUI.DrawTexture(S(o.x - 3, 0, 6, o.y - o.h), AcPalette.Tex(new Color(0.85f, 0.25f, 0.3f)));
-                    GUI.DrawTexture(r, CgIcon("gift_box", new Color(0.3f, 0.6f, 0.9f)), ScaleMode.ScaleToFit); break;
-                case 10: GUI.DrawTexture(r, CgIcon("orn_ball", o.col), ScaleMode.ScaleToFit); break;
-                case 11: GUI.DrawTexture(r, CgIcon("orn_star", new Color(1f, 0.82f, 0.25f)), ScaleMode.ScaleToFit); break;
-                case 12: GUI.DrawTexture(r, CgIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)), ScaleMode.ScaleToFit); break;
+                    DrawIco(r, CgIco("gift_box", new Color(0.3f, 0.6f, 0.9f)), ScaleMode.ScaleToFit); break;
+                case 10: DrawIco(r, CgIco("orn_ball", o.col), ScaleMode.ScaleToFit); break;
+                case 11: DrawIco(r, CgIco("orn_star", new Color(1f, 0.82f, 0.25f)), ScaleMode.ScaleToFit); break;
+                case 12: DrawIco(r, CgIco("orn_heart", new Color(0.95f, 0.25f, 0.35f)), ScaleMode.ScaleToFit); break;
             }
             GUI.color = Color.white;
         }
@@ -213,7 +214,7 @@ public partial class AcRoom
             var m = GUI.matrix;
             float ang = cgJumps == 2 ? (cgTime * 720) % 360 : cgSlide ? 0 : Mathf.Sin(cgTime * 16) * 6;
             GUIUtility.RotateAroundPivot(ang, cr.center);
-            GUI.DrawTexture(cr, CgIcon("gingerbread_man", Color.white), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
+            DrawIco(cr, CgIco("gingerbread_man", Color.white), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
             GUI.matrix = m;
         }
         // 위쪽 정보
@@ -271,13 +272,15 @@ public partial class AcRoom
     }
 
 
-    readonly Dictionary<string, Texture2D> cgIcons = new Dictionary<string, Texture2D>();
+    readonly Dictionary<string, Texture> cgIcons = new Dictionary<string, Texture>();
+    bool cgOpaque;   // 읽기가 안 되는 기기: 아이콘을 배경째 그림
     Texture2D cgCircle;
     // 아이콘 카메라로 그린 뒤 배경색(자홍)을 투명하게 바꾼 그림
-    Texture2D CgIcon(string model, Color c)
+    Texture CgIcon(string model, Color c)
     {
         string key = model + HexOf(c);
-        if (cgIcons.TryGetValue(key, out var t) && t) return t;
+        if (cgIcons.TryGetValue(key, out var have) && have) return have;
+        Texture2D t;
         EnsureIconCam();
         var oldBg = iconCam.backgroundColor;
         iconCam.backgroundColor = new Color(1, 0, 1, 1);
@@ -301,11 +304,25 @@ public partial class AcRoom
                 if (p.a < 1) { p.r = p.g; p.b = p.g; }
                 px[i] = p;
             }
+            bool blank = true;
+            for (int i = 0; i < px.Length && blank; i += 7) if (px[i].r + px[i].g + px[i].b > 0.05f) blank = false;
+            if (blank) { cgOpaque = true; iconCam.backgroundColor = new Color(0.62f, 0.76f, 0.95f); var rt2 = SnowIcon(model, c); iconCam.backgroundColor = oldBg; snowIcons.Remove(sk); if (old) snowIcons[sk] = old; cgIcons[key] = rt2; return rt2; }
             t.SetPixels(px); t.Apply();
             rt.Release();
         }
         cgIcons[key] = t;
         return t;
+    }
+
+    Texture CgIco(string model, Color c) => cgIcons.TryGetValue(model + HexOf(c), out var t) ? t : null;
+    void DrawIco(Rect r, Texture t, ScaleMode m) { if (t) GUI.DrawTexture(r, t, m, !cgOpaque); }
+    bool cgIconsReady;
+    void PrepareCgIcons()
+    {
+        if (cgIconsReady) return; cgIconsReady = true;
+        CgIcon("candy_cane_big", Color.white); CgIcon("snowman_small", Color.white); CgIcon("gift_box", new Color(0.3f, 0.6f, 0.9f));
+        for (int i = 0; i < 4; i++) CgIcon("orn_ball", JellyCol(i));
+        CgIcon("orn_star", new Color(1f, 0.82f, 0.25f)); CgIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)); CgIcon("gingerbread_man", Color.white);
     }
 
     Texture2D Circle()

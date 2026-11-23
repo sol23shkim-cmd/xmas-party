@@ -790,6 +790,10 @@ public partial class AcRoom : MonoBehaviour
             pitch = 8f; targetYaw = 180f;
             me.transform.rotation = Quaternion.Euler(0, Mathf.Sin(Time.time * 0.6f) * 35f, 0);
         }
+        // 트리를 볼 때는 카메라와 트리 사이 기둥·벽을 잘라냄 (가까운 면을 트리 바로 앞까지 당김)
+        bool treeView = decorating || treeOverview;
+        float wantNear = treeView ? Mathf.Max(0.3f, dist - TreeR - 1.5f) : 0.3f;
+        cam.nearClipPlane = snap ? wantNear : Mathf.Lerp(cam.nearClipPlane, wantNear, 1 - Mathf.Exp(-dt * 4f));
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);
@@ -1163,7 +1167,7 @@ public partial class AcRoom : MonoBehaviour
             var c = AcPalette.Vivid[Wrap(colSel + k, AcPalette.Vivid.Length)];
             GUI.DrawTexture(new Rect(cx + 82 + k * 22, cy + 66, 18, 12), AcPalette.Tex(c));
         }
-        GUI.Label(narrow ? new Rect(SW - 120, cy - 6, 110, 22) : new Rect(SW - 250, y + 10, 120, 22), $"장식 {ornObjs.Count}개", sSmall);
+        GUI.Label(narrow ? new Rect(SW - 120, cy - 6, 110, 22) : new Rect(SW - 20 - 96 - 112 - 76, y + 10, 72, 22), $"장식 {ornObjs.Count}개", sSmall);
     }
 
     // 캐릭터 꾸미기
