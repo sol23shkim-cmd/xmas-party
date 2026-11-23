@@ -47,10 +47,10 @@ public partial class AcRoom
         {
             inGameMusic = playingGame && cg != CgState.Board;
             fade = 0; // 바꾸기
-            musicB.clip = musicA.clip; musicB.time = musicA.isPlaying && musicA.clip ? Mathf.Min(musicA.time, musicA.clip.length - 0.05f) : 0; musicB.volume = musicA.volume; musicB.loop = musicA.loop; musicB.pitch = musicA.pitch;
+            musicB.clip = musicA.clip; if (musicA.isPlaying && musicA.clip && musicA.clip.loadState == AudioDataLoadState.Loaded) musicB.time = Mathf.Min(musicA.time, musicA.clip.length - 0.05f); musicB.volume = musicA.volume; musicB.loop = musicA.loop; musicB.pitch = musicA.pitch;
             if (musicA.isPlaying) musicB.Play();
             musicA.Stop();
-            if (inGameMusic) { musicA.clip = Clip("Music/cookie_theme"); musicA.loop = true; musicA.time = 0; musicA.Play(); }
+            if (inGameMusic) { musicA.clip = Clip("Music/cookie_theme"); musicA.loop = true; musicA.Play(); }
             else { NextCarol(); }
         }
         fade = Mathf.MoveTowards(fade, 1, dt / 1.2f);
@@ -58,20 +58,25 @@ public partial class AcRoom
         musicB.volume = target * (1 - fade) * (inGameMusic ? 1f : 0.85f);
         if (fade >= 1 && musicB.isPlaying) musicB.Stop();
         musicA.pitch = Mathf.MoveTowards(musicA.pitch, inGameMusic && cgFeverT > 0 ? 1.12f : 1f, dt * 0.5f);
-        if (!inGameMusic && !musicA.isPlaying)
+        // 웹: 곡을 내려받는 중이거나 아직 소리가 풀리기 전엔 isPlaying이 false → 곡이 끝난 걸로 보지 않기
+        var mc = musicA.clip;
+        bool songOver = mc == null || (mc.loadState == AudioDataLoadState.Loaded && Time.unscaledTime - songStartT > mc.length + 0.5f) || mc.loadState == AudioDataLoadState.Failed;
+        if (!inGameMusic && !musicA.isPlaying && songOver)
         {
             musicGap -= dt;
             if (musicGap <= 0) NextCarol();
         }
     }
 
+    float songStartT;
     void NextCarol()
     {
         int k; do k = Random.Range(0, Carols.Length); while (Carols.Length > 1 && k == lastCarol);
         lastCarol = k;
         var c = Clip("Music/" + Carols[k]);
-        musicA.clip = c; musicA.loop = false; musicA.pitch = 1; musicA.time = 0;
+        musicA.clip = c; musicA.loop = false; musicA.pitch = 1;
         if (c != null) musicA.Play();
+        songStartT = Time.unscaledTime;
         musicGap = 2.5f;
     }
 

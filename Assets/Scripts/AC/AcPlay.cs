@@ -302,7 +302,7 @@ public partial class AcRoom
     {
         long round = QuizRound; double inr = QuizInRound; bool reveal = inr >= QuizAnswerMs;
         var qz = QuizFor(round);
-        float pw = Mathf.Min(SW - 20, 640), ph = Mathf.Min(SH - 90, 470);
+        float pw = Mathf.Min(SW - 20, 640), ph = Mathf.Min(SH - 90, 350);
         var p = new Rect(SW / 2 - pw / 2, SH / 2 - ph / 2 + 20, pw, ph);
         GUI.Box(R(p), "", sBox);
         GUI.Label(new Rect(p.x + 16, p.y + 10, 300, 28), "크리스마스 퀴즈", sLabel);
@@ -325,7 +325,7 @@ public partial class AcRoom
             if (reveal && i == qz.correct) border = new Color(0.3f, 0.7f, 0.35f);
             else if (reveal && answered && mine == i) border = new Color(0.9f, 0.3f, 0.3f);
             GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(border));
-            if (GUI.Button(r, "<b>" + "①②③④"[i] + " " + qz.choices[i] + "</b>", sBtn) && !reveal && !answered)
+            if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", sBtn) && !reveal && !answered)
             {
                 myQuizAnswer[round] = i; AddAct("q", round + ":" + i); Sfx("click", 0.6f);
             }
@@ -459,14 +459,13 @@ public partial class AcRoom
     void SnowFightHUD()
     {
         if (!snowMode) return;
-        float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : 60;
-        var r = new Rect(12, top, w, 96);
+        float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : SW < 1000 ? 112 : 60;
+        var s = net != null ? net.Get("sbf") : null;
+        var top3 = s == null ? new List<(string, int)>() : s.Values.OfType<Dictionary<string, object>>().Select(d => (AcJson.S(d, "name"), (int)AcJson.D(d, "hits"))).Where(x => x.Item2 > 0).OrderByDescending(x => x.Item2).Take(3).ToList();
+        var r = new Rect(12, top, w, 36 + top3.Count * 20);
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 12, r.y + 6, w - 20, 24), $"<b>눈싸움</b>  맞힘 {sbHits} · 맞음 {sbTaken}", sSmall);
-        var s = net != null ? net.Get("sbf") : null;
-        if (s != null)
         {
-            var top3 = s.Values.OfType<Dictionary<string, object>>().Select(d => (AcJson.S(d, "name"), (int)AcJson.D(d, "hits"))).OrderByDescending(x => x.Item2).Take(3).ToList();
             for (int i = 0; i < top3.Count; i++) GUI.Label(new Rect(r.x + 12, r.y + 30 + i * 20, w - 20, 20), $"{i + 1}. {Short(top3[i].Item1, 8)}  {top3[i].Item2}번 맞힘", sSmall);
         }
     }

@@ -882,7 +882,7 @@ public partial class AcRoom : MonoBehaviour
         {
             float d = (a - b).magnitude;
             if (!pinching) { pinching = true; pinchD = Mathf.Max(20, d); pinchZ = decoZoom; }
-            else decoZoom = Mathf.Clamp(pinchZ * pinchD / Mathf.Max(20, d), 0.5f, 1.8f);
+            else decoZoom = Mathf.Clamp(pinchZ * pinchD / Mathf.Max(20, d), 0.5f, 2.4f);
             ptrMoved = true; lastPtr = ptrPos; dragCand = -1;
             return true;
         }
@@ -895,14 +895,14 @@ public partial class AcRoom : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
         if (PinchZoom()) return;
-        if (ptrPressed && ptrMoved && !ptrOnUI)
+        if (ptrPressed && ptrMoved && !ptrOnUI && dragCand < 0)
         {
             var d = ptrPos - lastPtr;
             decoYaw += d.x * 0.22f;
             decoH -= d.y * 0.012f;
         }
         lastPtr = ptrPos;
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 1.8f);   // 휠: 확대·축소
+        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 2.4f);   // 휠: 확대·축소
         var a = MoveAxis();
         decoYaw -= a.x * 70f * dt; decoH += a.y * 3f * dt;
         if (decoButtons != 0) { decoYaw -= (decoButtons == 3 ? 1 : decoButtons == 4 ? -1 : 0) * 80f * dt; decoH += (decoButtons == 1 ? 1 : decoButtons == 2 ? -1 : 0) * 3.2f * dt; }
@@ -1012,6 +1012,18 @@ public partial class AcRoom : MonoBehaviour
 
     void OnGUI()
     {
+        var ev = Event.current; bool down = ev.type == EventType.MouseDown || ev.type == EventType.TouchDown; Vector2 mpos = ev.mousePosition / UiK;
+        OnGUIInner();
+        // 화면 UI 위에서 누르기 시작했는지 IMGUI 쪽에서도 확인 (UI 위에서 끌 때 카메라가 돌지 않게)
+        if (down)
+        {
+            foreach (var r in uiRects) if (r.Contains(mpos)) { ptrOnUI = true; break; }
+            if (decorating) foreach (var (rr, idx) in decoIconRects) if (rr.Contains(mpos)) { dragCand = idx; ptrOnUI = true; }
+        }
+    }
+
+    void OnGUIInner()
+    {
         GUI.matrix = Matrix4x4.Scale(new Vector3(UiK, UiK, 1));
         Styles(); SocialStyles();
         uiRects.Clear();
@@ -1028,7 +1040,7 @@ public partial class AcRoom : MonoBehaviour
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(520, SW - 20);
-            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : SW < 700 ? 64 : 18;   // 좁은 화면: 위 버튼 줄 아래
+            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : SW / 2 + tw / 2 > SW - 250 ? 64 : 18;   // 위 오른쪽 버튼과 겹치면 그 아래
             var r = new Rect(SW / 2 - tw / 2, ty, tw, 40);
             GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }
@@ -1195,8 +1207,8 @@ public partial class AcRoom : MonoBehaviour
         if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "장식을 고르면 달 수 있어요 (지금은 둘러보기만)", sSmall);
         else
         {
-            GUI.Label(new Rect(26, y + 104, Mathf.Min(420, SW - 150), 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 누른 높이에 한 바퀴" : it != null ? it.desc : ornTypes[ornSel], sSmall);
-            var ur = new Rect(narrow ? SW - 20 - 90 : Mathf.Min(26 + 430, SW - 320), y + 100, 82, 28);
+            GUI.Label(new Rect(26, y + 104, narrow ? SW - 150 : Mathf.Min(420, SW - 290 - 130), 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 누른 높이에 한 바퀴" : it != null ? it.desc : ornTypes[ornSel], sSmall);
+            var ur = new Rect(narrow ? SW - 20 - 90 : SW - 290 - 110, y + 100, 82, 28);
             if (GUI.Button(R(ur), "선택 해제", sBtn)) ornPicked = false;
         }
         // 색: < ■ 이름 >
@@ -1251,7 +1263,7 @@ public partial class AcRoom : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
         if (PinchZoom()) return;
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 1.8f);
+        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 2.4f);
         if (ptrPressed && ptrMoved && !ptrOnUI) decoYaw += (ptrPos - lastPtr).x * 0.22f;
         lastPtr = ptrPos;
         var a = MoveAxis(); decoYaw -= a.x * 70f * dt;
