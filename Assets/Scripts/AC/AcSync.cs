@@ -14,7 +14,7 @@ public class AcNet
     public float x, z, ry, speed;
     public string emote = ""; public double emoteT;     // 인사·하트 등
     public string chat = ""; public double chatT;       // 말풍선
-    public bool decorating, left, empty;
+    public bool decorating, left, empty, skate;
     public long seq; public double t;
 }
 

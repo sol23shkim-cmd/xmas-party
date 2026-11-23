@@ -111,12 +111,12 @@ public partial class AcRoom
                     id = kv.Key, from = AcJson.S(d, "from"), fromName = AcJson.S(d, "fromName"), to = AcJson.S(d, "to"), toName = AcJson.S(d, "toName"),
                     title = AcJson.S(d, "title"), body = AcJson.S(d, "body"), ct = AcJson.D(d, "ct"),
                 };
-                if (l.to != "all" && l.to != myId && l.from != myId) continue;   // 남의 비밀 편지는 안 보임
+                if (l.to != "all" && l.to != myKey && l.from != myKey) continue;   // 남의 비밀 편지는 안 보임
                 letters.Add(l);
-                if (lettersPrimed && l.from != myId)
+                if (lettersPrimed && l.from != myKey)
                 {
-                    if (l.to == myId) { Toast(l.fromName + " 님이 비밀 편지를 보냈어요! 서재 편지함에서 읽어 보세요"); Log("[편지] " + l.fromName + " 님의 비밀 편지가 도착했어요"); }
-                    else { Toast(l.fromName + " 님이 모두가 보라고 편지를 썼어요 (서재 편지함)"); Log("[편지] " + l.fromName + " 님의 공개 편지: " + l.title); }
+                    if (l.to == myKey) { Toast(l.fromName + " 님이 비밀 편지를 보냈어요! 서재나 거실 벽난로 편지함에서 읽어 보세요"); Log("[편지] " + l.fromName + " 님의 비밀 편지가 도착했어요"); }
+                    else { Toast(l.fromName + " 님이 모두가 보라고 편지를 썼어요 (서재·벽난로 편지함)"); Log("[편지] " + l.fromName + " 님의 공개 편지: " + l.title); }
                 }
             }
         letters.RemoveAll(l => !alive.Contains(l.id));
@@ -124,7 +124,7 @@ public partial class AcRoom
         lettersPrimed = true;
     }
 
-    int UnreadLetters => readLetters == null ? 0 : letters.Count(l => l.from != myId && !readLetters.Contains(l.id));
+    int UnreadLetters => readLetters == null ? 0 : letters.Count(l => l.from != myKey && !readLetters.Contains(l.id));
 
     void MarkRead(Letter l)
     {
@@ -137,12 +137,13 @@ public partial class AcRoom
     {
         if (net == null) return;
         var ppl = Recipients();
-        var (toId, toName) = ppl[Mathf.Clamp(writeTo, 0, ppl.Count - 1)];
+        var (toId, toNameRaw) = ppl[Mathf.Clamp(writeTo, 0, ppl.Count - 1)];
+        string toName = toNameRaw.Replace("  (접속 중)", "");
         string title = writeTitle.Trim(), body = writeBody.Trim();
         if (title == "") { Toast("제목을 적어 주세요"); return; }
         if (body == "") { Toast("내용을 적어 주세요"); return; }
         string id = "l" + Guid.NewGuid().ToString("N").Substring(0, 10);
-        string json = "{\"from\":" + AcJson.Esc(myId) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"to\":" + AcJson.Esc(toId) + ",\"toName\":" + AcJson.Esc(toName) +
+        string json = "{\"from\":" + AcJson.Esc(myKey) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"to\":" + AcJson.Esc(toId) + ",\"toName\":" + AcJson.Esc(toName) +
                       ",\"title\":" + AcJson.Esc(Short(title, 40)) + ",\"body\":" + AcJson.Esc(body.Length > 1500 ? body.Substring(0, 1500) : body) + ",\"ct\":" + AcSync.UnixMs.ToString("0") + "}";
         net.Put("letters/" + id, json);
         writeTitle = ""; writeBody = "";
@@ -151,16 +152,26 @@ public partial class AcRoom
         Toast(toId == "all" ? "공개 편지를 테이블에 올려 두었어요" : toName + " 님에게 비밀 편지를 보냈어요");
     }
 
+    // 받는 사람: 한 번이라도 들어왔던 사람 모두 (이름으로 구분해서, 다음에 들어와도 편지가 남아 있음)
     List<(string id, string name)> Recipients()
     {
         var l = new List<(string, string)> { ("all", "모두에게 (공개)") };
-        foreach (var kv in remotes.OrderBy(k => k.Value.net?.name ?? "")) if (kv.Value.net != null) l.Add((kv.Key, kv.Value.net.name));
+        var online = new HashSet<string>();
+        foreach (var r in remotes.Values) if (r.net != null) online.Add(NameKey(r.net.name));
+        var seen = new HashSet<string> { myKey, "all" };
+        var mem = net != null ? net.Get("members") : null;
+        var all = new List<(string key, string name, bool on)>();
+        foreach (var r in remotes.Values) if (r.net != null && seen.Add(NameKey(r.net.name))) all.Add((NameKey(r.net.name), r.net.name, true));
+        if (mem != null)
+            foreach (var kv in mem)
+                if (kv.Value is Dictionary<string, object> d && seen.Add(kv.Key)) all.Add((kv.Key, AcJson.S(d, "name"), online.Contains(kv.Key)));
+        foreach (var m in all.OrderBy(m => m.on ? 0 : 1).ThenBy(m => m.name)) l.Add((m.key, m.name + (m.on ? "  (접속 중)" : "")));
         return l;
     }
 
     void OpenLetters() { lettersOpen = true; openLetter = null; letterTab = UnreadMine() > 0 ? 0 : UnreadPublic() > 0 ? 1 : 0; walkTarget = null; followId = null; nextLetterPoll = 0; }
-    int UnreadMine() => readLetters == null ? 0 : letters.Count(l => l.to == myId && l.from != myId && !readLetters.Contains(l.id));
-    int UnreadPublic() => readLetters == null ? 0 : letters.Count(l => l.to == "all" && l.from != myId && !readLetters.Contains(l.id));
+    int UnreadMine() => readLetters == null ? 0 : letters.Count(l => l.to == myKey && l.from != myKey && !readLetters.Contains(l.id));
+    int UnreadPublic() => readLetters == null ? 0 : letters.Count(l => l.to == "all" && l.from != myKey && !readLetters.Contains(l.id));
 
     // ===== 화면 =====
     void LettersWindow()
@@ -194,9 +205,9 @@ public partial class AcRoom
 
     void EnvelopeGrid(Rect area)
     {
-        var list = letterTab == 0 ? letters.Where(l => l.to == myId && l.from != myId).ToList()
+        var list = letterTab == 0 ? letters.Where(l => l.to == myKey && l.from != myKey).ToList()
                  : letterTab == 1 ? letters.Where(l => l.to == "all").ToList()
-                 : letters.Where(l => l.from == myId).ToList();
+                 : letters.Where(l => l.from == myKey).ToList();
         if (list.Count == 0)
         {
             string msg = letterTab == 0 ? "아직 나에게 온 편지가 없어요" : letterTab == 1 ? "아직 공개 편지가 없어요. 첫 편지를 써 보세요!" : "아직 보낸 편지가 없어요";
@@ -218,7 +229,7 @@ public partial class AcRoom
             int r = i / cols, c = i % cols;
             float x = startX - area.x + c * (cw + gap), y = r * (ch + gap) - letterScroll.y;
             if (y + ch < 0 || y > area.height) continue;
-            bool unread = l.from != myId && readLetters != null && !readLetters.Contains(l.id);
+            bool unread = l.from != myKey && readLetters != null && !readLetters.Contains(l.id);
             float tilt = ((l.id.GetHashCode() & 7) - 3.5f) * 1.2f;
             var er = new Rect(x + 8, y + 6, cw - 16, (cw - 16) * 0.66f);
             var m = GUI.matrix;
@@ -258,13 +269,13 @@ public partial class AcRoom
         GUI.EndGroup();
         GUI.Label(new Rect(ix, paper.yMax - 50, iw - 190, 30), "From. " + l.fromName + "   " + Ago(l.ct), new GUIStyle(sHand) { fontSize = 22 });
         if (GUI.Button(new Rect(paper.xMax - 96, paper.yMax - 46, 80, 32), "닫기", sBtn)) openLetter = null;
-        if (l.from != myId && GUI.Button(new Rect(paper.xMax - 182, paper.yMax - 46, 80, 32), "답장", sBtn))
+        if (l.from != myKey && GUI.Button(new Rect(paper.xMax - 182, paper.yMax - 46, 80, 32), "답장", sBtn))
         {
             var ppl = Recipients();
             int idx = ppl.FindIndex(p => p.id == l.from);
             writeTo = idx >= 0 ? idx : 0;
             writeTitle = "Re: " + l.title; openLetter = null; letterTab = 3;
-            if (idx < 0) Toast(l.fromName + " 님이 지금은 없어서 공개 편지로 써요");
+            if (idx < 0) Toast(l.fromName + " 님을 목록에서 못 찾아서 공개 편지로 써요");
         }
     }
 
@@ -284,7 +295,7 @@ public partial class AcRoom
         if (GUI.Button(new Rect(ix + iw - 34, y, 34, 32), ">", sBtn)) writeTo = Wrap(writeTo + 1, ppl.Count);
         y += 38;
         GUI.Label(new Rect(ix, y, iw, 22), writeTo == 0 ? "<size=12>공개 편지: 테이블에 올려 두면 모두 읽을 수 있고, 모두에게 알림이 가요</size>"
-                                                       : "<size=12>비밀 편지: 받는 사람만 읽을 수 있고, 그 사람에게 알림이 가요</size>", sSmall);
+                                                       : "<size=12>비밀 편지: 받는 사람만 읽을 수 있고, 지금 없어도 다음에 들어오면 받아요</size>", sSmall);
         y += 26;
         GUI.Label(new Rect(ix, y + 6, 50, 30), "제목", sSmall);
         var titleR = new Rect(ix + 54, y, iw - 54, 38);

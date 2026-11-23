@@ -145,13 +145,16 @@ public class AcFirebase : MonoBehaviour
         if (p[0] == "snow" && p.Length == 2) return "orn/x~snow~" + p[1];
         if (p[0] == "letters" && p.Length == 2) return "orn/x~letter~" + p[1];
         if (p[0] == "msg" && p.Length == 3) return "orn/x~msg~" + p[1] + "~" + p[2];
+        if (p[0] == "members" && p.Length == 2) return "orn/x~member~" + p[1];
+        if (p[0] == "scores" && p.Length == 2) return "orn/x~score~" + p[1];
         return path;
     }
 
     public Dictionary<string, object> Get(string path)
     {
         var p = path.Split('/');
-        string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~" : null;
+        string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~"
+                      : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : null;
         if (prefix != null)
         {
             var orn = Node("orn");
@@ -201,7 +204,7 @@ public class AcFirebase : MonoBehaviour
                 id = kv.Key, name = AcJson.S(d, "name"), look = AcJson.S(d, "look"),
                 x = AcJson.F(d, "x"), z = AcJson.F(d, "z"), ry = AcJson.F(d, "ry"), speed = AcJson.F(d, "speed"),
                 emote = AcJson.S(d, "emote"), emoteT = AcJson.D(d, "emoteT"), chat = AcJson.S(d, "chat"), chatT = AcJson.D(d, "chatT"),
-                decorating = AcJson.B(d, "decorating"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
+                decorating = AcJson.B(d, "decorating"), skate = AcJson.B(d, "skate"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
             };
             // 오래 안 바뀐 기록(꺼진 사람)은 빼기
             if (now > 0 && n.t > 0 && now - n.t > 10000) continue;
@@ -225,7 +228,7 @@ public class AcFirebase : MonoBehaviour
             res[kv.Key] = new AcRoom.Orn
             {
                 id = kv.Key, type = AcJson.S(d, "type"), color = AcJson.S(d, "color"), owner = AcJson.S(d, "owner"),
-                x = AcJson.F(d, "x"), y = AcJson.F(d, "y"), z = AcJson.F(d, "z"), ry = AcJson.F(d, "ry"), t = AcJson.D(d, "t"),
+                x = AcJson.F(d, "x"), y = AcJson.F(d, "y"), z = AcJson.F(d, "z"), ry = AcJson.F(d, "ry"), t = AcJson.D(d, "t"), v = (int)AcJson.D(d, "v"),
             };
         }
         return res;

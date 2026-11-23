@@ -18,6 +18,25 @@ public partial class AcRoom
     readonly HashSet<string> seenNotes = new HashSet<string>();
     bool notesPrimed; float nextNotePoll;
 
+    // ===== 이름 = 그 사람의 주소 (다음에 같은 이름으로 들어오면 편지·쪽지·점수가 그대로) =====
+    public static string NameKey(string name)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in (name ?? "").Trim())
+            if (".$#[]/~\\".IndexOf(ch) < 0 && !char.IsControl(ch)) sb.Append(ch);
+        var k = sb.ToString();
+        return k.Length > 24 ? k.Substring(0, 24) : k == "" ? "noname" : k;
+    }
+    string myKey => NameKey(uiName);
+    float nextMemberWrite;
+
+    void UpdateMember()
+    {
+        if (net == null || Time.unscaledTime < nextMemberWrite) return;
+        nextMemberWrite = Time.unscaledTime + 60f;
+        net.Put("members/" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"last\":" + AcSync.UnixMs.ToString("0") + "}");
+    }
+
     // ===== 쪽지 =====
     void SendNote(string toId, string toName, string text)
     {
@@ -25,7 +44,7 @@ public partial class AcRoom
         text = text.Trim(); if (text == "") return;
         if (text.Length > 200) text = text.Substring(0, 200);
         string id = "n" + Guid.NewGuid().ToString("N").Substring(0, 10);
-        string json = "{\"from\":" + AcJson.Esc(myId) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"text\":" + AcJson.Esc(text) + ",\"ct\":" + AcSync.UnixMs.ToString("0") + "}";
+        string json = "{\"from\":" + AcJson.Esc(myKey) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"text\":" + AcJson.Esc(text) + ",\"ct\":" + AcSync.UnixMs.ToString("0") + "}";
         net.Put("msg/" + toId + "/" + id, json);
         Toast(toName + " 님에게 쪽지를 보냈어요");
     }
@@ -34,18 +53,28 @@ public partial class AcRoom
     {
         if (net == null || Time.unscaledTime < nextNotePoll) return;
         nextNotePoll = Time.unscaledTime + 0.5f;
-        var box = net.Get("msg/" + myId);
+        var box = net.Get("msg/" + myKey);
         if (box != null)
             foreach (var kv in box)
             {
                 if (seenNotes.Contains(kv.Key) || !(kv.Value is Dictionary<string, object> d)) continue;
                 seenNotes.Add(kv.Key);
                 var n = new Note { id = kv.Key, from = AcJson.S(d, "from"), fromName = AcJson.S(d, "fromName"), text = AcJson.S(d, "text"), ct = AcJson.D(d, "ct") };
+                if (readNotes == null) readNotes = new HashSet<string>(PlayerPrefs.GetString("ac_notes_read", "").Split(','));
+                n.read = readNotes.Contains(n.id);
                 inbox.Add(n);
                 if (notesPrimed) { Toast(n.fromName + " 님의 쪽지: " + Short(n.text, 24)); Log("[쪽지] " + n.fromName + ": " + n.text); }
             }
         notesPrimed = true;   // 들어오기 전에 온 쪽지는 조용히 "새 쪽지"로만
         inbox.Sort((a, b) => b.ct.CompareTo(a.ct));
+    }
+
+    HashSet<string> readNotes;
+    void MarkNoteRead(Note n)
+    {
+        n.read = true;
+        if (readNotes == null) readNotes = new HashSet<string>();
+        if (readNotes.Add(n.id)) { PlayerPrefs.SetString("ac_notes_read", string.Join(",", readNotes.Take(400))); PlayerPrefs.Save(); }
     }
 
     static string Short(string s, int n) => s == null ? "" : s.Length > n ? s.Substring(0, n) + "..." : s;
@@ -98,9 +127,9 @@ public partial class AcRoom
         float along = Mathf.Clamp(Vector3.Dot(t - a, d), 0, len);
         var closest = a + d * along; closest.y = 0;
         var off = closest - t; off.y = 0;
-        if (off.magnitude > 3.1f || along <= 0.01f || along >= len - 0.01f) return b;
+        if (off.magnitude > TreeR + 0.5f || along <= 0.01f || along >= len - 0.01f) return b;
         if (off.magnitude < 0.05f) off = new Vector3(-d.z, 0, d.x);
-        var w = t + off.normalized * 3.7f;
+        var w = t + off.normalized * (TreeR + 1.1f);
         return Flat(a, w) < 0.8f ? b : w;
     }
 
@@ -150,16 +179,20 @@ public partial class AcRoom
 
     // ===== 상황별 버튼 =====
     float TreeDist => Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
-    bool NearTree => phase == Phase.Play && !Outside && TreeDist < 5.6f;
-    bool InStudy => phase == Phase.Play && !Outside && AreaAt(me.transform.position.x) == "서재";
+    bool NearTree => phase == Phase.Play && !Outside && TreeDist < TreeR + 3.2f;
+    Vector3 firePos;
+    bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f;
+    bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position.x) == "쿠키 공방";
+    bool InStudy => phase == Phase.Play && !Outside && (AreaAt(me.transform.position.x) == "서재" || NearFireplace);
 
     void ContextButtons()
     {
         if (phase != Phase.Play || showCustom) return;
         string label = null; Action act = null;
-        if (NearTree) { label = "트리 꾸미기"; act = () => { decorating = true; walkTarget = null; followId = null; }; }
-        else if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
+        if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
+        else if (NearTree) { label = "트리 꾸미기"; act = StartDecorating; }
         else if (Outside) { label = "눈사람 만들기"; act = StartBuilding; }
+        else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
@@ -168,6 +201,18 @@ public partial class AcRoom
         GUI.DrawTexture(new Rect(r.x - 4, r.y - 4, r.width + 8, r.height + 8), AcPalette.Tex(Color.Lerp(new Color(0.85f, 0.3f, 0.3f), new Color(0.98f, 0.78f, 0.32f), pulse)));
         R(r);
         if (GUI.Button(r, "<b>" + label + "</b>", sBtnBig)) act();
+        if (Outside)   // 스케이트
+        {
+            var r3 = new Rect(r.xMax + 14, r.y + 6, IsMobile ? 140 : 128, r.height - 12);
+            R(r3);
+            if (GUI.Button(r3, me.skating ? "스케이트 벗기" : "스케이트 타기", sBtn)) { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }
+        }
+        if (NearTree && !InStudy)   // 트리 전경 보기 (근처에서)
+        {
+            var r2 = new Rect(r.xMax + 14, r.y + 6, IsMobile ? 120 : 110, r.height - 12);
+            R(r2);
+            if (GUI.Button(r2, treeOverview ? "전경 닫기" : "트리 전경", sBtn)) treeOverview = !treeOverview;
+        }
     }
 
     GUIStyle sBtnBig;
@@ -184,6 +229,7 @@ public partial class AcRoom
         if (unread > 0) br.width = bw + 60;
         br.x = SW - br.width - 12;
         R(br);
+        MapButton(br);
         if (GUI.Button(br, bl, sBtn)) showPeople = !showPeople;
         if (followId != null && remotes.TryGetValue(followId, out var fr) && fr.net != null)
         {
@@ -215,10 +261,10 @@ public partial class AcRoom
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("답장", sBtn, GUILayout.Width(70), GUILayout.Height(26)) && !Dragging)
             {
-                var nn = n; nn.read = true;
+                var nn = n; MarkNoteRead(nn);
                 Ask(nn.fromName + " 님에게 답장", "", false, t => SendNote(nn.from, nn.fromName, t));
             }
-            if (!n.read && GUILayout.Button("읽음", sBtn, GUILayout.Width(60), GUILayout.Height(26)) && !Dragging) n.read = true;
+            if (!n.read && GUILayout.Button("읽음", sBtn, GUILayout.Width(60), GUILayout.Height(26)) && !Dragging) MarkNoteRead(n);
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
         }
@@ -243,7 +289,7 @@ public partial class AcRoom
             if (GUILayout.Button("쪽지 보내기", sBtn, GUILayout.Height(30)) && !Dragging)
             {
                 string nm = name;
-                Ask(nm + " 님에게 쪽지", "", false, t => SendNote(id, nm, t));
+                Ask(nm + " 님에게 쪽지", "", false, t => SendNote(NameKey(nm), nm, t));
             }
             GUILayout.EndHorizontal();
         }

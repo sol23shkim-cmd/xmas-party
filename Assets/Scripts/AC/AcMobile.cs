@@ -77,6 +77,12 @@ public partial class AcRoom
 
     void TapMove(float dt)
     {
+        if (me.skating)   // 스케이트: 누른 곳 방향으로 미끄러짐 (움직임은 MovePlayer가 함)
+        {
+            if (ptrPressed && !ptrOnUI && (ptrMoved || Time.unscaledTime - ptrDownAt > 0.15f) && GroundAt(ptrPos, out var gs)) walkTarget = gs;
+            else if (Tap && GroundAt(ptrPos, out var gs2)) walkTarget = gs2;
+            return;
+        }
         if (ptrDown) longUsed = false;
         // 꾸미는 중에 트리를 누른 것이면 이동하지 않음
         bool onTree = decorating && treeCol != null && treeCol.Raycast(cam.ScreenPointToRay(ptrPos), out _, 100f);
@@ -98,7 +104,7 @@ public partial class AcRoom
         p = Collide(p, 0.36f);
         p = ClampRegion(prev, p);
         var tv = new Vector2(p.x - TreePos.x, p.z - TreePos.z);
-        if (tv.magnitude < 2.6f) { tv = tv.normalized * 2.6f; p.x = TreePos.x + tv.x; p.z = TreePos.z + tv.y; }
+        if (tv.magnitude < TreeR) { tv = tv.normalized * TreeR; p.x = TreePos.x + tv.x; p.z = TreePos.z + tv.y; }
         var moved = p - prev; moved.y = 0;
         if (moved.magnitude < spd * dt * 0.15f && !ptrPressed) walkTarget = null;   // 막혀서 못 가면 멈춤
         me.speed = dt > 0 ? moved.magnitude / dt : 0;

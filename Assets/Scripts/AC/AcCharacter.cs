@@ -94,6 +94,23 @@ public class AcCharacter : MonoBehaviour
             else h.transform.localPosition = new Vector3(0, human ? 0f : top - hatTop, 0);
             attached.Add(h);
         }
+        if (skating) { skating = false; SetSkates(true); }   // 다시 만들 때 스케이트도 다시 신김
+    }
+
+    // ===== 스케이트 =====
+    public bool skating;
+    GameObject skL, skR;
+    public Color skateColor = new Color(0.98f, 0.97f, 0.95f);
+    public void SetSkates(bool on)
+    {
+        if (on == skating && ((skL != null) == on)) return;
+        skating = on;
+        if (skL) Destroy(skL); if (skR) Destroy(skR);
+        skL = skR = null;
+        if (!on || !legL || !legR || !AcmLoader.Exists("skate_boot")) return;
+        var t = new Dictionary<string, Color> { { "boot", skateColor }, { "cuff", look.scarf } };
+        skL = AcmLoader.Spawn("skate_boot", legL, t); skL.transform.localPosition = new Vector3(-0.002f, -0.125f, 0.04f);
+        skR = AcmLoader.Spawn("skate_boot", legR, t); skR.transform.localPosition = new Vector3(0.002f, -0.125f, 0.04f);
     }
 
     void Update()
@@ -130,12 +147,29 @@ public class AcCharacter : MonoBehaviour
                     break;
             }
         }
+        if (skating && et >= 1.8f)
+        {
+            // 스케이트: 다리를 번갈아 옆뒤로 밀고, 몸은 앞으로 숙이고 좌우로 실룩
+            float st = Mathf.Clamp01(speed / 6f);
+            float push = Mathf.Sin(phase * 0.55f);
+            float pl = Mathf.Max(0, push), pr = Mathf.Max(0, -push);
+            if (legL) legL.localRotation = Quaternion.Euler(-pl * 34f * st, 0, -pl * 24f * st);
+            if (legR) legR.localRotation = Quaternion.Euler(-pr * 34f * st, 0, pr * 24f * st);
+            if (armL) armL.localRotation = Quaternion.Euler(push * 35f * st, 0, -10f - 30f * st);
+            if (armR) armR.localRotation = Quaternion.Euler(-push * 35f * st, 0, 10f + 30f * st);
+            if (body)
+            {
+                body.localPosition = new Vector3(push * 0.035f * st, 0.11f + Mathf.Abs(push) * 0.012f * st, 0);
+                body.localRotation = Quaternion.Euler(14f * st, push * 6f * st, -push * 9f * st);
+            }
+            return;
+        }
         // 걸을 때 통통 튀고, 서 있을 때는 숨쉬듯 살짝
         float target = s > 0.05f ? Mathf.Abs(Mathf.Sin(phase)) * 0.045f * s : Mathf.Sin(Time.time * 2.2f) * 0.006f + 0.006f;
         bob = Mathf.Lerp(bob, target, 1 - Mathf.Exp(-dt * 20f));
         if (body)
         {
-            body.localPosition = new Vector3(0, bob + jump, 0);
+            body.localPosition = new Vector3(0, bob + jump + (skating ? 0.11f : 0f), 0);
             body.localRotation = Quaternion.Euler(s * 6f, 0, Mathf.Sin(phase) * 3f * s);
         }
     }

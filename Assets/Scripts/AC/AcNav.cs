@@ -26,7 +26,7 @@ public partial class AcRoom
     bool StaticWalkable(float x, float z, List<float> bx)
     {
         const float wall = 0.55f, body = 0.4f;
-        if (new Vector2(x - TreePos.x, z - TreePos.z).magnitude < 2.85f) return false;
+        if (new Vector2(x - TreePos.x, z - TreePos.z).magnitude < TreeR + 0.25f) return false;
         bool houseX = Mathf.Abs(x) < HouseHalf + wall;
         if (houseX && Mathf.Abs(z + HalfZ) < wall && Mathf.Abs(x - DoorPos.x) > 0.62f) return false;
         if (houseX && Mathf.Abs(z - HalfZ) < wall && !(x > FrontGapX0 + 0.55f && x < FrontGapX1 - 0.55f)) return false;

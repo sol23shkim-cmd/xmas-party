@@ -137,7 +137,7 @@ public partial class AcRoom
     void ShowGarland(Orn o)
     {
         ColorUtility.TryParseHtmlString("#" + o.color, out var c);
-        var go = GarlandObject(GarlandPath(o.y), o.type, c);
+        var go = GarlandObject(GarlandPath(OrnWorld(o).y), o.type, c);
         go.transform.SetParent(world, true);
         go.AddComponent<AcOrnTag>().id = o.id;
         ornObjs[o.id] = go; ornData[o.id] = o;

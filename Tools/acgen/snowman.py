@@ -202,3 +202,25 @@ def holly(m):
     b = m.part("berry", k=0.0)
     for x, y in ((0, 0.0), (0.016, 0.014), (-0.016, 0.014)):
         b.add(lambda p, x=x, y=y: sd_sphere(p, (x, y, 0.022), 0.013), RED, 0.0)
+
+
+# ---------------------------------------------------------------- 스케이트 (캐릭터 발에 신기는 한 짝)
+# 원점 = 캐릭터 발 중심(발 타원 중심), 앞 = +z. 날 바닥이 y = -0.11 (캐릭터를 그만큼 띄움)
+@S("skate_boot", (-0.12, -0.13, -0.16), (0.12, 0.16, 0.2), 0.0035, "스케이트 한 짝", place="foot")
+def skate_boot(m):
+    b = m.part("boot", tint=(0.98, 0.97, 0.95), group="boot", k=0.025)
+    b.add(lambda p: sd_ellipsoid(p, (0, 0.0, 0.0), (0.094, 0.066, 0.112)), WHITE, 1.0)
+    b.add(lambda p: sd_cylinder(p, (0, 0.06, -0.025), 0.05, 0.075, 0.03), WHITE, 1.0)          # 발목
+    b.add(lambda p: sd_roundbox(p, (0, -0.055, 0.005), (0.07, 0.018, 0.105), 0.015), (0.55, 0.38, 0.28), 0.0)   # 밑창
+    b.paint(lambda p: np.abs(p[:, 1] - 0.1) - 0.012 + 5 * (p[:, 1] < 0.05), (0.85, 0.85, 0.85), 1.0, soft=0.006)  # 발목 띠
+    c = m.part("cuff", tint=(0.86, 0.22, 0.24), group="cuff", k=0.02)
+    c.add(lambda p: sd_torus(p, (0, 0.115, -0.025), 0.072, 0.022), WHITE, 1.0)
+    c.add(lambda p: sd_sphere(p, (0, 0.13, 0.055), 0.028), WHITE, 1.0)                           # 방울
+    l = m.part("laces", k=0.0)
+    for i, z in enumerate((0.03, 0.06, 0.085)):
+        l.add(lambda p, z=z, i=i: sd_capsule(p, (-0.03, 0.05 - i * 0.012, z), (0.03, 0.05 - i * 0.012, z), 0.006), (0.3, 0.3, 0.35), 0.0)
+    bl = m.part("blade", gloss=0.9, k=0.008)
+    bl.add(lambda p: sd_roundbox(p, (0, -0.1, 0.0), (0.008, 0.016, 0.125), 0.005), (0.82, 0.85, 0.9), 0.0)
+    bl.add(lambda p: sd_torus(p, (0, -0.075, 0.125), 0.028, 0.008, rot(z=90)), (0.82, 0.85, 0.9), 0.0)   # 앞쪽 말린 날
+    for z in (-0.07, 0.07):
+        bl.add(lambda p, z=z: sd_cylinder(p, (0, -0.075, z), 0.018, 0.011), (0.7, 0.72, 0.78), 0.0)   # 받침
