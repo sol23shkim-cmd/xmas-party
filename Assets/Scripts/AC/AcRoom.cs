@@ -826,10 +826,10 @@ public partial class AcRoom : MonoBehaviour
         // 아이콘을 눌러 끌기 시작
         if (ptrDown && !pinching)
         {
-            dragCand = -1; var u = new Vector2(mp.x / UiK, (Screen.height - mp.y) / UiK);
+            var u = new Vector2(ptrStart.x / UiK, (Screen.height - ptrStart.y) / UiK);
             foreach (var (rr, idx) in decoIconRects) if (rr.Contains(u)) dragCand = idx;
         }
-        if (dragCand >= 0 && ptrPressed && !OverUI(mp) && !dragOrn) { dragOrn = true; SetSel(dragCand); ornPicked = true; }
+        if (dragCand >= 0 && (ptrPressed || ptrUp) && !OverUI(mp) && !dragOrn && !pinching) { dragOrn = true; SetSel(dragCand); ornPicked = true; }
         bool dropNow = dragOrn && ptrUp;
         if (!ptrPressed && !ptrUp) { dragCand = -1; dragOrn = false; }
         if (OverUI(mp)) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); if (dropNow) dragOrn = false; return; }   // 화면 UI 위
@@ -882,7 +882,7 @@ public partial class AcRoom : MonoBehaviour
         {
             float d = (a - b).magnitude;
             if (!pinching) { pinching = true; pinchD = Mathf.Max(20, d); pinchZ = decoZoom; }
-            else decoZoom = Mathf.Clamp(pinchZ * pinchD / Mathf.Max(20, d), 0.5f, 2.4f);
+            else decoZoom = Mathf.Clamp(pinchZ * pinchD / Mathf.Max(20, d), 0.5f, 3.5f);
             ptrMoved = true; lastPtr = ptrPos; dragCand = -1;
             return true;
         }
@@ -902,7 +902,7 @@ public partial class AcRoom : MonoBehaviour
             decoH -= d.y * 0.012f;
         }
         lastPtr = ptrPos;
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 2.4f);   // 휠: 확대·축소
+        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 3.5f);   // 휠: 확대·축소
         var a = MoveAxis();
         decoYaw -= a.x * 70f * dt; decoH += a.y * 3f * dt;
         if (decoButtons != 0) { decoYaw -= (decoButtons == 3 ? 1 : decoButtons == 4 ? -1 : 0) * 80f * dt; decoH += (decoButtons == 1 ? 1 : decoButtons == 2 ? -1 : 0) * 3.2f * dt; }
@@ -1174,7 +1174,7 @@ public partial class AcRoom : MonoBehaviour
     void DecorateBar()
     {
         bool narrow = SW < 640;   // 세로 화면: 모양 줄 아래에 색 줄
-        float h = narrow ? 230 : 158, y = SH - h - 8;
+        float h = narrow ? 246 : 158, y = SH - h - 8;
         GUI.Box(R(new Rect(10, y, SW - 20, h)), "", sBox);
         // 머리줄: 제목·장식 수 (왼쪽) / 트리 전경·나오기 (오른쪽)
         GUI.Label(new Rect(26, y + 8, 120, 26), "트리 꾸미기", sLabel);
@@ -1263,7 +1263,7 @@ public partial class AcRoom : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
         if (PinchZoom()) return;
-        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 2.4f);
+        float sc = Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 3.5f);
         if (ptrPressed && ptrMoved && !ptrOnUI) decoYaw += (ptrPos - lastPtr).x * 0.22f;
         lastPtr = ptrPos;
         var a = MoveAxis(); decoYaw -= a.x * 70f * dt;
