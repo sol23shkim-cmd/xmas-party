@@ -193,14 +193,14 @@ public partial class AcRoom
             var r = S(o.x - o.w / 2, o.y - o.h, o.w, o.h);
             switch (o.kind)
             {
-                case 0: GUI.DrawTexture(r, SnowIcon("candy_cane_big", Color.white), ScaleMode.ScaleToFit); break;
-                case 1: GUI.DrawTexture(r, SnowIcon("snowman_small", Color.white), ScaleMode.ScaleToFit); break;
+                case 0: GUI.DrawTexture(r, CgIcon("candy_cane_big", Color.white), ScaleMode.ScaleToFit); break;
+                case 1: GUI.DrawTexture(r, CgIcon("snowman_small", Color.white), ScaleMode.ScaleToFit); break;
                 case 2:
                     GUI.DrawTexture(S(o.x - 3, 0, 6, o.y - o.h), AcPalette.Tex(new Color(0.85f, 0.25f, 0.3f)));
-                    GUI.DrawTexture(r, SnowIcon("gift_box", new Color(0.3f, 0.6f, 0.9f)), ScaleMode.ScaleToFit); break;
-                case 10: GUI.DrawTexture(r, SnowIcon("orn_ball", o.col), ScaleMode.ScaleToFit); break;
-                case 11: GUI.DrawTexture(r, SnowIcon("orn_star", new Color(1f, 0.82f, 0.25f)), ScaleMode.ScaleToFit); break;
-                case 12: GUI.DrawTexture(r, SnowIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)), ScaleMode.ScaleToFit); break;
+                    GUI.DrawTexture(r, CgIcon("gift_box", new Color(0.3f, 0.6f, 0.9f)), ScaleMode.ScaleToFit); break;
+                case 10: GUI.DrawTexture(r, CgIcon("orn_ball", o.col), ScaleMode.ScaleToFit); break;
+                case 11: GUI.DrawTexture(r, CgIcon("orn_star", new Color(1f, 0.82f, 0.25f)), ScaleMode.ScaleToFit); break;
+                case 12: GUI.DrawTexture(r, CgIcon("orn_heart", new Color(0.95f, 0.25f, 0.35f)), ScaleMode.ScaleToFit); break;
             }
             GUI.color = Color.white;
         }
@@ -213,7 +213,7 @@ public partial class AcRoom
             var m = GUI.matrix;
             float ang = cgJumps == 2 ? (cgTime * 720) % 360 : cgSlide ? 0 : Mathf.Sin(cgTime * 16) * 6;
             GUIUtility.RotateAroundPivot(ang, cr.center);
-            GUI.DrawTexture(cr, SnowIcon("gingerbread_man", Color.white), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
+            GUI.DrawTexture(cr, CgIcon("gingerbread_man", Color.white), cgSlide ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit);
             GUI.matrix = m;
         }
         // 위쪽 정보
@@ -259,7 +259,7 @@ public partial class AcRoom
         {
             float x = r.x + 20 + (i >= 5 ? r.width / 2 - 10 : 0), yy = y + (i % 5) * rowH;
             var circle = new Rect(x, yy + 2, rowH - 4, rowH - 4);
-            GUI.DrawTexture(circle, AcPalette.Tex(i < 3 ? medal[i] : new Color(0.9f, 0.85f, 0.78f)));
+            GUI.color = i < 3 ? medal[i] : new Color(0.9f, 0.85f, 0.78f); GUI.DrawTexture(circle, Circle()); GUI.color = Color.white;
             GUI.Label(circle, (i + 1).ToString(), new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold });
             string nm = i < top.Count ? top[i].name : "-";
             string sc = i < top.Count ? top[i].best.ToString("#,0") + "점" : "";
@@ -268,6 +268,57 @@ public partial class AcRoom
             GUI.Label(new Rect(x + r.width / 2 - 120, yy + 2, 90, rowH), sc, new GUIStyle(sSmall) { alignment = TextAnchor.UpperRight });
         }
         if (GUI.Button(new Rect(r.center.x - 70, r.yMax - 46, 140, 36), cg == CgState.Menu ? "<b>시작하기</b>" : "<b>다시 하기</b>", sBtn)) StartRun();
+    }
+
+
+    readonly Dictionary<string, Texture2D> cgIcons = new Dictionary<string, Texture2D>();
+    Texture2D cgCircle;
+    // 아이콘 카메라로 그린 뒤 배경색(자홍)을 투명하게 바꾼 그림
+    Texture2D CgIcon(string model, Color c)
+    {
+        string key = model + HexOf(c);
+        if (cgIcons.TryGetValue(key, out var t) && t) return t;
+        EnsureIconCam();
+        var oldBg = iconCam.backgroundColor;
+        iconCam.backgroundColor = new Color(1, 0, 1, 1);
+        string sk = model + HexOf(c);
+        if (snowIcons.TryGetValue(sk, out var old) && old) { snowIcons.Remove(sk); }
+        var rt = SnowIcon(model, c) as RenderTexture;
+        iconCam.backgroundColor = oldBg;
+        snowIcons.Remove(sk);
+        if (old) snowIcons[sk] = old;
+        t = new Texture2D(96, 96, TextureFormat.RGBA32, false);
+        if (rt != null)
+        {
+            var prev = RenderTexture.active; RenderTexture.active = rt;
+            t.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0); RenderTexture.active = prev;
+            var px = t.GetPixels();
+            for (int i = 0; i < px.Length; i++)
+            {
+                var p = px[i];
+                float m = Mathf.Min(p.r, p.b) - p.g;   // 자홍일수록 큼
+                p.a = m > 0.55f ? 0 : m > 0.3f ? 1 - (m - 0.3f) / 0.25f : 1;
+                if (p.a < 1) { p.r = p.g; p.b = p.g; }
+                px[i] = p;
+            }
+            t.SetPixels(px); t.Apply();
+            rt.Release();
+        }
+        cgIcons[key] = t;
+        return t;
+    }
+
+    Texture2D Circle()
+    {
+        if (cgCircle) return cgCircle;
+        int n = 64; cgCircle = new Texture2D(n, n, TextureFormat.RGBA32, false);
+        for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(n / 2f, n / 2f));
+                cgCircle.SetPixel(x, y, new Color(1, 1, 1, Mathf.Clamp01(n / 2f - d)));
+            }
+        cgCircle.Apply();
+        return cgCircle;
     }
 
     void MakeCgTextures()
