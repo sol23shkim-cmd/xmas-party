@@ -14,29 +14,24 @@ public partial class AcRoom
         navX0 = WorldX0; navZ0 = WorldZ0;
         navW = Mathf.CeilToInt((WorldX1 - WorldX0) / NavCell); navH = Mathf.CeilToInt((WorldZ1 - WorldZ0) / NavCell);
         navStatic = new bool[navW * navH];
-        var bx = Bounds();
         for (int j = 0; j < navH; j++)
             for (int i = 0; i < navW; i++)
             {
                 float x = navX0 + (i + 0.5f) * NavCell, z = navZ0 + (j + 0.5f) * NavCell;
-                navStatic[j * navW + i] = StaticWalkable(x, z, bx);
+                navStatic[j * navW + i] = StaticWalkable(x, z);
             }
     }
 
-    bool StaticWalkable(float x, float z, List<float> bx)
+    bool StaticWalkable(float x, float z)
     {
         const float wall = 0.55f, body = 0.4f;
         if (new Vector2(x - TreePos.x, z - TreePos.z).magnitude < TreeR + 0.25f) return false;
-        bool houseX = Mathf.Abs(x) < HouseHalf + wall;
-        if (houseX && Mathf.Abs(z + HalfZ) < wall && Mathf.Abs(x - DoorPos.x) > 0.62f) return false;
-        if (houseX && Mathf.Abs(z - HalfZ) < wall && !(x > FrontGapX0 + 0.55f && x < FrontGapX1 - 0.55f)) return false;
-        if (z > -HalfZ - wall && z < HalfZ + wall)
-            for (int k = 0; k < bx.Count; k++)
-            {
-                if (Mathf.Abs(x - bx[k]) >= wall) continue;
-                bool arch = k > 0 && k < bx.Count - 1 && Mathf.Abs(z - ArchZ) < 0.6f;
-                if (!arch) return false;
-            }
+        var p = new Vector2(x, z);
+        foreach (var (a, b) in wallSegs)
+        {
+            if (x < Mathf.Min(a.x, b.x) - 1 || x > Mathf.Max(a.x, b.x) + 1 || z < Mathf.Min(a.y, b.y) - 1 || z > Mathf.Max(a.y, b.y) + 1) continue;
+            if (SegDist(p, a, b) < wall) return false;
+        }
         foreach (var o in obstacles)
         {
             var l = o.inv * (new Vector3(x, 0, z) - o.c);

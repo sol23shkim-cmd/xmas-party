@@ -1,16 +1,18 @@
-// AcHouse.cs - 큰 집: 가운데 트리 거실 + 양옆으로 방 4개씩 (모두 8개). 방 사이는 아치 문으로 이어짐.
-// 카메라가 남쪽(+z)에서 보므로 방들을 가로 한 줄로 배치하고, 앞쪽(+z) 벽은 두지 않음.
+// AcHouse.cs - 큰 집 (ㄷ자): 앞줄 = 방2 + 트리 거실 + 방2, 뒷줄 = 양쪽 날개 뒤에 방 2개씩 (모두 8개).
+// 트리 거실 뒤는 눈 덮인 안뜰. 방 사이는 아치 문, 앞·뒷줄 사이도 문으로 이어짐.
+// 카메라는 남쪽(+z)에서 보므로, 나와 카메라 사이에 있는 가로 벽은 낮게 내려서 안이 보이게 함 (잘라 보기).
 using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AcRoom
 {
     const int RoomSegs = 3;                                   // 방 하나 가로 3칸 (9.6m)
-    const int RoomsPerSide = 4;
     static float RoomW => RoomSegs * SEG;
-    static float HouseHalf => HalfX + RoomsPerSide * RoomW;   // 집 전체 반폭 (약 64m)
-    static float ArchZ => -HalfZ + SEG * 2.5f;                // 방 사이 아치 문 위치
-    const int ArchIz = 2;
+    static float RoomD => NZ * SEG;                           // 방 세로 (12.8m)
+    static float HouseHalf => HalfX + 2 * RoomW;              // 집 반폭 (28.8m)
+    static float HouseZ0 => -HalfZ - RoomD;                   // 뒷줄 방 뒷벽 (-19.2m)
+    static float ArchZ => -HalfZ + SEG * 2.5f;                // 앞줄 방 사이 아치 문 위치
+    static float BackArchZ => HouseZ0 + SEG * 2.5f;           // 뒷줄 방 사이 아치 문 위치
     // 앞쪽(+z) 낮은 벽의 출입구: 트리 거실 앞 한 칸
     static float FrontGapX0 => -HalfX + SEG * 3;
     static float FrontGapX1 => -HalfX + SEG * 4;
@@ -35,176 +37,320 @@ public partial class AcRoom
         public System.Action<Vector3, Transform> fill;        // 방 가운데(바닥) 기준으로 가구 채우기
     }
 
-    readonly List<(float x0, float x1, string name)> areas = new List<(float, float, string)>();
+    class Area { public string name; public Rect r; public RoomDef def; public GameObject root; }   // r: x → x, y → z
+    readonly List<Area> areasR = new List<Area>();
     string curArea = "";
-    readonly List<(float x0, float x1, GameObject go)> roomRoots = new List<(float, float, GameObject)>();
     float nextCull;
+
+    // 방 배치 (x0, z0) — 앞줄 z0 = -HalfZ, 뒷줄 z0 = HouseZ0
+    (RoomDef def, float x0, float z0)[] Layout()
+    {
+        RoomDef R(string n, string wall, string wain, System.Action<Vector3, Transform> f, string floor = "floor_planks", string ft = null)
+            => new RoomDef { name = n, wall = C(wall), wain = C(wain), fill = f, floor = floor, floorTint = ft != null ? C(ft) : default };
+        float fz = -HalfZ, bz = HouseZ0;
+        return new[]
+        {
+            (R("부엌", "EAF4EC", "6E9C87", FillKitchen, "floor_tiles"), -HalfX - RoomW, fz),
+            (R("서재", "EFE6D2", "5B3E2E", FillLibrary), -HalfX - 2 * RoomW, fz),
+            (R("쿠키 공방", "FBEBDD", "A8693F", FillBakery), -HalfX - RoomW, bz),
+            (R("겨울 온실", "E3F1F6", "8FB3A2", FillGreenhouse, "floor_tiles", "DCE6DA"), -HalfX - 2 * RoomW, bz),
+            (R("놀이방", "FFF0F3", "D97C8C", FillPlayroom), HalfX, fz),
+            (R("음악실", "F6EEDB", "8C5A3C", FillMusic), HalfX + RoomW, fz),
+            (R("선물 포장실", "FDF3DC", "B8463F", FillGiftRoom), HalfX, bz),
+            (R("침실", "ECEBF7", "7D7BAE", FillBedroom), HalfX + RoomW, bz),
+        };
+    }
+
+    static Color C(string h) { ColorUtility.TryParseHtmlString("#" + h, out var c); return c; }
+    Dictionary<string, Color> T(params (string k, string hex)[] kv) { var d = new Dictionary<string, Color>(); foreach (var (k, h) in kv) d[k] = C(h); return d; }
+
+    // ===== 벽 조각 =====
+    class WallPiece
+    {
+        public Vector3 pos; public bool alongX; public string kind;   // plain window door arch
+        public bool exterior, lowBase; public float cur = 1f, baseH = 1f;
+        public readonly List<GameObject> gos = new List<GameObject>();
+        public readonly List<GameObject> decos = new List<GameObject>();
+    }
+    readonly List<WallPiece> walls = new List<WallPiece>();
+    readonly List<(Vector2 a, Vector2 b)> wallSegs = new List<(Vector2, Vector2)>();   // 부딪히는 벽 선분 (x,z)
+    readonly List<(string name, GameObject go)> builtObjs = new List<(string, GameObject)>();
+    bool recordPuts;
+    const float DoorHalf = 0.95f;
+
+    Area AreaRect(Vector3 p) { foreach (var a in areasR) if (a.r.Contains(new Vector2(p.x, p.z))) return a; return null; }
+    string AreaAt(Vector3 p) { var a = AreaRect(p); return a != null ? a.name : (InHall(p) ? "트리 거실" : ""); }
+    static bool InHall(Vector3 p) => Mathf.Abs(p.x) < HalfX && p.z > -HalfZ && p.z < HalfZ;
+    bool InHouse(Vector3 p) => InHall(p) || AreaRect(p) != null;
+    bool InHouseStatic(float x, float z) => InHouse(new Vector3(x, 0, z));
+
+    // 집 바깥까지의 거리 (안이면 0)
+    float DistToHouse(Vector3 p)
+    {
+        float best = float.MaxValue;
+        void Try(float x0, float z0, float x1, float z1)
+        {
+            float dx = Mathf.Max(x0 - p.x, 0, p.x - x1), dz = Mathf.Max(z0 - p.z, 0, p.z - z1);
+            best = Mathf.Min(best, Mathf.Sqrt(dx * dx + dz * dz));
+        }
+        Try(-HalfX, -HalfZ, HalfX, HalfZ);
+        foreach (var a in areasR) Try(a.r.xMin, a.r.yMin, a.r.xMax, a.r.yMax);
+        return best;
+    }
+
+    Dictionary<string, Color> TintAt(float x, float z)
+    {
+        if (InHall(new Vector3(x, 0, z))) return null;
+        var a = AreaRect(new Vector3(x, 0, z));
+        if (a != null) return new Dictionary<string, Color> { { "wall", a.def.wall }, { "wainscot", a.def.wain } };
+        return new Dictionary<string, Color> { { "wall", C("F3E6D3") }, { "wainscot", C("8C5A3C") } };   // 바깥 벽
+    }
 
     // 멀리 있는 방은 꺼서 휴대폰에서도 가볍게
     void CullRooms()
     {
         if (Time.unscaledTime < nextCull || me == null) return;
         nextCull = Time.unscaledTime + 0.3f;
-        float x = me.transform.position.x, reach = IsMobile ? 15f : 24f;
-        foreach (var (x0, x1, go) in roomRoots)
+        var p = me.transform.position; float reach = IsMobile ? 16f : 26f;
+        foreach (var a in areasR)
         {
-            float d = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
-            bool on = d < reach;
-            if (go.activeSelf != on) go.SetActive(on);
+            float dx = Mathf.Max(a.r.xMin - p.x, 0, p.x - a.r.xMax), dz = Mathf.Max(a.r.yMin - p.z, 0, p.z - a.r.yMax);
+            bool on = Mathf.Sqrt(dx * dx + dz * dz) < reach || treeOverview;
+            if (a.root.activeSelf != on) a.root.SetActive(on);
         }
     }
 
-    static Color C(string h) { ColorUtility.TryParseHtmlString("#" + h, out var c); return c; }
-    Dictionary<string, Color> T(params (string k, string hex)[] kv) { var d = new Dictionary<string, Color>(); foreach (var (k, h) in kv) d[k] = C(h); return d; }
-
-    // 경계 x 목록 (왼쪽 끝 → 오른쪽 끝)
-    List<float> Bounds()
+    WallPiece AddWall(Vector3 pos, bool alongX, string kind, bool lowBase = false)
     {
-        var b = new List<float>();
-        for (int i = RoomsPerSide; i >= 1; i--) b.Add(-HalfX - (i) * RoomW);
-        b.Add(-HalfX); b.Add(HalfX);
-        for (int i = 1; i <= RoomsPerSide; i++) b.Add(HalfX + i * RoomW);
-        return b;
+        var w = new WallPiece { pos = pos, alongX = alongX, kind = kind, lowBase = lowBase, baseH = lowBase ? 0.3f : 1f };
+        w.cur = w.baseH;
+        // 양쪽 방 색
+        Vector3 nrm = alongX ? Vector3.forward : Vector3.right;
+        Vector3 pA = pos + nrm * 0.5f, pB = pos - nrm * 0.5f;
+        bool inA = InHouse(pA), inB = InHouse(pB);
+        w.exterior = inA != inB;
+        string model = kind == "window" ? "wall_window_big" : kind == "door" || kind == "arch" ? "wall_door" : "wall_plain";
+        var house = houseTr;
+        for (int side = 0; side < 2; side++)
+        {
+            var p = side == 0 ? pA : pB;
+            float ry = alongX ? (side == 0 ? 0 : 180) : (side == 0 ? 90 : -90);
+            var g = Put(model, pos + (side == 0 ? nrm : -nrm) * 0.06f, ry, S, TintAt(p.x, p.z), house);
+            if (model == "wall_window_big") HidePart(g, "glass");
+            bool realDoor = kind == "door" && side == 0 && Mathf.Abs(pos.x - DoorPos.x) < 0.1f && Mathf.Abs(pos.z - DoorPos.z) < 0.1f;
+            if (model == "wall_door")
+            {
+                if (realDoor) doorTr = AcmLoader.Find(g, "door");
+                else HidePart(g, "door");
+            }
+            if (lowBase) g.transform.localScale = new Vector3(S, S * w.baseH, S);
+            w.gos.Add(g);
+        }
+        // 부딪히는 선분 (문은 가운데를 비움)
+        Vector2 c = new Vector2(pos.x, pos.z), u = alongX ? Vector2.right : Vector2.up;
+        float h = SEG / 2f;
+        if (kind == "door" || kind == "arch") { wallSegs.Add((c - u * h, c - u * DoorHalf)); wallSegs.Add((c + u * DoorHalf, c + u * h)); }
+        else wallSegs.Add((c - u * h, c + u * h));
+        walls.Add(w);
+        return w;
     }
-
-    RoomDef[] LeftRooms() => new[]
-    {
-        new RoomDef { name = "부엌", floor = "floor_tiles", wall = C("EAF4EC"), wain = C("6E9C87"), fill = FillKitchen },
-        new RoomDef { name = "쿠키 공방", wall = C("FBEBDD"), wain = C("A8693F"), fill = FillBakery },
-        new RoomDef { name = "서재", wall = C("EFE6D2"), wain = C("5B3E2E"), fill = FillLibrary },
-        new RoomDef { name = "겨울 온실", floor = "floor_tiles", wall = C("E3F1F6"), wain = C("8FB3A2"), floorTint = C("DCE6DA"), fill = FillGreenhouse },
-    };
-    RoomDef[] RightRooms() => new[]
-    {
-        new RoomDef { name = "놀이방", wall = C("FFF0F3"), wain = C("D97C8C"), fill = FillPlayroom },
-        new RoomDef { name = "침실", wall = C("ECEBF7"), wain = C("7D7BAE"), fill = FillBedroom },
-        new RoomDef { name = "음악실", wall = C("F6EEDB"), wain = C("8C5A3C"), fill = FillMusic },
-        new RoomDef { name = "선물 포장실", wall = C("FDF3DC"), wain = C("B8463F"), fill = FillGiftRoom },
-    };
+    Transform houseTr;
 
     void BuildHouse()
     {
-        var house = new GameObject("House").transform; house.SetParent(world, false);
-        var bx = Bounds();
-        areas.Clear();
-        var left = LeftRooms(); var right = RightRooms();
-        // 방 영역 (왼쪽 끝부터)
-        for (int i = 0; i < RoomsPerSide; i++) areas.Add((bx[i], bx[i + 1], left[RoomsPerSide - 1 - i].name));
-        areas.Add((-HalfX, HalfX, "트리 거실"));
-        for (int i = 0; i < RoomsPerSide; i++) areas.Add((bx[RoomsPerSide + 1 + i], bx[RoomsPerSide + 2 + i], right[i].name));
-
-        for (int side = -1; side <= 1; side += 2)
+        houseTr = new GameObject("House").transform; houseTr.SetParent(world, false);
+        areasR.Clear();
+        foreach (var (d, x0, z0) in Layout())
         {
-            var defs = side < 0 ? left : right;
-            for (int i = 0; i < RoomsPerSide; i++)
-            {
-                var d = defs[i];
-                float x0 = side < 0 ? -HalfX - (i + 1) * RoomW : HalfX + i * RoomW;
-                float cx = x0 + RoomW / 2;
-                var room = new GameObject(d.name).transform; room.SetParent(house, false);
-                roomRoots.Add((x0, x0 + RoomW, room.gameObject));
-                var floorT = d.floorTint.a > 0 ? new Dictionary<string, Color> { { "floor", d.floorTint } } : null;
-                for (int ix = 0; ix < RoomSegs; ix++)
-                    for (int iz = 0; iz < NZ; iz++)
-                        Put(d.floor, new Vector3(x0 + SEG * (ix + 0.5f), 0, -HalfZ + SEG * (iz + 0.5f)), (ix + iz) % 2 * 90, S, floorT, room);
-                var wt = new Dictionary<string, Color> { { "wall", d.wall }, { "wainscot", d.wain } };
-                // 뒷벽: 큰 창 2개 (밖의 눈사람도 보이게)
-                for (int ix = 0; ix < RoomSegs; ix++)
-                {
-                    string w = ix != 1 ? "wall_window_big" : "wall_plain";
-                    var g = Put(w, new Vector3(x0 + SEG * (ix + 0.5f), 0, -HalfZ), 0, S, wt, room);
-                    if (w != "wall_plain") HidePart(g, "glass");
-                    Put("string_lights", new Vector3(x0 + SEG * (ix + 0.5f), 3.35f * S, -HalfZ + 0.15f), 0, S * 0.62f, null, room);
-                }
-                d.fill(new Vector3(cx, 0, 0), room);
-                PointLight(new Vector3(cx, 4.5f, 0), new Color(1f, 0.9f, 0.75f), 11f, 0.5f);
-            }
+            var room = new GameObject(d.name).transform; room.SetParent(houseTr, false);
+            var a = new Area { name = d.name, r = new Rect(x0, z0, RoomW, RoomD), def = d, root = room.gameObject };
+            areasR.Add(a);
         }
-        // 경계 벽 (방 사이는 아치 문, 양 끝은 창 있는 벽)
-        for (int k = 0; k < bx.Count; k++)
+        recordPuts = true;
+        // 바닥·가구·조명
+        foreach (var a in areasR)
         {
-            float x = bx[k];
-            bool end = k == 0 || k == bx.Count - 1;
-            var tL = AreaTint(x - 1f); var tR = AreaTint(x + 1f);
+            var d = a.def; var room = a.root.transform;
+            var floorT = d.floorTint.a > 0 ? new Dictionary<string, Color> { { "floor", d.floorTint } } : null;
+            for (int ix = 0; ix < RoomSegs; ix++)
+                for (int iz = 0; iz < NZ; iz++)
+                    Put(d.floor, new Vector3(a.r.x + SEG * (ix + 0.5f), 0, a.r.y + SEG * (iz + 0.5f)), (ix + iz) % 2 * 90, S, floorT, room);
+            var c = new Vector3(a.r.center.x, 0, a.r.center.y);
+            d.fill(c, room);
+            PointLight(new Vector3(c.x, 4.5f, c.z), new Color(1f, 0.9f, 0.75f), 11f, 0.5f);
+            // 뒷벽 위 전구 줄
+            for (int ix = 0; ix < RoomSegs; ix++)
+                Put("string_lights", new Vector3(a.r.x + SEG * (ix + 0.5f), 3.35f * S, a.r.y + 0.15f), 0, S * 0.62f, null, room);
+        }
+        // 트리 거실 뒷벽 (안뜰 쪽: 큰 창 2개 + 진짜 문) + 전구 줄 + 문 위 화환
+        for (int ix = 0; ix < NX; ix++)
+        {
+            float x = -HalfX + SEG * (ix + 0.5f);
+            string k = ix == NX - 1 ? "door" : ix == 1 || ix == 3 ? "window" : "plain";
+            AddWall(new Vector3(x, 0, -HalfZ), true, k);
+            Put("string_lights", new Vector3(x, 3.35f * S, -HalfZ + 0.15f), 0, S * 0.62f, null, houseTr);
+            if (k == "door") Put("wreath", new Vector3(x, 1.75f * S + 1.2f, -HalfZ + 0.16f), 0, 1.1f, null, houseTr);
+        }
+        foreach (int sd in new[] { -1, 1 })
+        {
+            float xin = sd * HalfX, xmid = sd * (HalfX + RoomW), xout = sd * HouseHalf;
+            // 날개: 앞·뒷줄 사이 벽 (방마다 가운데 칸이 문)
+            for (int k = 0; k < 2 * RoomSegs; k++)
+            {
+                float x = sd < 0 ? -HalfX - SEG * (k + 0.5f) : HalfX + SEG * (k + 0.5f);
+                AddWall(new Vector3(x, 0, -HalfZ), true, k % RoomSegs == 1 ? "arch" : "plain");
+            }
+            // 날개 뒷벽 (바깥, 큰 창)
+            for (int k = 0; k < 2 * RoomSegs; k++)
+            {
+                float x = sd < 0 ? -HalfX - SEG * (k + 0.5f) : HalfX + SEG * (k + 0.5f);
+                AddWall(new Vector3(x, 0, HouseZ0), true, k % RoomSegs == 1 ? "plain" : "window");
+            }
             for (int iz = 0; iz < NZ; iz++)
             {
-                float z = -HalfZ + SEG * (iz + 0.5f);
-                bool arch = !end && iz == ArchIz;
-                string w = arch ? "wall_door" : end && (iz == 1 || iz == 2) ? "wall_window_big" : "wall_plain";
-                // 양쪽 방에서 각각 보이도록 등을 맞댄 두 장 (집 양 끝은 바깥쪽에서도 보이게)
-                var tOut = new Dictionary<string, Color> { { "wall", C("F3E6D3") }, { "wainscot", C("8C5A3C") } };
-                { var g = Put(w, new Vector3(x - 0.06f, 0, z), -90, S, k > 0 ? tL : tOut, house); if (arch) HidePart(g, "door"); if (w != "wall_plain") HidePart(g, "glass"); }
-                { var g = Put(w, new Vector3(x + 0.06f, 0, z), 90, S, k < bx.Count - 1 ? tR : tOut, house); if (arch) HidePart(g, "door"); if (w != "wall_plain") HidePart(g, "glass"); }
+                float zf = -HalfZ + SEG * (iz + 0.5f), zb = HouseZ0 + SEG * (iz + 0.5f);
+                // 트리 거실 옆 (앞줄) / 안뜰 쪽 (뒷줄)
+                AddWall(new Vector3(xin, 0, zf), false, iz == 2 ? "arch" : "plain");
+                AddWall(new Vector3(xin, 0, zb), false, iz == 2 ? "arch" : iz == 0 || iz == 3 ? "window" : "plain");
+                // 날개 가운데 칸막이
+                AddWall(new Vector3(xmid, 0, zf), false, iz == 2 ? "arch" : "plain");
+                AddWall(new Vector3(xmid, 0, zb), false, iz == 2 ? "arch" : "plain");
+                // 집 양 끝 (바깥, 큰 창)
+                AddWall(new Vector3(xout, 0, zf), false, iz == 1 || iz == 2 ? "window" : "plain");
+                AddWall(new Vector3(xout, 0, zb), false, iz == 1 || iz == 2 ? "window" : "plain");
             }
-            Put("wall_corner", new Vector3(x, 0, -HalfZ), 0, S, null, house);
-            Put("wall_corner", new Vector3(x, 0, HalfZ), 0, S, null, house).transform.localScale = new Vector3(S, S * 0.32f, S);
         }
         // 앞쪽(+z)은 카메라가 넘겨볼 수 있게 낮은 벽 (트리 거실 앞 한 칸은 출입구)
         for (float x = -HouseHalf + SEG / 2; x < HouseHalf; x += SEG)
         {
             if (x > FrontGapX0 && x < FrontGapX1) continue;
-            var tin = AreaTint(x);
-            var g = Put("wall_plain", new Vector3(x, 0, HalfZ), 180, S, tin, house);
-            g.transform.localScale = new Vector3(S, S * 0.3f, S);
-            var g2 = Put("wall_plain", new Vector3(x, 0, HalfZ + 0.12f), 0, S, new Dictionary<string, Color> { { "wall", C("F3E6D3") }, { "wainscot", C("8C5A3C") } }, house);
-            g2.transform.localScale = new Vector3(S, S * 0.3f, S);
+            AddWall(new Vector3(x, 0, HalfZ), true, "plain", true);
+        }
+        // 모서리 기둥
+        var corners = new HashSet<Vector2>();
+        foreach (float x in new[] { -HouseHalf, -HalfX - RoomW, -HalfX, HalfX, HalfX + RoomW, HouseHalf })
+            foreach (float z in new[] { HouseZ0, -HalfZ, HalfZ })
+            {
+                if (Mathf.Abs(x) < HalfX + 0.1f && z < -HalfZ - 1) { }   // 안뜰 쪽 모서리도 둠
+                corners.Add(new Vector2(x, z));
+            }
+        foreach (var cp in corners)
+        {
+            var g = Put("wall_corner", new Vector3(cp.x, 0, cp.y), 0, S, null, houseTr);
+            if (cp.y > HalfZ - 0.1f) g.transform.localScale = new Vector3(S, S * 0.32f, S);
         }
         foreach (var gx in new[] { FrontGapX0, FrontGapX1 })
         {
-            Put("wall_corner", new Vector3(gx, 0, HalfZ + 0.06f), 0, S, null, house).transform.localScale = new Vector3(S * 1.3f, S * 0.42f, S * 1.3f);
-            Put("lantern_ground", new Vector3(gx + (gx < 0 ? -0.0f : 0.0f), S * 0.42f * 3.5f, HalfZ + 0.06f), 0, 0.9f, null, house);
+            var post = Put("wall_corner", new Vector3(gx, 0, HalfZ + 0.06f), 0, S, null, houseTr); post.transform.localScale = new Vector3(S * 1.3f, S * 0.42f, S * 1.3f);
+            frontPosts.Add(post);
+            frontPosts.Add(Put("lantern_ground", new Vector3(gx, S * 0.42f * 3.5f, HalfZ + 0.06f), 0, 0.9f, null, houseTr));
         }
     }
 
-    Dictionary<string, Color> AreaTint(float x)
+    // 벽에 붙은 장식(전구 줄·선반·액자·시계 등)을 그 벽 조각에 묶음 (벽을 낮추면 같이 숨김)
+    static readonly string[] WallDecoNames = { "string_lights", "kitchen_shelf", "picture_frame", "wall_clock", "bell_pair", "wreath", "mistletoe" };
+    void AttachWallDecos()
     {
-        var bx = Bounds();
-        if (x > -HalfX && x < HalfX) return null;
-        var left = LeftRooms(); var right = RightRooms();
-        for (int i = 0; i < RoomsPerSide; i++)
+        recordPuts = false;
+        foreach (var (name, go) in builtObjs)
         {
-            float l0 = -HalfX - (i + 1) * RoomW;
-            if (x >= l0 && x < l0 + RoomW) return new Dictionary<string, Color> { { "wall", left[i].wall }, { "wainscot", left[i].wain } };
-            float r0 = HalfX + i * RoomW;
-            if (x >= r0 && x < r0 + RoomW) return new Dictionary<string, Color> { { "wall", right[i].wall }, { "wainscot", right[i].wain } };
+            if (go == null) continue;
+            bool deco = false; foreach (var n in WallDecoNames) if (name == n) deco = true;
+            if (!deco) continue;
+            var p = go.transform.position;
+            WallPiece best = null; float bd = 1.2f;
+            foreach (var w in walls)
+            {
+                float perp = w.alongX ? Mathf.Abs(p.z - w.pos.z) : Mathf.Abs(p.x - w.pos.x);
+                float along = w.alongX ? Mathf.Abs(p.x - w.pos.x) : Mathf.Abs(p.z - w.pos.z);
+                if (along > SEG / 2 + 0.2f) continue;
+                if (perp < bd) { bd = perp; best = w; }
+            }
+            if (best != null) best.decos.Add(go);
+            else looseDecos.Add(go);
         }
-        return null;
+        builtObjs.Clear();
     }
+    readonly List<GameObject> looseDecos = new List<GameObject>();
+    readonly List<GameObject> frontPosts = new List<GameObject>();   // 출입구 기둥·등불 (트리를 볼 땐 숨김)
 
-    string AreaAt(float x)
+    // 잘라 보기: 나와 카메라 사이의 가로 벽은 낮게, 트리 전경 볼 때는 안쪽 벽과 벽 장식을 모두 숨김
+    void UpdateWalls(float dt)
     {
-        foreach (var a in areas) if (x >= a.x0 && x < a.x1) return a.name;
-        return "";
-    }
-
-    // 실내 이동: 지금 있는 영역 안에서만, 경계의 아치 문으로만 옆방에 감
-    Vector3 ClampInside(Vector3 prev, Vector3 p)
-    {
-        var bx = Bounds(); int n = bx.Count;
-        int k = 0;
-        for (int i = 0; i < n - 1; i++) if (prev.x >= bx[i]) k = i;
-        float lo = bx[k] + 0.6f, hi = bx[k + 1] - 0.6f;
-        bool zOk = Mathf.Abs(p.z - ArchZ) < 0.7f;
-        if (zOk && k > 0) lo = bx[k] - 0.6f;
-        if (zOk && k < n - 2) hi = bx[k + 1] + 0.6f;
-        float before = p.x;
-        p.x = Mathf.Clamp(p.x, lo, hi);
-        // 벽에 막혔는데 아치가 가까우면 아치 쪽으로 살짝 미끄러지게 (문 찾기 쉽게)
-        if (Mathf.Abs(before - p.x) > 0.0005f && Mathf.Abs(p.z - ArchZ) < 2.2f)
+        if (me == null || walls.Count == 0) return;
+        var p = me.transform.position;
+        bool overview = treeOverview;
+        foreach (var w in walls)
         {
-            bool towardInner = (p.x >= hi - 0.001f && k < n - 2) || (p.x <= lo + 0.001f && k > 0);
-            if (towardInner) p.z = Mathf.MoveTowards(p.z, ArchZ, 0.06f);
+            float target = w.baseH;
+            if (overview && !w.exterior) target = 0f;
+            else if (w.alongX && !w.lowBase && phase != Phase.Lobby)
+            {
+                bool between = w.pos.z > p.z + 0.25f && w.pos.z < p.z + 15f && Mathf.Abs(w.pos.x - p.x) < 15f;
+                if (between) target = 0.3f;
+            }
+            if (Mathf.Abs(w.cur - target) < 0.001f) continue;
+            w.cur = Mathf.MoveTowards(w.cur, target, dt * 3.5f);
+            foreach (var g in w.gos)
+            {
+                bool vis = w.cur > 0.02f;
+                if (g.activeSelf != vis) g.SetActive(vis);
+                g.transform.localScale = new Vector3(S, S * Mathf.Max(0.02f, w.cur), S);
+            }
         }
-        for (int i = 1; i < n - 1; i++)
-            if (Mathf.Abs(p.x - bx[i]) < 0.6f) p.z = Mathf.Clamp(p.z, ArchZ - 0.69f, ArchZ + 0.69f);   // 문 통로 안
+        // 벽 장식: 전경 볼 때는 모두 숨김, 아니면 벽이 다 올라와 있을 때만
+        foreach (var w in walls)
+            foreach (var d in w.decos) if (d) { bool vis = !overview && w.cur > 0.92f; if (d.activeSelf != vis) d.SetActive(vis); }
+        if (overview != decosHidden) { decosHidden = overview; foreach (var d in looseDecos) if (d) d.SetActive(!overview); }
+        bool posts = !(overview || decorating);
+        foreach (var g in frontPosts) if (g && g.activeSelf != posts) g.SetActive(posts);
+    }
+    bool decosHidden;
+
+    // ===== 벽에 부딪히기 (원 vs 선분, 지나쳐 버리지 않게 이전 위치 쪽으로) =====
+    Vector3 WallCollide(Vector3 prev, Vector3 p, float r)
+    {
+        for (int it = 0; it < 2; it++)
+            foreach (var (a, b) in wallSegs)
+            {
+                if (p.x < Mathf.Min(a.x, b.x) - r - 0.2f || p.x > Mathf.Max(a.x, b.x) + r + 0.2f || p.z < Mathf.Min(a.y, b.y) - r - 0.2f || p.z > Mathf.Max(a.y, b.y) + r + 0.2f) continue;
+                bool alongX = Mathf.Abs(a.y - b.y) < 0.01f;
+                float rr = r + 0.12f;
+                if (alongX)
+                {
+                    float x0 = Mathf.Min(a.x, b.x), x1 = Mathf.Max(a.x, b.x), z = a.y;
+                    float qx = Mathf.Clamp(p.x, x0, x1);
+                    float side = Mathf.Sign(prev.z - z); if (side == 0) side = 1;
+                    float dz = p.z - z;
+                    if (p.x >= x0 && p.x <= x1 && Mathf.Sign(dz) != side) dz = side * 0.001f;
+                    float dx = p.x - qx, d = Mathf.Sqrt(dx * dx + dz * dz);
+                    if (d < rr) { if (d < 1e-5f) { dz = side; d = 1; } p.x = qx + dx / d * rr; p.z = z + dz / d * rr; }
+                }
+                else
+                {
+                    float z0 = Mathf.Min(a.y, b.y), z1 = Mathf.Max(a.y, b.y), x = a.x;
+                    float qz = Mathf.Clamp(p.z, z0, z1);
+                    float side = Mathf.Sign(prev.x - x); if (side == 0) side = 1;
+                    float dx = p.x - x;
+                    if (p.z >= z0 && p.z <= z1 && Mathf.Sign(dx) != side) dx = side * 0.001f;
+                    float dz = p.z - qz, d = Mathf.Sqrt(dx * dx + dz * dz);
+                    if (d < rr) { if (d < 1e-5f) { dx = side; d = 1; } p.x = x + dx / d * rr; p.z = qz + dz / d * rr; }
+                }
+            }
         return p;
+    }
+
+    static float SegDist(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a; float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-6f, ab.sqrMagnitude));
+        return Vector2.Distance(p, a + ab * t);
     }
 
     void CheckArea()
     {
         CullRooms();
         if (me == null || phase != Phase.Play || Outside) return;
-        var a = AreaAt(me.transform.position.x);
+        var a = AreaAt(me.transform.position);
         if (a != "" && a != curArea) { if (curArea != "") Toast(a); curArea = a; }
     }
 
@@ -214,30 +360,30 @@ public partial class AcRoom
     void FillKitchen(Vector3 c, Transform t)
     {
         float b = Back;
-        Put("fridge", c + V(-5.2f, 0, b - c.z), 0, 1.25f, null, t);
-        for (int i = 0; i < 3; i++) Put("kitchen_counter", c + V(-3.0f + i * 2.05f, 0, b - c.z + 0.05f), 0, 1.25f, null, t);
-        Put("oven", c + V(3.3f, 0, b - c.z), 0, 1.25f, null, t);
-        Put("kitchen_counter", c + V(5.0f, 0, b - c.z + 0.05f), 0, 1.0f, null, t);
+        Put("fridge", c + V(-5.2f, 0, b), 0, 1.25f, null, t);
+        for (int i = 0; i < 3; i++) Put("kitchen_counter", c + V(-3.0f + i * 2.05f, 0, b + 0.05f), 0, 1.25f, null, t);
+        Put("oven", c + V(3.3f, 0, b), 0, 1.25f, null, t);
+        Put("kitchen_counter", c + V(5.0f, 0, b + 0.05f), 0, 1.0f, null, t);
         Put("kitchen_shelf", c + V(-1.0f, 2.3f, -OldHZ + 0.2f), 0, 1.3f, null, t);
         Put("kitchen_shelf", c + V(2.0f, 2.3f, -OldHZ + 0.2f), 0, 1.3f, null, t);
-        Put("cookie_plate", c + V(-1.0f, 1.17f, b - c.z), 0, 1.3f, null, t);
-        Put("cocoa_mug", c + V(-3.4f, 1.17f, b - c.z), 0, 1.5f, null, t);
-        Put("cocoa_mug", c + V(-3.1f, 1.17f, b - c.z + 0.1f), 50, 1.5f, T(("mug", "43A047")), t);
+        Put("cookie_plate", c + V(-1.0f, 1.17f, b), 0, 1.3f, null, t);
+        Put("cocoa_mug", c + V(-3.4f, 1.17f, b), 0, 1.5f, null, t);
+        Put("cocoa_mug", c + V(-3.1f, 1.17f, b + 0.1f), 50, 1.5f, T(("mug", "43A047")), t);
         Put("rug_rect", c + V(0, 0.004f, 2.4f), 0, 1.3f, T(("fabric", "6E9C87")), t);
         Put("dining_table", c + V(0, 0, 2.4f), 0, 1.2f, null, t);
         for (int i = -1; i <= 1; i += 2) { Put("chair", c + V(i * 0.7f, 0, 1.4f), 0, 1.15f, null, t); Put("chair", c + V(i * 0.7f, 0, 3.4f), 180, 1.15f, null, t); }
         Put("candle_set", c + V(0, 0.95f, 2.4f), 0, 1.1f, null, t);
         Put("gingerbread_man", c + V(5.0f, 0, 3.5f), -120, 1.1f, null, t);
         Put("poinsettia", c + V(-5.3f, 0, 5.2f), 0, 1.3f, null, t);
-        PointLight(c + V(3.3f, 0.6f, b - c.z + 0.6f), new Color(1f, 0.65f, 0.35f), 3.5f, 0.8f);
+        PointLight(c + V(3.3f, 0.6f, b + 0.6f), new Color(1f, 0.65f, 0.35f), 3.5f, 0.8f);
     }
 
     void FillBakery(Vector3 c, Transform t)
     {
         float b = Back;
-        Put("oven", c + V(-4.8f, 0, b - c.z), 0, 1.25f, T(("body", "E8B04B")), t);
-        Put("oven", c + V(-3.6f, 0, b - c.z), 0, 1.25f, T(("body", "E8B04B")), t);
-        Put("kitchen_counter", c + V(-1.6f, 0, b - c.z + 0.05f), 0, 1.25f, T(("cabinet", "FBE3C8"), ("top", "C98B5A")), t);
+        Put("oven", c + V(-4.8f, 0, b), 0, 1.25f, T(("body", "E8B04B")), t);
+        Put("oven", c + V(-3.6f, 0, b), 0, 1.25f, T(("body", "E8B04B")), t);
+        Put("kitchen_counter", c + V(-1.6f, 0, b + 0.05f), 0, 1.25f, T(("cabinet", "FBE3C8"), ("top", "C98B5A")), t);
         Put("kitchen_shelf", c + V(1.2f, 2.3f, -OldHZ + 0.2f), 0, 1.3f, null, t);
         for (int r = 0; r < 2; r++)
         {
@@ -248,18 +394,18 @@ public partial class AcRoom
             Put("cocoa_mug", tc + V(0.3f, 0.92f, 0.1f), 20, 1.5f, null, t);
             for (int s = -1; s <= 1; s += 2) Put("chair", tc + V(s * 0.85f, 0, 0), -90 * s, 1.15f, null, t);
         }
-        Put("gingerbread_man", c + V(4.6f, 0, b - c.z + 0.6f), -10, 1.4f, null, t);
-        Put("gingerbread_woman", c + V(3.4f, 0, b - c.z + 0.6f), 10, 1.4f, null, t);
+        Put("gingerbread_man", c + V(4.6f, 0, b + 0.6f), -10, 1.4f, null, t);
+        Put("gingerbread_woman", c + V(3.4f, 0, b + 0.6f), 10, 1.4f, null, t);
         Put("candy_cane_big", c + V(5.6f, 0, 4.5f), -90, 1.4f, null, t);
         Put("candy_cane_big", c + V(-5.6f, 0, 4.5f), 90, 1.4f, null, t);
-        Put("wall_clock", c + V(1.8f, 0, b - c.z - 0.25f), 0, 1.2f, null, t);
+        Put("wall_clock", c + V(1.8f, 0, b - 0.25f), 0, 1.2f, null, t);
         Put("rug_round", c + V(0, 0.004f, 5.0f), 0, 1.3f, T(("rug", "E8B04B")), t);
     }
 
     void FillLibrary(Vector3 c, Transform t)
     {
         float b = Back;
-        for (int i = 0; i < 5; i++) Put("bookshelf", c + V(-4.6f + i * 2.3f, 0, b - c.z - 0.25f), 0, 1.35f, i % 2 == 0 ? null : T(("wood", "8A5A3C")), t);
+        for (int i = 0; i < 5; i++) Put("bookshelf", c + V(-4.6f + i * 2.3f, 0, b - 0.25f), 0, 1.35f, i % 2 == 0 ? null : T(("wood", "8A5A3C")), t);
         Put("bookshelf", c + V(-OldHW + 0.45f, 0, -3.0f), 90, 1.35f, null, t);
         Put("bookshelf", c + V(-OldHW + 0.45f, 0, 3.0f), 90, 1.35f, null, t);
         Put("rug_round", c + V(0, 0.004f, 1.5f), 0, 1.6f, T(("rug", "7A3E3A")), t);
@@ -319,28 +465,28 @@ public partial class AcRoom
     void FillBedroom(Vector3 c, Transform t)
     {
         float b = Back;
-        Put("bed", c + V(-2.4f, 0, b - c.z + 1.4f), 0, 1.25f, null, t);
-        Put("bed", c + V(1.6f, 0, b - c.z + 1.4f), 0, 1.25f, T(("fabric", "F06292")), t);
-        Put("nightstand_lamp", c + V(-4.0f, 0, b - c.z), 0, 1.2f, null, t);
-        Put("nightstand_lamp", c + V(-0.4f, 0, b - c.z), 0, 1.2f, null, t);
-        Put("nightstand_lamp", c + V(3.2f, 0, b - c.z), 0, 1.2f, null, t);
-        Put("wardrobe", c + V(5.1f, 0, b - c.z + 0.1f), 0, 1.25f, null, t);
+        Put("bed", c + V(-2.4f, 0, b + 1.4f), 0, 1.25f, null, t);
+        Put("bed", c + V(1.6f, 0, b + 1.4f), 0, 1.25f, T(("fabric", "F06292")), t);
+        Put("nightstand_lamp", c + V(-4.0f, 0, b), 0, 1.2f, null, t);
+        Put("nightstand_lamp", c + V(-0.4f, 0, b), 0, 1.2f, null, t);
+        Put("nightstand_lamp", c + V(3.2f, 0, b), 0, 1.2f, null, t);
+        Put("wardrobe", c + V(5.1f, 0, b + 0.1f), 0, 1.25f, null, t);
         Put("dresser", c + V(OldHW - 0.5f, 0, 2.0f), -90, 1.25f, null, t);
         Put("rug_rect", c + V(-0.4f, 0.004f, 2.6f), 0, 1.4f, T(("fabric", "7D7BAE")), t);
         Put("armchair", c + V(-4.6f, 0, 3.6f), 40, 1.15f, T(("fabric", "B39DDB")), t);
         Put("floor_lamp", c + V(-5.5f, 0, 2.2f), 0, 1.1f, null, t);
-        Put("teddy_bear", c + V(1.6f, 0.62f, b - c.z + 0.4f), 0, 1.2f, null, t);
+        Put("teddy_bear", c + V(1.6f, 0.62f, b + 0.4f), 0, 1.2f, null, t);
         Put("cushion", c + V(0.8f, 0, 4.0f), 15, 1.3f, T(("fabric", "B39DDB")), t);
         Put("picture_frame", c + V(-0.4f, 3.6f, -OldHZ + 0.12f), 0, 1.4f, null, t);
-        PointLight(c + V(-0.4f, 1.2f, b - c.z + 0.3f), new Color(1f, 0.7f, 0.55f), 4f, 0.8f);
+        PointLight(c + V(-0.4f, 1.2f, b + 0.3f), new Color(1f, 0.7f, 0.55f), 4f, 0.8f);
     }
 
     void FillMusic(Vector3 c, Transform t)
     {
         float b = Back;
-        Put("piano", c + V(-2.6f, 0, b - c.z - 0.1f), 0, 1.3f, null, t);
-        Put("piano", c + V(2.0f, 0, b - c.z - 0.1f), 0, 1.3f, T(("wood", "F5F1E8")), t);
-        Put("wall_clock", c + V(5.2f, 0, b - c.z - 0.25f), 0, 1.3f, null, t);
+        Put("piano", c + V(-2.6f, 0, b - 0.1f), 0, 1.3f, null, t);
+        Put("piano", c + V(2.0f, 0, b - 0.1f), 0, 1.3f, T(("wood", "F5F1E8")), t);
+        Put("wall_clock", c + V(5.2f, 0, b - 0.25f), 0, 1.3f, null, t);
         Put("rug_round", c + V(0, 0.004f, 2.0f), 0, 1.7f, T(("rug", "8C5A3C")), t);
         Put("sofa", c + V(0, 0, 4.6f), 180, 1.15f, T(("fabric", "B8463F")), t);
         Put("armchair", c + V(-3.2f, 0, 2.6f), 60, 1.15f, null, t);
@@ -348,8 +494,8 @@ public partial class AcRoom
         Put("floor_lamp", c + V(-5.2f, 0, 4.2f), 0, 1.15f, null, t);
         Put("floor_lamp", c + V(5.2f, 0, 4.2f), 0, 1.15f, null, t);
         Put("bookshelf", c + V(OldHW - 0.45f, 0, 0.6f), -90, 1.3f, null, t);
-        Put("poinsettia", c + V(-5.3f, 0, b - c.z + 0.4f), 0, 1.3f, null, t);
-        Put("star_lantern", c + V(-2.6f, 1.75f, b - c.z - 0.2f), 0, 1.0f, null, t);
+        Put("poinsettia", c + V(-5.3f, 0, b + 0.4f), 0, 1.3f, null, t);
+        Put("star_lantern", c + V(-2.6f, 1.75f, b - 0.2f), 0, 1.0f, null, t);
         Put("bell_pair", c + V(0, 4.1f, -OldHZ + 0.2f), 0, 1.4f, null, t);
         Put("coffee_table", c + V(0, 0, 2.6f), 0, 1.0f, null, t);
         Put("candle_set", c + V(0, 0.47f, 2.6f), 0, 1.2f, null, t);

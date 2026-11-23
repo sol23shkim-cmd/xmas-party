@@ -113,9 +113,80 @@ public class AcCharacter : MonoBehaviour
         skR = AcmLoader.Spawn("skate_boot", legR, t); skR.transform.localPosition = new Vector3(0.002f, -0.125f, 0.04f);
     }
 
+    // ===== 쿠키 달리기 자세 =====
+    public int runPose;      // 0 보통, 1 달리기, 2 점프, 3 2단 점프(공중제비), 4 슬라이드, 5 다침, 6 쓰러짐, 7 환호, 8 서서 기다림
+    public float runT;       // 지금 자세가 된 지 몇 초
+    float runPhase;
+    void RunAnim(float dt)
+    {
+        runT += dt;
+        runPhase += dt * 17f;
+        float s = Mathf.Sin(runPhase), c = Mathf.Cos(runPhase);
+        Quaternion br = Quaternion.identity; Vector3 bp = Vector3.zero;
+        Vector3 aL = new Vector3(0, 0, -4), aR = new Vector3(0, 0, 4), lL = Vector3.zero, lR = Vector3.zero;
+        const float cy = 0.5f;
+        switch (runPose)
+        {
+            case 1:   // 달리기: 팔다리 크게, 몸은 앞으로
+                lL = new Vector3(-s * 58f, 0, 0); lR = new Vector3(s * 58f, 0, 0);
+                aL = new Vector3(s * 65f, 0, -8f); aR = new Vector3(-s * 65f, 0, 8f);
+                br = Quaternion.Euler(13f, 0, s * 3f); bp = new Vector3(0, Mathf.Abs(c) * 0.07f, 0);
+                break;
+            case 2:   // 점프: 한 다리 접고 두 팔 위로
+                lL = new Vector3(-75f, 0, 0); lR = new Vector3(30f, 0, 0);
+                aL = new Vector3(-20f, 0, -150f); aR = new Vector3(-20f, 0, 150f);
+                br = Quaternion.Euler(-6f, 0, 0);
+                break;
+            case 3:   // 2단 점프: 웅크리고 앞으로 한 바퀴
+                {
+                    float a = Mathf.SmoothStep(0, 1, Mathf.Clamp01(runT / 0.42f)) * 360f;
+                    lL = lR = new Vector3(-95f, 0, 0); aL = new Vector3(-110f, 0, -20f); aR = new Vector3(-110f, 0, 20f);
+                    br = Quaternion.Euler(a, 0, 0); bp = new Vector3(0, cy, 0) - br * new Vector3(0, cy, 0);
+                }
+                break;
+            case 4:   // 슬라이드: 뒤로 누워 미끄러짐
+                br = Quaternion.Euler(-72f, 0, Mathf.Sin(runT * 30f) * 2f); bp = new Vector3(0, 0.16f, -0.05f);
+                aL = new Vector3(-150f, 0, -25f); aR = new Vector3(-150f, 0, 25f);
+                lL = new Vector3(-8f, 0, 0); lR = new Vector3(8f, 0, 0);
+                break;
+            case 5:   // 다침
+                br = Quaternion.Euler(-22f, 0, Mathf.Sin(runT * 40f) * 8f);
+                aL = new Vector3(0, 0, -110f); aR = new Vector3(0, 0, 110f);
+                lL = new Vector3(-30f, 0, 0); lR = new Vector3(20f, 0, 0);
+                break;
+            case 6:   // 쓰러짐
+                {
+                    float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01(runT / 0.6f));
+                    br = Quaternion.Euler(-88f * k, 0, 0); bp = new Vector3(0, 0.12f * k, 0);
+                    aL = new Vector3(0, 0, -100f * k); aR = new Vector3(0, 0, 100f * k);
+                }
+                break;
+            case 7:   // 환호
+                {
+                    float w = Mathf.Sin(runT * 12f);
+                    aL = new Vector3(0, 0, -150f - w * 15f); aR = new Vector3(0, 0, 150f + w * 15f);
+                    bp = new Vector3(0, Mathf.Abs(Mathf.Sin(runT * 6f)) * 0.18f, 0);
+                    lL = new Vector3(-Mathf.Abs(Mathf.Sin(runT * 6f)) * 25f, 0, 0); lR = lL;
+                }
+                break;
+            default:  // 8: 서서 기다림 (숨쉬기)
+                bp = new Vector3(0, Mathf.Sin(runT * 2.5f) * 0.01f, 0);
+                aL = new Vector3(Mathf.Sin(runT * 2f) * 6f, 0, -8f); aR = new Vector3(-Mathf.Sin(runT * 2f) * 6f, 0, 8f);
+                break;
+        }
+        if (armL) armL.localRotation = Quaternion.Euler(aL);
+        if (armR) armR.localRotation = Quaternion.Euler(aR);
+        if (legL) legL.localRotation = Quaternion.Euler(lL);
+        if (legR) legR.localRotation = Quaternion.Euler(lR);
+        if (tail) tail.localRotation = Quaternion.Euler(0, s * 25f, 0);
+        if (body) { body.localRotation = br; body.localPosition = bp; }
+    }
+    public void SetRunPose(int p) { if (p != runPose) { runPose = p; runT = 0; } }
+
     void Update()
     {
         float dt = Time.deltaTime;
+        if (runPose > 0) { RunAnim(dt); return; }
         float s = Mathf.Clamp01(speed / 2.2f);
         phase += dt * (4f + 6f * s);
         float sw = Mathf.Sin(phase) * 38f * s;

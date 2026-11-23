@@ -91,29 +91,8 @@ public partial class AcRoom
         walkTarget = FollowStep(me.transform.position, tp);
     }
 
-    // 벽을 돌아서 가는 다음 지점
-    Vector3 NextWaypoint(Vector3 a, Vector3 b)
-    {
-        bool ai = InHouse(a), bi = InHouse(b);
-        var backIn = new Vector3(DoorPos.x, 0, -HalfZ + 1.3f); var backOut = new Vector3(DoorPos.x, 0, -HalfZ - 1.6f);
-        var frontIn = new Vector3(FrontDoorPos.x, 0, HalfZ - 1.3f); var frontOut = new Vector3(FrontDoorPos.x, 0, HalfZ + 1.6f);
-        if (ai && bi) return IndoorStep(a, b);
-        if (ai)   // 나가기
-        {
-            bool useBack = Vector3.Distance(a, backIn) + Vector3.Distance(backOut, b) < Vector3.Distance(a, frontIn) + Vector3.Distance(frontOut, b);
-            var inn = useBack ? backIn : frontIn; var outp = useBack ? backOut : frontOut;
-            if (Flat(a, inn) < 0.7f || (useBack ? a.z < -HalfZ + 0.9f : a.z > HalfZ - 0.7f)) return outp;
-            return IndoorStep(a, inn);
-        }
-        if (bi)   // 들어가기
-        {
-            bool useBack = Vector3.Distance(a, backOut) + Vector3.Distance(backIn, b) < Vector3.Distance(a, frontOut) + Vector3.Distance(frontIn, b);
-            var inn = useBack ? backIn : frontIn; var outp = useBack ? backOut : frontOut;
-            if (Flat(a, outp) < 0.7f) return inn;
-            return OutdoorStep(a, outp);
-        }
-        return OutdoorStep(a, b);
-    }
+    // 길찾기가 실패했을 때: 그냥 그쪽으로 (트리는 돌아서)
+    Vector3 NextWaypoint(Vector3 a, Vector3 b) => AvoidTree(a, b);
 
     static float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
 
@@ -133,57 +112,14 @@ public partial class AcRoom
         return Flat(a, w) < 0.8f ? b : w;
     }
 
-    Vector3 IndoorStep(Vector3 a, Vector3 b) => AvoidTree(a, IndoorStepRaw(a, b));
-
-    Vector3 IndoorStepRaw(Vector3 a, Vector3 b)
-    {
-        var bx = Bounds(); int n = bx.Count;
-        int ka = 0, kb = 0;
-        for (int i = 0; i < n - 1; i++) { if (a.x >= bx[i]) ka = i; if (b.x >= bx[i]) kb = i; }
-        if (ka == kb) return b;
-        float x = ka < kb ? bx[ka + 1] : bx[ka]; float dir = ka < kb ? 1 : -1;
-        var near = new Vector3(x - dir * 1.0f, 0, ArchZ); var far = new Vector3(x + dir * 1.0f, 0, ArchZ);
-        if (Flat(a, near) < 0.6f || Mathf.Abs(a.x - x) < 0.9f) return far;
-        return near;
-    }
-
-    Vector3 OutdoorStep(Vector3 a, Vector3 b)
-    {
-        float ex = HouseHalf + 1.1f, ez = HalfZ + 1.1f;
-        if (!SegHitsRect(a, b, ex, ez)) return b;
-        float cx = HouseHalf + 1.6f, cz = HalfZ + 1.6f;
-        var corners = new[] { new Vector3(-cx, 0, -cz), new Vector3(cx, 0, -cz), new Vector3(-cx, 0, cz), new Vector3(cx, 0, cz) };
-        Vector3 best = b; float bd = float.MaxValue;
-        foreach (var c in corners)
-        {
-            if (Flat(a, c) < 0.8f || SegHitsRect(a, c, ex, ez)) continue;
-            float d = Flat(a, c) + Flat(c, b) + (SegHitsRect(c, b, ex, ez) ? 2 * (cx + cz) : 0);
-            if (d < bd) { bd = d; best = c; }
-        }
-        return best;
-    }
-
-    static bool SegHitsRect(Vector3 a, Vector3 b, float hx, float hz)
-    {
-        float t0 = 0, t1 = 1, dx = b.x - a.x, dz = b.z - a.z;
-        float[] p = { -dx, dx, -dz, dz }, q = { a.x + hx, hx - a.x, a.z + hz, hz - a.z };
-        for (int i = 0; i < 4; i++)
-        {
-            if (Mathf.Abs(p[i]) < 1e-6f) { if (q[i] < 0) return false; continue; }
-            float t = q[i] / p[i];
-            if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
-            else { if (t < t0) return false; if (t < t1) t1 = t; }
-        }
-        return t0 < t1;
-    }
 
     // ===== 상황별 버튼 =====
     float TreeDist => Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
     bool NearTree => phase == Phase.Play && !Outside && TreeDist < TreeR + 3.2f;
     Vector3 firePos;
     bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f;
-    bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position.x) == "쿠키 공방";
-    bool InStudy => phase == Phase.Play && !Outside && (AreaAt(me.transform.position.x) == "서재" || NearFireplace);
+    bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "쿠키 공방";
+    bool InStudy => phase == Phase.Play && !Outside && (AreaAt(me.transform.position) == "서재" || NearFireplace);
 
     void ContextButtons()
     {
@@ -211,7 +147,7 @@ public partial class AcRoom
         {
             var r2 = new Rect(r.xMax + 14, r.y + 6, IsMobile ? 120 : 110, r.height - 12);
             R(r2);
-            if (GUI.Button(r2, treeOverview ? "전경 닫기" : "트리 전경", sBtn)) treeOverview = !treeOverview;
+            if (GUI.Button(r2, "트리 전경", sBtn)) { treeOverview = true; decoYaw = 180f; }
         }
     }
 
@@ -230,6 +166,7 @@ public partial class AcRoom
         br.x = SW - br.width - 12;
         R(br);
         MapButton(br);
+        MusicButton(new Rect(br.x - 78, br.y, 70, br.height));
         if (GUI.Button(br, bl, sBtn)) showPeople = !showPeople;
         if (followId != null && remotes.TryGetValue(followId, out var fr) && fr.net != null)
         {

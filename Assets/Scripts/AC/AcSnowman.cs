@@ -212,8 +212,7 @@ public partial class AcRoom
         pos = me.transform.position + fwd * 1.3f + right * 1.2f; pos.y = 0;
         ry = Mathf.Atan2(-fwd.x, -fwd.z) * Mathf.Rad2Deg;   // 카메라를 바라보게
         why = "";
-        float gx = Mathf.Abs(pos.x) - HouseHalf, gz = pos.z < 0 ? -HalfZ - pos.z : pos.z - HalfZ;
-        if (Mathf.Max(gx, gz) < 1.4f) { why = "집에서 조금 더 떨어져서 만들어요"; return false; }
+        if (DistToHouse(pos) < 1.4f) { why = "집에서 조금 더 떨어져서 만들어요"; return false; }
         if (pos.x < WorldX0 + 1 || pos.x > WorldX1 - 1 || pos.z < WorldZ0 + 1 || pos.z > WorldZ1 - 1) { why = "마당 안쪽에서 만들어요"; return false; }
         foreach (var c in snowCircles) if (new Vector2(c.x - pos.x, c.y - pos.z).magnitude < c.z + 0.8f) { why = "옆에 눈사람이 있어요. 조금 옮겨서 만들어요"; return false; }
         return true;

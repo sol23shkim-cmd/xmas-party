@@ -214,10 +214,12 @@ public partial class AcRoom
     void ClearPassages()
     {
         var zones = new List<Rect>();   // x, z 평면
-        var bx = Bounds();
-        for (int i = 1; i < bx.Count - 1; i++) zones.Add(new Rect(bx[i] - 1.7f, ArchZ - 1.0f, 3.4f, 2.0f));
-        zones.Add(new Rect(DoorPos.x - 1.1f, -HalfZ, 2.2f, 1.9f));
-        zones.Add(new Rect(FrontGapX0 + 0.3f, HalfZ - 1.9f, FrontGapX1 - FrontGapX0 - 0.6f, 1.9f));
+        foreach (var w in walls)
+        {
+            if (w.kind != "door" && w.kind != "arch") continue;
+            zones.Add(w.alongX ? new Rect(w.pos.x - 1.1f, w.pos.z - 1.9f, 2.2f, 3.8f) : new Rect(w.pos.x - 1.9f, w.pos.z - 1.1f, 3.8f, 2.2f));
+        }
+        zones.Add(new Rect(FrontGapX0 + 0.3f, HalfZ - 1.9f, FrontGapX1 - FrontGapX0 - 0.6f, 3.8f));
         var remove = new HashSet<GameObject>();
         foreach (var (go, o) in solidObjs)
         {
@@ -288,43 +290,16 @@ public partial class AcRoom
         return p;
     }
 
-    // 실내/실외 이동 범위: 집 안에서는 방과 아치로만, 바깥으로는 뒷문·앞 출입구로만 오감
-    static bool InHouse(Vector3 p) => Mathf.Abs(p.x) < HouseHalf && p.z > -HalfZ && p.z < HalfZ;
-
+    // 이동 범위: 마당 끝 + 벽 (문·아치·앞 출입구로만 지나감)
     Vector3 ClampRegion(Vector3 prev, Vector3 p)
     {
-        float backX = DoorPos.x, wallZ = -HalfZ;
-        float fx0 = FrontGapX0 + 0.5f, fx1 = FrontGapX1 - 0.5f;
-        if (InHouse(prev))
-        {
-            bool backLane = prev.z < wallZ + 0.9f, frontLane = prev.z > HalfZ - 0.7f;
-            if (backLane && Mathf.Abs(prev.x - backX) < 0.8f) p.x = Mathf.Clamp(p.x, backX - 0.74f, backX + 0.74f);   // 뒷문 문간
-            else if (frontLane && prev.x > fx0 - 0.05f && prev.x < fx1 + 0.05f) p.x = Mathf.Clamp(p.x, fx0, fx1);   // 앞 출입구
-            else p = ClampInside(prev, p);
-            bool inBack = Mathf.Abs(p.x - backX) < 0.75f, inFront = p.x >= fx0 && p.x <= fx1;
-            p.z = Mathf.Clamp(p.z, inBack ? wallZ - 1.2f : wallZ + 0.9f, inFront ? HalfZ + 1.2f : HalfZ - 0.7f);
-            return p;
-        }
-        // 바깥
         p.x = Mathf.Clamp(p.x, WorldX0, WorldX1);
         p.z = Mathf.Clamp(p.z, WorldZ0, WorldZ1);
-        const float m = 0.6f;
-        if (Mathf.Abs(p.x) < HouseHalf + m && p.z > -HalfZ - m && p.z < HalfZ + m)
-        {
-            bool viaBack = prev.z <= -HalfZ - 0.0f && Mathf.Abs(p.x - backX) < 0.74f;
-            bool viaFront = prev.z >= HalfZ && p.x > fx0 && p.x < fx1;
-            if (viaBack) p.x = Mathf.Clamp(p.x, backX - 0.74f, backX + 0.74f);
-            else if (viaFront) p.x = Mathf.Clamp(p.x, fx0, fx1);
-            else if (prev.z <= -HalfZ - m + 0.01f) p.z = Mathf.Min(p.z, -HalfZ - m);
-            else if (prev.z >= HalfZ + m - 0.01f) p.z = Mathf.Max(p.z, HalfZ + m);
-            else if (prev.x < 0) p.x = Mathf.Min(p.x, -HouseHalf - m);
-            else p.x = Mathf.Max(p.x, HouseHalf + m);
-        }
-        return p;
+        return WallCollide(prev, p, 0.36f);
     }
 
     bool Outside => me != null && !InHouse(me.transform.position);
-    bool BackYard => me != null && me.transform.position.z < -HalfZ - 0.1f && Mathf.Abs(me.transform.position.x) < HouseHalf + 0.5f;
+    bool BackYard => me != null && !InHouse(me.transform.position) && me.transform.position.z < -HalfZ;
 
     // ========================================================
     // 오너먼트 놓을 자리: 몸통이 트리 표면 밖으로 살짝 나오게 (깊은 곳은 살짝 묻히고, 튀어나온 곳은 그대로)
@@ -403,14 +378,15 @@ public partial class AcRoom
         var flake = SnowFlakeMesh();
         var mat = new Material(AcmLoader.Mat) { name = "Snow" };
         mat.SetFloat("_Emit", 0.55f); mat.SetFloat("_HasTint", 0);
-        float wx = 2 * HouseHalf + 2 * YardW + 8;
-        // (중심, 크기, 개수/초)
+        float wx = 2 * HouseHalf + 2 * YardW + 8, sy = 20f, houseD = HalfZ - HouseZ0;
+        // (중심, 크기, 개수/초) — 높은 곳(20m)에서 내려서 트리 전경을 볼 때도 위에서부터 내림
         var boxes = new[]
         {
-            (new Vector3(0, 8, -HalfZ - YardBack / 2 - 1f), new Vector3(wx, 0.1f, YardBack + 2f), 800f),     // 뒤
-            (new Vector3(0, 8, HalfZ + YardFront / 2 + 1f), new Vector3(wx, 0.1f, YardFront + 2f), 650f),    // 앞
-            (new Vector3(-HouseHalf - YardW / 2 - 1f, 8, 0), new Vector3(YardW + 2f, 0.1f, 2 * HalfZ), 90f),  // 왼쪽
-            (new Vector3(HouseHalf + YardW / 2 + 1f, 8, 0), new Vector3(YardW + 2f, 0.1f, 2 * HalfZ), 90f),   // 오른쪽
+            (new Vector3(0, sy, HouseZ0 - YardBack / 2 - 1f), new Vector3(wx, 0.1f, YardBack + 2f), 520f),     // 뒤
+            (new Vector3(0, sy, HalfZ + YardFront / 2 + 1f), new Vector3(wx, 0.1f, YardFront + 2f), 430f),     // 앞
+            (new Vector3(-HouseHalf - YardW / 2 - 1f, sy, (HalfZ + HouseZ0) / 2), new Vector3(YardW + 2f, 0.1f, houseD), 110f),  // 왼쪽
+            (new Vector3(HouseHalf + YardW / 2 + 1f, sy, (HalfZ + HouseZ0) / 2), new Vector3(YardW + 2f, 0.1f, houseD), 110f),   // 오른쪽
+            (new Vector3(0, sy, (-HalfZ + HouseZ0) / 2), new Vector3(2 * HalfX, 0.1f, RoomD), 90f),                              // 안뜰
         };
         foreach (var (c, size, rate) in boxes)
         {
@@ -420,18 +396,18 @@ public partial class AcRoom
             go.SetActive(false);
             var ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;
-            main.loop = true; main.prewarm = true; main.duration = 10f;
-            main.startLifetime = 8f; main.startSpeed = 0f;
+            main.loop = true; main.prewarm = true; main.duration = 18f;
+            main.startLifetime = 17f; main.startSpeed = 0f;
             main.startSize = new ParticleSystem.MinMaxCurve(0.7f, 1.5f);
             main.startRotation = new ParticleSystem.MinMaxCurve(0, Mathf.PI * 2);
-            main.maxParticles = (int)(rate * 12);
+            main.maxParticles = (int)(rate * 19);
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.startColor = Color.white;
-            var em = ps.emission; em.rateOverTime = rate;
+            var em = ps.emission; em.rateOverTime = rate * (IsMobile ? 0.5f : 1f);
             var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Box; sh.scale = size;
             var vel = ps.velocityOverLifetime; vel.enabled = true; vel.space = ParticleSystemSimulationSpace.World;
             vel.x = new ParticleSystem.MinMaxCurve(-0.25f, 0.25f);
-            vel.y = new ParticleSystem.MinMaxCurve(-0.9f, -1.3f);
+            vel.y = new ParticleSystem.MinMaxCurve(-1.05f, -1.45f);
             vel.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f);
             var noise = ps.noise; noise.enabled = true; noise.strength = 0.35f; noise.frequency = 0.25f; noise.scrollSpeed = 0.2f;
             var r = go.GetComponent<ParticleSystemRenderer>();
@@ -447,7 +423,7 @@ public partial class AcRoom
         // 작은 이십면체에 가까운 공 (지름 약 7cm)
         var m = new Mesh { name = "flake" };
         var verts = new List<Vector3>(); var tris = new List<int>();
-        int seg = 6, ring = 4; float rad = 0.035f;
+        int seg = 5, ring = 3; float rad = 0.04f;
         for (int j = 0; j <= ring; j++)
             for (int i = 0; i <= seg; i++)
             {
