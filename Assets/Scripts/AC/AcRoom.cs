@@ -830,8 +830,8 @@ public partial class AcRoom : MonoBehaviour
             foreach (var (rr, idx) in decoIconRects) if (rr.Contains(u)) dragCand = idx;
         }
         if (dragCand >= 0 && (ptrPressed || ptrUp) && !OverUI(mp) && !dragOrn && !pinching) { dragOrn = true; SetSel(dragCand); ornPicked = true; }
-        bool dropNow = dragOrn && ptrUp;
-        if (!ptrPressed && !ptrUp) { dragCand = -1; dragOrn = false; }
+        bool dropNow = false;   // 놓기는 OnGUI의 MouseUp에서 (빠른 끌기도 놓치지 않게)
+        if (!ptrPressed && !ptrUp && !ptrDown) { dragCand = -1; dragOrn = false; }
         if (OverUI(mp)) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); if (dropNow) dragOrn = false; return; }   // 화면 UI 위
         var ray = cam.ScreenPointToRay(mp);
         // 떼기: 오너먼트를 오른쪽 클릭
@@ -866,6 +866,17 @@ public partial class AcRoom : MonoBehaviour
             if (place) AddOrn(ornTypes[ornSel], CurColor, pos, ry);
         }
         else { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); }
+    }
+
+    // 장식 아이콘을 끌어다 놓은 곳에 달기
+    void DropOrnAt(Vector2 screen)
+    {
+        if (!decorating || treeCol == null || ornTypes.Count == 0 || OverUI(screen)) return;
+        var ray = cam.ScreenPointToRay(screen);
+        if (!treeCol.Raycast(ray, out var hit, 100f)) return;
+        if (IsGarland(ornTypes[ornSel])) { AddOrn(ornTypes[ornSel], CurColor, new Vector3(TreePos.x, hit.point.y + 0.08f, TreePos.z), 0); return; }
+        OrnPlacement(hit, out var pos, out var ry);
+        AddOrn(ornTypes[ornSel], CurColor, pos, ry);
     }
 
     // ===== 꾸미기 카메라: 끌어서 위아래 스크롤·좌우 돌기, 휠·WASD도 =====
@@ -1012,8 +1023,21 @@ public partial class AcRoom : MonoBehaviour
 
     void OnGUI()
     {
-        var ev = Event.current; bool down = ev.type == EventType.MouseDown || ev.type == EventType.TouchDown; Vector2 mpos = ev.mousePosition / UiK;
+        var ev = Event.current; var et = ev.type; bool down = et == EventType.MouseDown || et == EventType.TouchDown;
+        var m0 = GUI.matrix; GUI.matrix = Matrix4x4.identity; Vector2 raw = Event.current.mousePosition; GUI.matrix = m0;   // 화면 픽셀(위가 0)
+        Vector2 mpos = raw / UiK;
         OnGUIInner();
+        // 장식 끌어 놓기 (IMGUI 이벤트로: 아주 빠른 끌기도 처리)
+        if (decorating && !treeOverview && !pinching)
+        {
+            var scr = new Vector2(raw.x, Screen.height - raw.y);
+            if ((et == EventType.MouseDrag || et == EventType.TouchMove) && dragCand >= 0 && !dragOrn && !OverUI(scr)) { dragOrn = true; SetSel(dragCand); ornPicked = true; }
+            if (et == EventType.MouseUp || et == EventType.TouchUp)
+            {
+                if (dragOrn) DropOrnAt(scr);
+                dragOrn = false; dragCand = -1;
+            }
+        }
         // 화면 UI 위에서 누르기 시작했는지 IMGUI 쪽에서도 확인 (UI 위에서 끌 때 카메라가 돌지 않게)
         if (down)
         {
