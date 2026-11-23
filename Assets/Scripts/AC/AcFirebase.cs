@@ -149,6 +149,7 @@ public class AcFirebase : MonoBehaviour
         if (p[0] == "scores" && p.Length == 2) return "orn/x~score~" + p[1];
         if (p[0] == "quiz" && p.Length == 2) return "orn/x~quiz~" + p[1];
         if (p[0] == "sbf" && p.Length == 2) return "orn/x~sbf~" + p[1];
+        if (p[0] == "qzs" && p.Length == 2) return "orn/x~qzs~" + p[1];
         return path;
     }
 
@@ -156,7 +157,7 @@ public class AcFirebase : MonoBehaviour
     {
         var p = path.Split('/');
         string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~"
-                      : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : p[0] == "quiz" ? "x~quiz~" : p[0] == "sbf" ? "x~sbf~" : null;
+                      : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : p[0] == "quiz" ? "x~quiz~" : p[0] == "sbf" ? "x~sbf~" : p[0] == "qzs" ? "x~qzs~" : null;
         if (prefix != null)
         {
             var orn = Node("orn");

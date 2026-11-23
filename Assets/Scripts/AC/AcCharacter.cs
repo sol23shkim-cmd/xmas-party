@@ -221,6 +221,14 @@ public class AcCharacter : MonoBehaviour
                     if (armR) armR.localRotation = Quaternion.Euler(0, 0, 80f * k);
                     jump = Mathf.Abs(Mathf.Sin(et * 10f)) * 0.06f * k;
                     break;
+                case "flinch":    // 작은 눈에 맞음: 짧게 움찔하며 팔로 얼굴 가리기
+                    {
+                        float kk = et < 0.55f ? Mathf.Sin(et / 0.55f * Mathf.PI) : 0;
+                        if (armL) armL.localRotation = Quaternion.Euler(-70f * kk, 0, -15f * kk);
+                        if (armR) armR.localRotation = Quaternion.Euler(-70f * kk, 0, 15f * kk);
+                        jump = 0.04f * kk;
+                    }
+                    break;
                 case "heart":     // 폴짝
                 case "gift":
                     jump = Mathf.Abs(Mathf.Sin(et * 7f)) * 0.15f * k;

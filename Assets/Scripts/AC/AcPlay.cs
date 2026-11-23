@@ -50,19 +50,34 @@ public partial class AcRoom
     {
         switch (kind)
         {
-            case "p":   // 피아노 음
+            case "p":   // 피아노 음: 미니게임 중이 아니면 어디서나 들림 (가까우면 조금 더 크게)
                 if (int.TryParse(data, out int note))
                 {
                     float d = Vector3.Distance(r.c.transform.position, me.transform.position);
-                    if (d < 16f) PlayPiano(note, Mathf.Lerp(0.75f, 0.15f, d / 16f));
+                    if (!playingGame && !quizOpen) PlayPiano(note, Mathf.Lerp(0.7f, 0.32f, Mathf.Clamp01(d / 30f)));
                     pianoGlow[note] = Time.unscaledTime;
+                    pianoBy[rid] = (r.net.name, Time.unscaledTime);
+                }
+                break;
+            case "qj": quizLobby[rid] = (r.net.name, Time.unscaledTime); break;   // 퀴즈 화면에 있음
+            case "qa":   // 퀴즈 초대
+                if (!quizOpen) { qzInviteFrom = r.net.name; qzInviteUntil = Time.unscaledTime + 15f; qzInviteStarted = false; }
+                break;
+            case "qs":   // 퀴즈 시작 "시작시각,씨앗"
+                {
+                    var v = data.Split(',');
+                    if (v.Length == 2 && double.TryParse(v[0], out double t0) && int.TryParse(v[1], out int seed) && t0 > qzT0)
+                    {
+                        qzT0 = t0; qzSeed = seed; myQuizAnswer.Clear(); qzScored = -1;
+                        if (!quizOpen) { qzInviteFrom = r.net.name; qzInviteUntil = Time.unscaledTime + 12f; qzInviteStarted = true; }
+                    }
                 }
                 break;
             case "s":   // 눈덩이
                 {
                     var v = data.Split(',');
                     if (v.Length >= 4 && float.TryParse(v[0], out float fx) && float.TryParse(v[1], out float fz) && float.TryParse(v[2], out float tx) && float.TryParse(v[3], out float tz))
-                        SpawnSnowball(new Vector3(fx, 1.1f, fz), new Vector3(tx, 0, tz), rid, r.net.name);
+                        SpawnSnowball(new Vector3(fx, 1.1f, fz), new Vector3(tx, 0, tz), rid, r.net.name, v.Length < 5 || v[4] != "0");
                 }
                 break;
             case "q":   // 퀴즈 답 "회차:고른 번호"
@@ -78,6 +93,32 @@ public partial class AcRoom
         }
     }
 
+    // 위쪽 알림: 누가 피아노를 치는 중 / 퀴즈 초대 (참여하기)
+    readonly Dictionary<string, (string name, float at)> pianoBy = new Dictionary<string, (string, float)>();
+    bool qzInviteStarted;
+    void PlayBanners()
+    {
+        if (phase != Phase.Play || playingGame) return;
+        float w = Mathf.Min(SW - 20, 360), y = SW / 2 + 180 > SW - 250 ? 112 : 64;
+        if (toast != null && Time.time < toastUntil) y += 46;
+        if (!quizOpen && Time.unscaledTime < qzInviteUntil && qzInviteFrom != null)
+        {
+            var r = new Rect(SW / 2 - w / 2, y, w, 40);
+            GUI.Box(R(r), "", sBox);
+            GUI.Label(new Rect(r.x + 12, r.y + 9, w - 120, 24), Short(qzInviteFrom, 6) + (qzInviteStarted ? " 님이 퀴즈를 시작했어요!" : " 님이 퀴즈에 불러요!"), sSmall);
+            if (GUI.Button(new Rect(r.xMax - 100, r.y + 6, 90, 28), "<b>참여하기</b>", sBtn)) { OpenQuiz(); qzInviteUntil = 0; }
+            y += 46;
+        }
+        var players = pianoBy.Where(kv => Time.unscaledTime - kv.Value.at < 2.5f).Select(kv => kv.Value.name).ToList();
+        if (players.Count > 0)
+        {
+            string t = string.Join(", ", players.Take(2).Select(n => Short(n, 6))) + (players.Count > 2 ? " 외" : "") + " 님이 피아노를 치고 있어요";
+            var r = new Rect(SW / 2 - w / 2, y, w, 32);
+            GUI.Box(R(r), "", sBox);
+            GUI.Label(new Rect(r.x + 10, r.y + 5, w - 20, 22), t, new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+        }
+    }
+
     double NetNow => net != null && net.ServerNow > 0 ? net.ServerNow : AcSync.UnixMs;
 
     void PlayUpdate(float dt)
@@ -87,6 +128,7 @@ public partial class AcRoom
         if (pianoOpen) PianoUpdate();
         if (quizOpen) QuizUpdate();
         SnowballUpdate(dt);
+        SnowFocusUpdate();
         if (snowMode && (!Outside || building || playingGame)) snowMode = false;
     }
 
@@ -219,11 +261,15 @@ public partial class AcRoom
     }
 
     // ========================================================
-    // 크리스마스 퀴즈 (모두 같은 문제를 같은 시간에: 20초마다 한 문제, 14초 동안 답하고 6초 동안 정답 공개)
-    bool quizOpen; int quizScore; long quizLastScored = -1; long quizLastTick = -1;
+    // 크리스마스 퀴즈: 서재에서 열고 '모두에게 알리기'로 부르기 → 누군가 '시작'하면 모두 같은 10문제를 같이 풂
+    //   한 문제 10초 + 정답 공개 2초. 판 정보(시작 시각·문제 고르는 씨앗)는 qzs/cur 에 저장하고 act "qs"로도 바로 알림
+    bool quizOpen; int quizScore;
     readonly Dictionary<long, int> myQuizAnswer = new Dictionary<long, int>();
     readonly Dictionary<long, Dictionary<string, (string name, int ch)>> quizAnswers = new Dictionary<long, Dictionary<string, (string, int)>>();
-    const double QuizRoundMs = 20000, QuizAnswerMs = 14000;
+    readonly Dictionary<string, (string name, float at)> quizLobby = new Dictionary<string, (string, float)>();   // 퀴즈 화면에 있는 사람
+    double qzT0; int qzSeed; long qzScored = -1; int qzLastTick = -1; float qzBeat;
+    string qzInviteFrom; float qzInviteUntil;
+    const int QzCount = 10; const double QzAnswerMs = 10000, QzRevealMs = 2000, QzPerMs = QzAnswerMs + QzRevealMs, QzLeadMs = 3500;
 
     static readonly (string q, string a, string[] wrong)[] QuizBank =
     {
@@ -232,7 +278,7 @@ public partial class AcRoom
         ("산타클로스의 썰매를 끄는 동물은?", "순록", new[] { "말", "썰매개", "북극곰" }),
         ("캐럴 '고요한 밤 거룩한 밤'이 처음 불린 나라는?", "오스트리아", new[] { "독일", "영국", "미국" }),
         ("크리스마스트리 꼭대기에 주로 다는 장식은?", "별", new[] { "종", "양말", "눈사람" }),
-        ("진저브레드 쿠키에 들어가는 대표 향신료는?", "생강", new[] { "후추", "계피만", "고추" }),
+        ("진저브레드 쿠키에 들어가는 대표 향신료는?", "생강", new[] { "후추", "바닐라", "고추" }),
         ("산타클로스의 모델로 알려진 성인은?", "성 니콜라스", new[] { "성 발렌타인", "성 패트릭", "성 조지" }),
         ("'징글벨'의 '징글'은 원래 무슨 소리일까요?", "썰매 방울 소리", new[] { "교회 종소리", "눈 밟는 소리", "말발굽 소리" }),
         ("핀란드의 산타 마을이 있는 도시는?", "로바니에미", new[] { "헬싱키", "오슬로", "스톡홀름" }),
@@ -245,49 +291,159 @@ public partial class AcRoom
         ("루돌프까지 합한 산타 썰매의 순록은 모두 몇 마리?", "9마리", new[] { "6마리", "8마리", "12마리" }),
         ("'Merry Christmas'의 Merry는 무슨 뜻일까요?", "즐거운", new[] { "조용한", "추운", "거룩한" }),
         ("눈사람의 코로 가장 많이 쓰는 채소는?", "당근", new[] { "오이", "감자", "고추" }),
-        ("크리스마스트리로 가장 흔히 쓰는 나무는?", "전나무", new[] { "벚나무", "소나무만", "은행나무" }),
+        ("크리스마스트리로 가장 흔히 쓰는 나무는?", "전나무", new[] { "벚나무", "은행나무", "단풍나무" }),
         ("발레 '호두까기 인형'의 작곡가는?", "차이콥스키", new[] { "모차르트", "베토벤", "쇼팽" }),
         ("크리스마스 다음 날, 영국 등에서 쉬는 날의 이름은?", "박싱 데이", new[] { "블랙 프라이데이", "보너스 데이", "리본 데이" }),
         ("'Feliz Navidad'는 어느 나라 말일까요?", "스페인어", new[] { "프랑스어", "이탈리아어", "독일어" }),
         ("눈 결정은 보통 몇 갈래로 뻗어 있을까요?", "6갈래", new[] { "4갈래", "5갈래", "8갈래" }),
-        ("산타의 장난감 공장에서 일한다고 알려진 도우미는?", "엘프", new[] { "드워프", "트롤", "요정 여왕" }),
+        ("산타의 장난감 공장에서 일한다고 알려진 도우미는?", "엘프", new[] { "드워프", "트롤", "고블린" }),
         ("문에 거는 크리스마스 리스(화환)는 어떤 모양일까요?", "동그란 고리", new[] { "세모", "별", "네모" }),
         ("미국 아이들이 산타를 위해 두는 간식은?", "우유와 쿠키", new[] { "콜라와 피자", "차와 떡", "주스와 사탕" }),
         ("크리스마스를 대표하는 두 가지 색은?", "빨강과 초록", new[] { "파랑과 노랑", "검정과 하양", "보라와 주황" }),
         ("노래 '루돌프 사슴코'에서 루돌프를 놀리던 것은?", "다른 순록들", new[] { "눈사람들", "엘프들", "산타" }),
         ("겨우살이(미슬토) 아래에서 하는 전통은?", "입맞춤", new[] { "춤추기", "선물 열기", "노래하기" }),
         ("크리스마스 전날 밤을 부르는 말은?", "크리스마스 이브", new[] { "박싱 데이", "새해 전야", "추수감사절" }),
+        ("동화 '그린치'에서 그린치가 훔치려 한 것은?", "크리스마스", new[] { "생일", "핼러윈", "새해" }),
+        ("산타의 웃음소리로 흔히 쓰는 말은?", "호호호", new[] { "하하하", "히히히", "크크크" }),
+        ("크리스마스트리 꾸미기 풍습이 시작된 곳으로 알려진 나라는?", "독일", new[] { "미국", "일본", "브라질" }),
+        ("노래 '루돌프 사슴코'에서 루돌프가 썰매를 끈 날의 날씨는?", "안개 낀 날", new[] { "비 오는 날", "바람 부는 날", "햇볕 쨍쨍한 날" }),
+        ("캐럴에서 산타는 착한 아이 명단을 몇 번 확인할까요?", "두 번", new[] { "한 번", "세 번", "열 번" }),
+        ("'X-mas'의 X는 어느 나라 글자에서 왔을까요?", "그리스어", new[] { "라틴어", "영어", "히브리어" }),
+        ("호주에서 크리스마스는 어느 계절일까요?", "여름", new[] { "겨울", "봄", "가을" }),
+        ("일본에서 크리스마스에 많이 먹기로 유명한 음식은?", "프라이드치킨", new[] { "초밥", "라멘", "떡국" }),
+        ("영국의 전통 크리스마스 디저트는?", "크리스마스 푸딩", new[] { "마카롱", "티라미수", "와플" }),
+        ("이탈리아의 크리스마스 빵은?", "파네토네", new[] { "바게트", "프레첼", "크루아상" }),
+        ("독일의 크리스마스 과일빵 이름은?", "슈톨렌", new[] { "파네토네", "브리오슈", "베이글" }),
+        ("프랑스의 통나무 모양 크리스마스 케이크는?", "부쉬 드 노엘", new[] { "마들렌", "에클레르", "크레페" }),
+        ("'노엘'은 어느 나라 말로 크리스마스일까요?", "프랑스어", new[] { "독일어", "스페인어", "러시아어" }),
+        ("독일어로 '메리 크리스마스'는?", "프로에 바이나흐텐", new[] { "부온 나탈레", "펠리스 나비다드", "주와이외 노엘" }),
+        ("눈은 구름 속 무엇이 얼어서 생길까요?", "수증기", new[] { "모래", "소금", "먼지" }),
+        ("북극곰의 털 아래 피부 색은?", "검은색", new[] { "하얀색", "분홍색", "노란색" }),
+        ("펭귄이 주로 사는 곳은?", "남반구", new[] { "북극", "사하라 사막", "아마존 숲" }),
+        ("물이 어는 온도는 섭씨 몇 도일까요?", "0도", new[] { "10도", "영하 10도", "4도" }),
+        ("1년 중 밤이 가장 긴 절기는?", "동지", new[] { "하지", "춘분", "입동" }),
+        ("동지에 먹는 음식은?", "팥죽", new[] { "떡국", "송편", "냉면" }),
+        ("설날에 먹는 대표 음식은?", "떡국", new[] { "팥죽", "송편", "삼계탕" }),
+        ("순록의 뿔에 대해 맞는 것은?", "암수 모두 뿔이 난다", new[] { "수컷만 뿔이 난다", "암컷만 뿔이 난다", "뿔이 없다" }),
+        ("겨울잠을 자는 동물은?", "곰", new[] { "토끼", "사슴", "참새" }),
+        ("크리스마스 양말을 영어로 흔히 뭐라고 할까요?", "스타킹", new[] { "미튼", "부츠", "머플러" }),
+        ("엄지만 따로 있는 벙어리장갑을 영어로?", "미튼", new[] { "글러브", "삭스", "스카프" }),
+        ("이글루는 무엇으로 지은 집일까요?", "눈 벽돌", new[] { "나무", "흙", "돌" }),
+        ("애니메이션 '겨울왕국'의 눈사람 이름은?", "올라프", new[] { "스벤", "한스", "크리스토프" }),
+        ("'겨울왕국'에서 엘사의 동생 이름은?", "안나", new[] { "벨", "에리얼", "라푼젤" }),
+        ("캐럴 'White Christmas'를 처음 불러 유명해진 가수는?", "빙 크로스비", new[] { "엘비스 프레슬리", "프랭크 시나트라", "마이클 잭슨" }),
+        ("머라이어 캐리의 대표 캐럴은?", "All I Want for Christmas Is You", new[] { "Last Christmas", "Jingle Bell Rock", "Silent Night" }),
+        ("캐럴 'Last Christmas'를 부른 그룹은?", "왬!", new[] { "비틀스", "아바", "퀸" }),
+        ("산타가 집에 들어올 때 쓴다는 통로는?", "굴뚝", new[] { "창문", "지하실", "현관문" }),
+        ("트리에 다는 반짝이는 실 장식의 이름은?", "틴셀", new[] { "리본", "털실", "레이스" }),
+        ("성탄절 별은 무엇을 기념할까요?", "베들레헴의 별", new[] { "북극성", "금성", "시리우스" }),
+        ("예수가 태어났다고 전해지는 마을은?", "베들레헴", new[] { "나사렛", "예루살렘", "로마" }),
+        ("동방박사는 보통 몇 명으로 전해질까요?", "3명", new[] { "2명", "5명", "12명" }),
+        ("동방박사의 선물은 황금, 유향, 그리고?", "몰약", new[] { "은", "비단", "소금" }),
+        ("어드벤트 캘린더는 무엇을 세는 달력일까요?", "크리스마스까지 남은 날", new[] { "새해까지 남은 날", "생일까지 남은 날", "방학까지 남은 날" }),
+        ("크리스마스 카드를 처음 팔기 시작한 나라는?", "영국", new[] { "미국", "프랑스", "일본" }),
+        ("소설 '크리스마스 캐럴'을 쓴 작가는?", "찰스 디킨스", new[] { "셰익스피어", "안데르센", "마크 트웨인" }),
+        ("크리스마스 꽃으로 불리는 빨간 잎 식물은?", "포인세티아", new[] { "튤립", "해바라기", "장미" }),
+        ("'호두까기 인형'은 어떤 공연일까요?", "발레", new[] { "오페라", "뮤지컬", "인형극" }),
+        ("핫초코의 원료는?", "카카오", new[] { "커피콩", "녹차", "보리" }),
+        ("겨울에 많이 먹는 주황색 과일은?", "귤", new[] { "수박", "참외", "복숭아" }),
+        ("동지 팥죽에 넣는 동그란 찹쌀떡은?", "새알심", new[] { "가래떡", "절편", "인절미" }),
+        ("북극 가까운 밤하늘에서 볼 수 있는 빛의 커튼은?", "오로라", new[] { "무지개", "신기루", "일식" }),
+        ("큰 눈 축제(눈 조각 축제)로 유명한 일본 도시는?", "삿포로", new[] { "도쿄", "오사카", "교토" }),
+        ("다음 중 겨울 올림픽 종목은?", "컬링", new[] { "수영", "양궁", "탁구" }),
+        ("컬링에서 얼음 위로 미는 것은?", "스톤", new[] { "퍽", "공", "원반" }),
+        ("2018년 겨울 올림픽이 열린 곳은?", "평창", new[] { "서울", "부산", "제주" }),
+        ("평창 겨울 올림픽의 마스코트는?", "수호랑", new[] { "호돌이", "꿈돌이", "해치" }),
+        ("아이스하키에서 치는 납작한 원반은?", "퍽", new[] { "스톤", "셔틀콕", "볼" }),
+        ("트리에 다는 둥근 장식을 흔히 뭐라고 할까요?", "오너먼트 볼", new[] { "리스", "틴셀", "갈런드" }),
+        ("트리를 빙 두르는 긴 장식 줄은?", "갈런드", new[] { "리스", "토퍼", "스커트" }),
+        ("트리 꼭대기에 올리는 장식을 통틀어 부르는 말은?", "트리 토퍼", new[] { "트리 스커트", "갈런드", "리스" }),
+        ("트리 밑동에 두르는 천의 이름은?", "트리 스커트", new[] { "트리 모자", "트리 양말", "트리 망토" }),
+        ("겨울철 손을 따뜻하게 하는 일회용품은?", "핫팩", new[] { "아이스팩", "쿨팩", "물파스" }),
+        ("가장 추운 대륙은?", "남극", new[] { "아시아", "유럽", "북아메리카" }),
+        ("북극점이 있는 바다는?", "북극해", new[] { "남극해", "대서양", "인도양" }),
+        ("영화 '나 홀로 집에' 1편의 배경 도시는?", "시카고 근처", new[] { "뉴욕", "로스앤젤레스", "마이애미" }),
+        ("해리 포터가 1편 크리스마스에 받은 특별한 선물은?", "투명 망토", new[] { "빗자루", "지팡이", "부엉이" }),
+        ("'찰리 브라운의 크리스마스'에 나오는 강아지는?", "스누피", new[] { "오디", "구피", "플루토" }),
+        ("산타의 부인은 흔히 어떻게 부를까요?", "미세스 클로스", new[] { "퀸 산타", "마담 노엘", "레이디 루돌프" }),
+        ("과자로 만든 작은 크리스마스 집은?", "진저브레드 하우스", new[] { "캔디 캐슬", "쿠키 타워", "초코 오두막" }),
+        ("똑같이 생긴 눈송이 두 개를 찾을 가능성은?", "거의 없다", new[] { "아주 흔하다", "반반이다", "항상 같다" }),
+        ("눈이 하얗게 보이는 까닭은?", "빛을 고르게 흩어서", new[] { "하얀 가루가 섞여서", "소금이 들어 있어서", "차가워서" }),
+        ("눈 덮인 길에서 미끄러지지 않게 신발에 끼우는 것은?", "아이젠", new[] { "깔창", "뒤꿈치", "구두주걱" }),
+        ("크리스마스 이브 자정에 드리는 미사를 흔히?", "자정 미사", new[] { "새벽 미사", "점심 미사", "저녁 기도" }),
+        ("눈사람을 영어로?", "스노맨", new[] { "아이스맨", "윈터맨", "콜드맨" }),
+        ("겨울에 강이 얼면 그 위에서 즐기는 놀이는?", "썰매", new[] { "수영", "카누", "서핑" }),
+        ("산타 썰매 순록 중 노래로 가장 유명한 순록은?", "루돌프", new[] { "대셔", "댄서", "코멧" }),
+        ("눈을 굴려 만드는 사람 모양 조각은?", "눈사람", new[] { "눈토끼", "얼음성", "눈꽃" }),
+        ("크리스마스를 우리말로 부르는 다른 이름은?", "성탄절", new[] { "추석", "단오", "한식" }),
+        ("'메리 크리스마스 앤드 해피 뉴 이어'의 뒷부분 뜻은?", "새해 복 많이 받으세요", new[] { "생일 축하해요", "잘 자요", "안녕히 가세요" }),
+        ("영하 20도와 영하 5도 중 더 추운 것은?", "영하 20도", new[] { "영하 5도", "둘이 같다", "알 수 없다" }),
+        ("스키장에서 위로 올라갈 때 타는 것은?", "리프트", new[] { "엘리베이터", "썰매", "자전거" }),
+        ("캐럴 '징글벨'은 무엇을 타고 달리는 노래일까요?", "말이 끄는 썰매", new[] { "자전거", "기차", "배" }),
     };
 
-    long QuizRound => (long)(NetNow / QuizRoundMs);
-    double QuizInRound => NetNow % QuizRoundMs;
+    long QzRound(int i) => (long)(qzT0 / 1000) * 100 + i;   // 문제마다 겹치지 않는 번호
+    bool QzActive => qzT0 > 0 && NetNow < qzT0 + QzCount * QzPerMs + 600;
 
-    (string q, string[] choices, int correct) QuizFor(long round)
+    // 이번 판의 10문제 (씨앗으로 모두 같은 문제·같은 보기 순서)
+    List<(string q, string[] choices, int correct)> qzSet; int qzSetSeed = int.MinValue;
+    List<(string q, string[] choices, int correct)> QzSet()
     {
-        var rnd = new System.Random((int)(round % 1000003) * 7919 + 17);
-        var item = QuizBank[(int)((round * 7) % QuizBank.Length)];
-        var list = new List<string> { item.a }; list.AddRange(item.wrong);
-        var order = list.OrderBy(_ => rnd.Next()).ToList();
-        return (item.q, order.ToArray(), order.IndexOf(item.a));
+        if (qzSet != null && qzSetSeed == qzSeed) return qzSet;
+        var rnd = new System.Random(qzSeed);
+        var idx = Enumerable.Range(0, QuizBank.Length).OrderBy(_ => rnd.Next()).Take(QzCount).ToList();
+        qzSet = new List<(string, string[], int)>();
+        foreach (var k in idx)
+        {
+            var it = QuizBank[k];
+            var list = new List<string> { it.a }; list.AddRange(it.wrong);
+            var order = list.OrderBy(_ => rnd.Next()).ToList();
+            qzSet.Add((it.q, order.ToArray(), order.IndexOf(it.a)));
+        }
+        qzSetSeed = qzSeed;
+        return qzSet;
     }
 
-    void OpenQuiz() { quizOpen = true; walkTarget = null; quizScore = MyQuizTotal(); }
+    void OpenQuiz() { quizOpen = true; walkTarget = null; quizScore = MyQuizTotal(); qzInviteUntil = 0; ReadQuizSession(); qzBeat = 0; }
 
     int MyQuizTotal() { var s = net != null ? net.Get("quiz") : null; return s != null && s.TryGetValue(myKey, out var v) && v is Dictionary<string, object> d ? (int)AcJson.D(d, "score") : 0; }
+
+    void ReadQuizSession()
+    {
+        var s = net != null ? net.Get("qzs") : null;
+        if (s != null && s.TryGetValue("cur", out var v) && v is Dictionary<string, object> d)
+        {
+            double t0 = AcJson.D(d, "t0");
+            if (t0 > qzT0) { qzT0 = t0; qzSeed = (int)AcJson.D(d, "seed"); }
+        }
+    }
+
+    void StartQuiz()
+    {
+        qzT0 = Math.Floor(NetNow + QzLeadMs); qzSeed = UnityEngine.Random.Range(1, int.MaxValue);
+        net?.Put("qzs/cur", "{\"t0\":" + qzT0.ToString("0") + ",\"seed\":" + qzSeed + ",\"by\":" + AcJson.Esc(uiName.Trim()) + "}");
+        AddAct("qs", qzT0.ToString("0") + "," + qzSeed);
+        myQuizAnswer.Clear(); qzScored = -1;
+    }
 
     void QuizUpdate()
     {
         if (Key("esc")) { quizOpen = false; return; }
-        long round = QuizRound; double inr = QuizInRound;
-        int secLeft = (int)Math.Ceiling((QuizAnswerMs - inr) / 1000);
-        if (inr < QuizAnswerMs && secLeft <= 3 && secLeft > 0 && quizLastTick != round * 10 + secLeft) { quizLastTick = round * 10 + secLeft; Sfx("tick", 0.5f); }
-        if (inr >= QuizAnswerMs && quizLastScored != round)
+        if (Time.unscaledTime > qzBeat) { qzBeat = Time.unscaledTime + 1.5f; AddAct("qj", ""); ReadQuizSession(); }
+        if (!QzActive) return;
+        double el = NetNow - qzT0;
+        if (el < 0) { int c = (int)Math.Ceiling(-el / 1000); if (c != qzLastTick && c <= 3) { qzLastTick = c; Sfx("tick", 0.5f); } return; }
+        int qi = (int)(el / QzPerMs); if (qi >= QzCount) return;
+        double inq = el - qi * QzPerMs;
+        int left = (int)Math.Ceiling((QzAnswerMs - inq) / 1000);
+        if (inq < QzAnswerMs && left <= 3 && left > 0 && qzLastTick != qi * 10 + left) { qzLastTick = qi * 10 + left; Sfx("tick", 0.45f); }
+        long round = QzRound(qi);
+        if (inq >= QzAnswerMs && qzScored != round)
         {
-            quizLastScored = round;
+            qzScored = round;
             if (myQuizAnswer.TryGetValue(round, out int mine))
             {
-                var qz = QuizFor(round);
-                if (mine == qz.correct)
+                if (mine == QzSet()[qi].correct)
                 {
                     Sfx("correct", 0.7f); quizScore = MyQuizTotal() + 1;
                     net?.Put("quiz/" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"score\":" + quizScore + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
@@ -295,98 +451,178 @@ public partial class AcRoom
                 else Sfx("wrong", 0.6f);
             }
         }
-        foreach (var k in quizAnswers.Keys.Where(k => k < round - 3).ToList()) quizAnswers.Remove(k);
+    }
+
+    // 이번 판 점수 (나 + 다른 사람)
+    List<(string name, int score)> QzScores()
+    {
+        var sc = new Dictionary<string, (string name, int s)>();
+        var set = QzSet();
+        sc[myId] = (uiName.Trim(), 0);
+        for (int i = 0; i < QzCount; i++)
+        {
+            long r = QzRound(i);
+            if (myQuizAnswer.TryGetValue(r, out int m) && m == set[i].correct) sc[myId] = (sc[myId].name, sc[myId].s + 1);
+            if (quizAnswers.TryGetValue(r, out var o))
+                foreach (var kv in o) { var cur = sc.TryGetValue(kv.Key, out var c) ? c : (kv.Value.name, 0); if (kv.Value.ch == set[i].correct) cur.Item2++; sc[kv.Key] = cur; }
+        }
+        return sc.Values.Select(v => (v.name, v.s)).OrderByDescending(v => v.Item2).ToList();
     }
 
     void QuizGUI()
     {
-        long round = QuizRound; double inr = QuizInRound; bool reveal = inr >= QuizAnswerMs;
-        var qz = QuizFor(round);
-        float pw = Mathf.Min(SW - 20, 640), ph = Mathf.Min(SH - 90, 350);
+        float pw = Mathf.Min(SW - 20, 640), ph = Mathf.Min(SH - 90, 380);
         var p = new Rect(SW / 2 - pw / 2, SH / 2 - ph / 2 + 20, pw, ph);
         GUI.Box(R(p), "", sBox);
         GUI.Label(new Rect(p.x + 16, p.y + 10, 300, 28), "크리스마스 퀴즈", sLabel);
-        GUI.Label(new Rect(p.x + 150, p.y + 14, 200, 22), $"내 점수 {quizScore}점", sSmall);
         if (GUI.Button(new Rect(p.xMax - 90, p.y + 8, 80, 30), "<b>나가기</b>", sBtn)) { quizOpen = false; return; }
-        // 남은 시간 막대
-        float frac = reveal ? (float)((QuizRoundMs - inr) / (QuizRoundMs - QuizAnswerMs)) : (float)(1 - inr / QuizAnswerMs);
-        GUI.DrawTexture(new Rect(p.x + 16, p.y + 44, p.width - 32, 8), AcPalette.Tex(new Color(0.85f, 0.8f, 0.72f)));
-        GUI.DrawTexture(new Rect(p.x + 16, p.y + 44, (p.width - 32) * Mathf.Clamp01(frac), 8), AcPalette.Tex(reveal ? new Color(0.35f, 0.65f, 0.4f) : frac < 0.25f ? new Color(0.9f, 0.35f, 0.3f) : new Color(0.95f, 0.65f, 0.25f)));
-        var qs = new GUIStyle(sLabel) { fontSize = 20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(p.x + 20, p.y + 58, p.width - 40, 70), qz.q, qs);
-        // 보기 2x2
-        myQuizAnswer.TryGetValue(round, out int mine); bool answered = myQuizAnswer.ContainsKey(round);
-        float cw = (p.width - 48) / 2, chh = 52;
-        for (int i = 0; i < 4; i++)
+        var center = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+        var big = new GUIStyle(sLabel) { fontSize = 20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
+        double el = NetNow - qzT0;
+        if (QzActive && el >= 0 && el < QzCount * QzPerMs)
         {
-            var r = new Rect(p.x + 16 + (i % 2) * (cw + 16), p.y + 136 + (i / 2) * (chh + 10), cw, chh);
-            Color border = new Color(0.86f, 0.8f, 0.72f);
-            if (answered && mine == i) border = new Color(0.25f, 0.5f, 0.9f);
-            if (reveal && i == qz.correct) border = new Color(0.3f, 0.7f, 0.35f);
-            else if (reveal && answered && mine == i) border = new Color(0.9f, 0.3f, 0.3f);
-            GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(border));
-            if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", sBtn) && !reveal && !answered)
+            int qi = (int)(el / QzPerMs); double inq = el - qi * QzPerMs; bool reveal = inq >= QzAnswerMs;
+            var qz = QzSet()[qi]; long round = QzRound(qi);
+            GUI.Label(new Rect(p.x + 160, p.y + 14, 200, 22), $"<b>{qi + 1} / {QzCount}</b> 문제", sSmall);
+            if (!reveal)
             {
-                myQuizAnswer[round] = i; AddAct("q", round + ":" + i); Sfx("click", 0.6f);
+                float frac = (float)(1 - inq / QzAnswerMs);
+                GUI.DrawTexture(new Rect(p.x + 16, p.y + 44, p.width - 32, 8), AcPalette.Tex(new Color(0.85f, 0.8f, 0.72f)));
+                GUI.DrawTexture(new Rect(p.x + 16, p.y + 44, (p.width - 32) * Mathf.Clamp01(frac), 8), AcPalette.Tex(frac < 0.3f ? new Color(0.9f, 0.35f, 0.3f) : new Color(0.95f, 0.65f, 0.25f)));
             }
+            GUI.Label(new Rect(p.x + 20, p.y + 58, p.width - 40, 66), qz.q, big);
+            myQuizAnswer.TryGetValue(round, out int mine); bool answered = myQuizAnswer.ContainsKey(round);
+            float cw = (p.width - 48) / 2, chh = 50;
+            for (int i = 0; i < 4; i++)
+            {
+                var r = new Rect(p.x + 16 + (i % 2) * (cw + 16), p.y + 130 + (i / 2) * (chh + 10), cw, chh);
+                Color border = new Color(0.86f, 0.8f, 0.72f);
+                if (answered && mine == i) border = new Color(0.25f, 0.5f, 0.9f);
+                if (reveal && i == qz.correct) border = new Color(0.3f, 0.7f, 0.35f);
+                else if (reveal && answered && mine == i) border = new Color(0.9f, 0.3f, 0.3f);
+                GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(border));
+                if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", sBtn) && !reveal && !answered)
+                { myQuizAnswer[round] = i; AddAct("q", round + ":" + i); Sfx("click", 0.6f); }
+            }
+            quizAnswers.TryGetValue(round, out var others);
+            float ly = p.y + 130 + 2 * (chh + 10) + 8;
+            if (!reveal)
+            {
+                int cnt = (others?.Count ?? 0) + (answered ? 1 : 0);
+                GUI.Label(new Rect(p.x + 16, ly, p.width - 32, 24), (answered ? "답했어요! " : $"{Math.Ceiling((QzAnswerMs - inq) / 1000)}초 안에 골라요  ") + $"({cnt}명 답함)", center);
+            }
+            else
+            {
+                var right = new List<string>();
+                if (answered && mine == qz.correct) right.Add(uiName.Trim());
+                if (others != null) foreach (var o in others.Values) if (o.ch == qz.correct) right.Add(o.name);
+                GUI.Label(new Rect(p.x + 16, ly, p.width - 32, 26), "<b>정답은 '" + qz.choices[qz.correct] + "'</b>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+                GUI.Label(new Rect(p.x + 16, ly + 28, p.width - 32, 40), right.Count > 0 ? string.Join(", ", right.Take(8)) + (right.Count > 8 ? " 외" : "") + " 님이 맞혔어요!" : "아무도 못 맞혔어요", center);
+            }
+            return;
         }
-        // 다른 사람 답 / 맞힌 사람
-        quizAnswers.TryGetValue(round, out var others);
-        int cnt = (others?.Count ?? 0) + (answered ? 1 : 0);
-        float ly = p.y + 136 + 2 * (chh + 10) + 6;
-        string info;
-        if (!reveal) info = answered ? $"답했어요! 다른 사람을 기다려요 ({cnt}명 답함)" : $"{Mathf.CeilToInt((float)((QuizAnswerMs - inr) / 1000))}초 안에 골라요  ({cnt}명 답함)";
-        else
+        if (QzActive && el < 0)
         {
-            var right = new List<string>();
-            if (answered && mine == qz.correct) right.Add(uiName.Trim());
-            if (others != null) foreach (var o in others.Values) if (o.ch == qz.correct) right.Add(o.name);
-            info = "정답: " + qz.choices[qz.correct] + "   " + (right.Count > 0 ? "맞힌 사람: " + string.Join(", ", right.Take(6)) : "아무도 못 맞혔어요");
+            GUI.Label(new Rect(p.x + 20, p.y + 80, p.width - 40, 40), "퀴즈가 곧 시작해요!", big);
+            GUI.Label(new Rect(p.x + 20, p.y + 130, p.width - 40, 80), $"<size=48><b>{Math.Ceiling(-el / 1000)}</b></size>", big);
+            GUI.Label(new Rect(p.x + 20, p.y + 220, p.width - 40, 24), "10문제 · 문제마다 10초", center);
+            return;
         }
-        GUI.Label(new Rect(p.x + 16, ly, p.width - 32, 24), info, new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        // 순위 (누적 정답 수)
+        // 모이는 화면 (끝난 판이 있으면 결과도)
+        float y = p.y + 48;
+        bool justEnded = qzT0 > 0 && NetNow - (qzT0 + QzCount * QzPerMs) < 90000;
+        if (justEnded)
+        {
+            var sc = QzScores();
+            GUI.Label(new Rect(p.x + 16, y, p.width - 32, 24), "<b>지난 판 결과</b>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            y += 28;
+            string line = string.Join("   ", sc.Take(5).Select((x, i) => $"{i + 1}등 {Short(x.name, 6)} {x.score}개"));
+            GUI.Label(new Rect(p.x + 16, y, p.width - 32, 44), line, center);
+            y += 50;
+        }
+        foreach (var k in quizLobby.Where(kv => Time.unscaledTime - kv.Value.at > 4f).Select(kv => kv.Key).ToList()) quizLobby.Remove(k);
+        var names = new List<string> { uiName.Trim() }; names.AddRange(quizLobby.Values.Select(v => v.name));
+        GUI.Label(new Rect(p.x + 16, y, p.width - 32, 24), $"<b>모인 사람 {names.Count}명</b>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+        y += 28;
+        GUI.Label(new Rect(p.x + 16, y, p.width - 32, 44), string.Join(", ", names.Take(14).Select(n => Short(n, 6))) + (names.Count > 14 ? " …" : ""), center);
+        y += 50;
+        GUI.Label(new Rect(p.x + 16, y, p.width - 32, 22), "10문제를 같이 풀어요 · 문제마다 10초", center);
+        y += 30;
+        float bw = Mathf.Min(170, (p.width - 48) / 2);
+        if (GUI.Button(new Rect(p.center.x - bw - 8, y, bw, 40), "모두에게 알리기", sBtn)) { AddAct("qa", ""); Toast("모두에게 퀴즈 소식을 보냈어요"); }
+        if (GUI.Button(new Rect(p.center.x + 8, y, bw, 40), justEnded ? "<b>다시 시작!</b>" : "<b>시작!</b>", sBtn)) StartQuiz();
+        y += 50;
         var s = net != null ? net.Get("quiz") : null;
-        if (s != null && s.Count > 0)
+        if (s != null && s.Count > 0 && y + 40 < p.yMax)
         {
             var top = s.Values.OfType<Dictionary<string, object>>().Select(d => (AcJson.S(d, "name"), (int)AcJson.D(d, "score"))).OrderByDescending(x => x.Item2).Take(5).ToList();
-            string line = "퀴즈 왕: " + string.Join("   ", top.Select((x, i) => $"{i + 1}. {Short(x.Item1, 6)} {x.Item2}"));
-            GUI.Label(new Rect(p.x + 16, ly + 28, p.width - 32, 40), line, new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true });
+            GUI.Label(new Rect(p.x + 16, y, p.width - 32, 40), "누적 퀴즈 왕: " + string.Join("   ", top.Select((x, i) => $"{i + 1}. {Short(x.Item1, 6)} {x.Item2}")), center);
         }
     }
 
     // ========================================================
     // 눈싸움
     bool snowMode; int sbHits, sbTaken; float sbCool, sbNextWrite;
-    class Snowball { public Vector3 a, b; public float t, T, h; public GameObject go; public string owner, ownerName; }
+    class Snowball { public Vector3 a, b; public float t, T, h; public GameObject go; public string owner, ownerName; public bool big; }
     readonly List<Snowball> snowballs = new List<Snowball>();
     readonly List<(GameObject go, Vector3 v, float life)> sbBits = new List<(GameObject, Vector3, float)>();
+    readonly List<(GameObject go, float until)> sbCaps = new List<(GameObject, float)>();   // 머리에 얹힌 눈 (큰 눈에 맞으면)
+    bool sbBig = true;                 // 큰 눈(가까이, 세게) / 작은 눈(멀리, 빠르게)
+    float sbHitFx; bool sbHitBig; Vector2 sbHitAt; Texture2D sbSplatTex;   // 내가 맞았을 때 화면 효과
 
     void ToggleSnowFight()
     {
         snowMode = !snowMode;
-        if (snowMode) Toast(IsMobile ? "눈싸움! 친구나 땅을 톡 누르면 눈덩이를 던져요" : "눈싸움! 클릭한 곳으로 눈덩이를 던져요 (F: 앞으로 던지기)");
+        if (snowMode) Toast(IsMobile ? "눈싸움! 친구나 땅을 톡 누르면 던져요 (큰 눈·작은 눈 고르기)" : "눈싸움! 클릭한 곳으로 던져요 (F: 앞으로, 1·2: 큰 눈·작은 눈)");
     }
 
     void ThrowSnowball(Vector3 target)
     {
         if (sbCool > 0) return;
-        sbCool = 0.45f;
+        sbCool = sbBig ? 0.6f : 0.28f;
+        float range = sbBig ? 16f : 30f;
         var from = me.transform.position;
         var d = target - from; d.y = 0;
-        if (d.magnitude > 18f) target = from + d.normalized * 18f;
+        if (d.magnitude > range) target = from + d.normalized * range;
         if (d.sqrMagnitude > 0.01f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; me.transform.rotation = Quaternion.Euler(0, yaw, 0); }
         var start = from + Vector3.up * 1.1f + me.transform.forward * 0.3f;
-        Emote("throw"); Sfx("throw", 0.6f);
-        AddAct("s", $"{start.x:F2},{start.z:F2},{target.x:F2},{target.z:F2}");
-        SpawnSnowball(start, target, myId, uiName.Trim());
+        Emote("throw"); Sfx("throw", sbBig ? 0.6f : 0.45f, sbBig ? 0.9f : 1.25f);
+        AddAct("s", $"{start.x:F2},{start.z:F2},{target.x:F2},{target.z:F2},{(sbBig ? 1 : 0)}");
+        SpawnSnowball(start, target, myId, uiName.Trim(), sbBig);
     }
 
-    void SpawnSnowball(Vector3 a, Vector3 b, string owner, string ownerName)
+    void SpawnSnowball(Vector3 a, Vector3 b, string owner, string ownerName, bool big)
     {
         a.y = 1.1f;
         float dist = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
-        var go = AcCatalog.Spawn("sm_snowball", world, null); go.transform.localScale = Vector3.one * 1.3f;
-        snowballs.Add(new Snowball { a = a, b = new Vector3(b.x, 0.5f, b.z), T = Mathf.Clamp(dist / 13f, 0.25f, 1.0f), h = 0.6f + dist * 0.12f, go = go, owner = owner, ownerName = ownerName });
+        var go = AcCatalog.Spawn("sm_snowball", world, null); go.transform.localScale = Vector3.one * (big ? 1.6f : 0.7f);
+        snowballs.Add(new Snowball { a = a, b = new Vector3(b.x, 0.5f, b.z), big = big,
+            T = big ? Mathf.Clamp(dist / 12f, 0.25f, 1.1f) : Mathf.Clamp(dist / 24f, 0.15f, 1.1f),
+            h = big ? 0.6f + dist * 0.12f : 0.3f + dist * 0.05f, go = go, owner = owner, ownerName = ownerName });
+    }
+
+    // 눈에 맞은 캐릭터 효과: 큰 눈 = 머리에 눈이 얹히고 크게 휘청, 작은 눈 = 톡 튀는 눈가루
+    void HitFx(Transform who, bool big)
+    {
+        if (!who) return;
+        var c = who.GetComponent<AcCharacter>();
+        if (big)
+        {
+            if (c) c.PlayEmote("hit");
+            Splash(who.position + Vector3.up * 1.3f, true);
+            var cap = AcCatalog.Spawn("sm_snowball", who, null);
+            cap.transform.localPosition = new Vector3(0, 1.55f, 0); cap.transform.localScale = new Vector3(1.5f, 0.7f, 1.5f);
+            sbCaps.Add((cap, Time.unscaledTime + 2.2f));
+        }
+        else
+        {
+            for (int k = 0; k < 5; k++)
+            {
+                var g = AcCatalog.Spawn("sm_snowball", world, null); g.transform.position = who.position + Vector3.up * 0.9f; g.transform.localScale = Vector3.one * 0.22f;
+                sbBits.Add((g, new Vector3(UnityEngine.Random.Range(-1.4f, 1.4f), UnityEngine.Random.Range(0.8f, 2f), UnityEngine.Random.Range(-1.4f, 1.4f)), 0.35f));
+            }
+            if (c) c.PlayEmote("flinch");
+        }
     }
 
     void SnowballUpdate(float dt)
@@ -396,7 +632,9 @@ public partial class AcRoom
         {
 #if ENABLE_INPUT_SYSTEM
             var kb = Keyboard.current;
-            if (kb != null && kb.fKey.wasPressedThisFrame) ThrowSnowball(me.transform.position + me.transform.forward * 8f);
+            if (kb != null && kb.fKey.wasPressedThisFrame) ThrowSnowball(me.transform.position + me.transform.forward * (sbBig ? 8f : 16f));
+            if (kb != null && kb.digit1Key.wasPressedThisFrame) sbBig = true;
+            if (kb != null && kb.digit2Key.wasPressedThisFrame) sbBig = false;
 #endif
         }
         for (int i = snowballs.Count - 1; i >= 0; i--)
@@ -407,26 +645,30 @@ public partial class AcRoom
             var p = Vector3.Lerp(s.a, s.b, u); p.y += Mathf.Sin(u * Mathf.PI) * s.h;
             if (s.go) s.go.transform.position = p;
             if (u < 1) continue;
-            Splash(s.b);
+            Splash(s.b, s.big);
             if (s.go) Destroy(s.go);
             snowballs.RemoveAt(i);
-            // 맞았는지: 던진 사람이 나면 다른 사람을, 남이 던졌으면 나를 확인
-            if (s.owner == myId)
-            {
-                foreach (var kv in remotes)
-                    if (kv.Value.c && Flat(kv.Value.c.transform.position, s.b) < 0.9f)
+            float hr = s.big ? 1.1f : 0.7f;
+            // 맞았는지: 던진 사람이 나면 다른 사람을, 남이 던졌으면 나를 확인 (효과는 모두에게)
+            foreach (var kv in remotes)
+                if (kv.Key != s.owner && kv.Value.c && Flat(kv.Value.c.transform.position, s.b) < hr)
+                {
+                    HitFx(kv.Value.c.transform, s.big);
+                    if (s.owner == myId)
                     {
-                        sbHits++; kv.Value.c.PlayEmote("hit"); Sfx("splat", 0.8f);
+                        sbHits++; Sfx("splat", s.big ? 0.85f : 0.6f, s.big ? 0.85f : 1.35f);
                         Toast($"{kv.Value.net?.name} 님을 맞혔어요! ({sbHits})");
                         if (Time.unscaledTime > sbNextWrite) { sbNextWrite = Time.unscaledTime + 1f; SaveSnowFight(); }
-                        break;
                     }
-                foreach (var n in npcs) if (n && n.gameObject.activeSelf && Flat(n.transform.position, s.b) < 0.9f) { n.PlayEmote("hit"); Sfx("splat", 0.7f); }
-            }
-            else
+                    break;
+                }
+            if (s.owner == myId) foreach (var n in npcs) if (n && n.gameObject.activeSelf && Flat(n.transform.position, s.b) < hr) { HitFx(n.transform, s.big); Sfx("splat", 0.6f, s.big ? 0.85f : 1.35f); }
+            if (s.owner != myId && Flat(me.transform.position, s.b) < hr)
             {
-                if (Flat(me.transform.position, s.b) < 0.9f) { sbTaken++; me.PlayEmote("hit"); Sfx("splat", 0.9f); Toast($"{s.ownerName} 님의 눈덩이에 맞았어요!"); }
-                foreach (var kv in remotes) if (kv.Key != s.owner && kv.Value.c && Flat(kv.Value.c.transform.position, s.b) < 0.9f) kv.Value.c.PlayEmote("hit");
+                sbTaken++; HitFx(me.transform, s.big); Sfx("splat", s.big ? 0.95f : 0.7f, s.big ? 0.8f : 1.3f);
+                sbHitFx = s.big ? 1.6f : 0.7f; sbHitBig = s.big;
+                sbHitAt = new Vector2(UnityEngine.Random.Range(0.2f, 0.8f), UnityEngine.Random.Range(0.25f, 0.65f));
+                Toast($"{s.ownerName} 님의 {(s.big ? "큰 눈덩이" : "작은 눈덩이")}에 맞았어요!");
             }
         }
         for (int i = sbBits.Count - 1; i >= 0; i--)
@@ -436,16 +678,57 @@ public partial class AcRoom
             sbBits[i] = b;
             if (b.life <= 0) { if (b.go) Destroy(b.go); sbBits.RemoveAt(i); }
         }
+        for (int i = sbCaps.Count - 1; i >= 0; i--)
+        {
+            var (go, until) = sbCaps[i];
+            float left = until - Time.unscaledTime;
+            if (go && left < 0.5f) go.transform.localScale = new Vector3(1.5f, 0.7f, 1.5f) * Mathf.Max(0.01f, left / 0.5f);
+            if (left <= 0 || !go) { if (go) Destroy(go); sbCaps.RemoveAt(i); }
+        }
+        if (sbHitFx > 0) sbHitFx -= dt;
     }
 
-    void Splash(Vector3 at)
+    void Splash(Vector3 at, bool big = true)
     {
-        for (int k = 0; k < 6; k++)
+        int n = big ? 10 : 4;
+        for (int k = 0; k < n; k++)
         {
-            var g = AcCatalog.Spawn("sm_snowball", world, null); g.transform.position = at; g.transform.localScale = Vector3.one * 0.5f;
-            var v = new Vector3(UnityEngine.Random.Range(-1.6f, 1.6f), UnityEngine.Random.Range(1.5f, 3f), UnityEngine.Random.Range(-1.6f, 1.6f));
-            sbBits.Add((g, v, 0.5f));
+            var g = AcCatalog.Spawn("sm_snowball", world, null); g.transform.position = at; g.transform.localScale = Vector3.one * (big ? 0.6f : 0.3f);
+            float sp = big ? 2.2f : 1.2f;
+            var v = new Vector3(UnityEngine.Random.Range(-sp, sp), UnityEngine.Random.Range(1.5f, big ? 3.5f : 2.2f), UnityEngine.Random.Range(-sp, sp));
+            sbBits.Add((g, v, big ? 0.7f : 0.4f));
         }
+    }
+
+    // 내가 맞았을 때 화면에 눈이 철썩 (큰 눈은 크게, 작은 눈은 귀퉁이에 작게)
+    void SnowHitOverlay()
+    {
+        if (sbHitFx <= 0 || Event.current.type != EventType.Repaint) return;
+        if (sbSplatTex == null)
+        {
+            sbSplatTex = new Texture2D(128, 128, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var rnd = new System.Random(7);
+            var blobs = new List<Vector3>();
+            for (int k = 0; k < 14; k++) { float ang = k / 14f * Mathf.PI * 2; float rr = 30 + (float)rnd.NextDouble() * 18; blobs.Add(new Vector3(64 + Mathf.Cos(ang) * rr, 64 + Mathf.Sin(ang) * rr, 8 + (float)rnd.NextDouble() * 10)); }
+            blobs.Add(new Vector3(64, 64, 40));
+            for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++)
+                {
+                    float a = 0;
+                    foreach (var b in blobs) a = Mathf.Max(a, Mathf.Clamp01((b.z - new Vector2(x - b.x, y - b.y).magnitude) / 2.5f));
+                    float sh = 0.9f + 0.1f * (y / 127f);
+                    sbSplatTex.SetPixel(x, y, new Color(sh, sh, 1f, a));
+                }
+            sbSplatTex.Apply();
+        }
+        float life = sbHitBig ? 1.6f : 0.7f, k2 = Mathf.Clamp01(sbHitFx / life);
+        float alpha = Mathf.Clamp01(k2 * 1.6f) * (sbHitBig ? 0.92f : 0.85f);
+        float size = sbHitBig ? Mathf.Max(SW, SH) * 0.95f : Mathf.Min(SW, SH) * 0.32f;
+        size *= 1f + (1 - k2) * 0.08f;
+        var c = new Vector2(sbHitAt.x * SW, sbHitAt.y * SH + (1 - k2) * (sbHitBig ? 60 : 20));   // 천천히 흘러내림
+        var old = GUI.color; GUI.color = new Color(1, 1, 1, alpha);
+        GUI.DrawTexture(new Rect(c.x - size / 2, c.y - size / 2, size, size), sbSplatTex);
+        if (sbHitBig) { GUI.color = new Color(1, 1, 1, alpha * 0.35f); GUI.DrawTexture(new Rect(0, 0, SW, SH), Texture2D.whiteTexture); }
+        GUI.color = old;
     }
 
     void SaveSnowFight()
@@ -458,6 +741,7 @@ public partial class AcRoom
 
     void SnowFightHUD()
     {
+        SnowHitOverlay();
         if (!snowMode) return;
         float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : SW < 1000 ? 112 : 60;
         var s = net != null ? net.Get("sbf") : null;
@@ -465,6 +749,16 @@ public partial class AcRoom
         var r = new Rect(12, top, w, 36 + top3.Count * 20);
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 12, r.y + 6, w - 20, 24), $"<b>눈싸움</b>  맞힘 {sbHits} · 맞음 {sbTaken}", sSmall);
+        // 큰 눈 / 작은 눈 고르기
+        var br = new Rect(r.x, r.yMax + 6, w, 40);
+        GUI.Box(R(br), "", sBox);
+        for (int i = 0; i < 2; i++)
+        {
+            var b = new Rect(br.x + 8 + i * ((w - 22) / 2 + 6), br.y + 5, (w - 22) / 2, 30);
+            bool on = (i == 0) == sbBig;
+            if (on) GUI.DrawTexture(new Rect(b.x - 2, b.y - 2, b.width + 4, b.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
+            if (GUI.Button(b, i == 0 ? "큰 눈 (세게)" : "작은 눈 (멀리)", sBtn)) sbBig = i == 0;
+        }
         {
             for (int i = 0; i < top3.Count; i++) GUI.Label(new Rect(r.x + 12, r.y + 30 + i * 20, w - 20, 20), $"{i + 1}. {Short(top3[i].Item1, 8)}  {top3[i].Item2}번 맞힘", sSmall);
         }

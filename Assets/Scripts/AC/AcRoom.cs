@@ -569,7 +569,7 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
+        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
@@ -765,12 +765,13 @@ public partial class AcRoom : MonoBehaviour
 
     Vector3? pointerFocus;
 
-    bool orbitOn; Vector3 orbFocus; float orbDist, orbPitch;
+    bool orbitOn; Vector3 orbFocus; float orbDist, orbPitch, skateZoom = 1f;
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
         float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = 180f;   // 실내·앞마당·옆마당: 남쪽(+z)에서, 뒷마당: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
-        if (SnowCamera(ref focus, ref dist, ref pitch)) { }
+        if (SnowCamera(ref focus, ref dist, ref pitch)) { targetYaw = snowYaw; }
+        else if (SnowFocusCamera(ref focus, ref dist, ref pitch, ref targetYaw)) { }
         else if (treeOverview)
         {
             // 트리 전경: 꼭대기 별까지 한눈에 (끌어서 돌려 봄)
@@ -788,8 +789,11 @@ public partial class AcRoom : MonoBehaviour
             dist = TreeR + (portrait ? 7.5f : 5.2f) * decoZoom;
             pitch = 8f; targetYaw = decoYaw;
             focus -= Vector3.up * 0.9f;   // 아래 패널을 피해서 살짝 위쪽이 보이게
-            if (pointerFocus.HasValue) focus = Vector3.Lerp(focus, pointerFocus.Value - Vector3.up * 0.9f, 0.12f);
         }
+        // 스케이트를 타면 조금 멀리서 (빨리 다니니까 넓게 보이게)
+        bool special = building || snowFocusId != null || treeOverview || decorating;
+        skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && me.skating ? 1.45f : 1f, dt * 0.9f);
+        if (!special) dist *= skateZoom;
         if (phase == Phase.Lobby)
         {
             // 입장 화면: 캐릭터를 앞에서 가까이 (뒤로 현관문이 보임). 왼쪽 패널을 피해 캐릭터를 오른쪽에
@@ -806,8 +810,8 @@ public partial class AcRoom : MonoBehaviour
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);
         if (snap) { cam.transform.position = want; cam.transform.rotation = rotq; return; }
-        // 트리를 볼 때: 트리 중심축을 기준으로 궤도처럼 돌기 (트리가 항상 화면 가운데)
-        if (treeView)
+        // 트리·눈사람을 볼 때: 그 중심축을 기준으로 궤도처럼 돌기 (항상 화면 가운데)
+        if (treeView || building || snowFocusId != null)
         {
             if (!orbitOn)
             {
@@ -845,6 +849,7 @@ public partial class AcRoom : MonoBehaviour
 
         pointerFocus = null;
         var mp = ptrPos;
+        if (ptrDown) { longUsed = false; if (!pinching) pinchUsed = false; decoPressTree = !OverUI(ptrStart) && treeCol.Raycast(cam.ScreenPointToRay(ptrStart), out _, 100f); }
         // 아이콘을 눌러 끌기 시작
         if (ptrDown && !pinching)
         {
@@ -852,7 +857,8 @@ public partial class AcRoom : MonoBehaviour
             foreach (var (rr, idx) in decoIconRects) if (rr.Contains(u)) dragCand = idx;
         }
         if (dragCand >= 0 && (ptrPressed || ptrUp) && !OverUI(mp) && !dragOrn && !pinching) { dragOrn = true; SetSel(dragCand); ornPicked = true; }
-        bool dropNow = false;   // 놓기는 OnGUI의 MouseUp에서 (빠른 끌기도 놓치지 않게)
+        if (dragOrn && ptrUp) { DropOrnAt(mp); dragOrn = false; dragCand = -1; return; }   // 끌어 온 장식: 손을 떼자마자 달기
+        bool dropNow = false;
         if (!ptrPressed && !ptrUp && !ptrDown) { dragCand = -1; dragOrn = false; }
         if (OverUI(mp)) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); if (dropNow) dragOrn = false; return; }   // 화면 UI 위
         var ray = cam.ScreenPointToRay(mp);
@@ -864,7 +870,8 @@ public partial class AcRoom : MonoBehaviour
             RemoveOrn(tag.id); Toast("장식을 뗐어요"); return;
         }
         if (!ornPicked) { if (ghost) ghost.SetActive(false); FocusAt(Vector3.zero, false); return; }   // 고른 장식이 없으면 둘러보기만
-        bool place = (Tap && !pinching) || dropNow;
+        // 고른 장식이 있으면: 트리를 누른 채 움직여 자리를 잡고, 손을 떼면 그 자리에 달기 (트리를 끌어도 돌지 않음)
+        bool place = (ptrUp && !ptrOnUI && decoPressTree && !pinching && !pinchUsed && !longUsed) || dropNow;
         if (dropNow) dragOrn = false;
         if (treeCol.Raycast(ray, out var hit, 100f))
         {
@@ -916,7 +923,7 @@ public partial class AcRoom : MonoBehaviour
             float d = (a - b).magnitude;
             if (!pinching) { pinching = true; pinchD = Mathf.Max(20, d); pinchZ = decoZoom; }
             else decoZoom = Mathf.Clamp(pinchZ * pinchD / Mathf.Max(20, d), 0.5f, 3.5f);
-            ptrMoved = true; lastPtr = ptrPos; dragCand = -1;
+            ptrMoved = true; lastPtr = ptrPos; dragCand = -1; pinchUsed = true;
             return true;
         }
 #endif
@@ -928,7 +935,7 @@ public partial class AcRoom : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
         if (PinchZoom()) return;
-        if (ptrPressed && ptrMoved && !ptrOnUI && dragCand < 0)
+        if (ptrPressed && ptrMoved && !ptrOnUI && dragCand < 0 && !(ornPicked && decoPressTree))
         {
             var d = ptrPos - lastPtr;
             decoYaw += d.x * 0.22f;
@@ -942,7 +949,7 @@ public partial class AcRoom : MonoBehaviour
         decoH = Mathf.Clamp(decoH, 0.8f, TreeTop - 0.3f);
     }
     int decoButtons;   // 화면의 위/아래/왼쪽/오른쪽 버튼을 누르고 있는 동안
-    bool ornPicked = true, dragOrn; int dragCand = -1;
+    bool ornPicked = true, dragOrn; int dragCand = -1; bool decoPressTree, pinchUsed;
     float ornScroll, barX0, barY0, barS0; bool barDrag, barMoved; int ornSelSeen = -1;
     readonly List<(Rect r, int i)> decoIconRects = new List<(Rect, int)>();
 
@@ -1061,11 +1068,17 @@ public partial class AcRoom : MonoBehaviour
                 dragOrn = false; dragCand = -1;
             }
         }
+        if (building && snowTab == 1 && !pinching)
+        {
+            var scr = new Vector2(raw.x, Screen.height - raw.y);
+            if ((et == EventType.MouseDrag || et == EventType.TouchMove) && dragCand >= 0 && !dragOrn && !OverUI(scr)) { dragOrn = true; snowDecoSel = dragCand; snowPicked = true; }
+            if (et == EventType.MouseUp || et == EventType.TouchUp) { if (dragOrn) SnowDropAt(scr); dragOrn = false; dragCand = -1; }
+        }
         // 화면 UI 위에서 누르기 시작했는지 IMGUI 쪽에서도 확인 (UI 위에서 끌 때 카메라가 돌지 않게)
         if (down)
         {
             foreach (var r in uiRects) if (r.Contains(mpos)) { ptrOnUI = true; break; }
-            if (decorating) foreach (var (rr, idx) in decoIconRects) if (rr.Contains(mpos)) { dragCand = idx; ptrOnUI = true; }
+            if (decorating || (building && snowTab == 1)) foreach (var (rr, idx) in decoIconRects) if (rr.Contains(mpos)) { dragCand = idx; ptrOnUI = true; }
         }
     }
 
@@ -1098,9 +1111,11 @@ public partial class AcRoom : MonoBehaviour
             GUI.Box(R(lr), "", sBox);
             for (int i = 0; i < chatLog.Count; i++) GUI.Label(new Rect(26, 20 + i * 22, 340, 22), chatLog[i], sSmall);
         }
+        PlayBanners();
         if (lettersOpen) { LettersWindow(); AskWindow(); return; }
         if (playingGame) { CookieGameGUI(); return; }
         if (treeOverview) { OverviewGUI(); return; }
+        if (snowFocusId != null) { SnowFocusGUI(); return; }
         if (pianoOpen) { PianoGUI(); return; }
         if (quizOpen) { QuizGUI(); return; }
         if (decorating) DecorateBar();
@@ -1229,46 +1244,16 @@ public partial class AcRoom : MonoBehaviour
         if (GUI.Button(new Rect(SW - 20 - 90, y + 6, 82, 32), "<b>나오기</b>", sBtn)) { decorating = false; return; }
         if (GUI.Button(new Rect(SW - 20 - 90 - 100, y + 6, 92, 32), "트리 전경", sBtn)) { treeOverview = true; return; }
         // 도움말은 맨 아래 줄
-        GUI.Label(new Rect(26, y + h - 26, SW - 52, 22), (narrow ? $"장식 {ornObjs.Count}개 · " : "") + (IsMobile ? "눌러 달기 · 끌어서 놓기 · 길게 눌러 떼기 · 두 손가락 확대" : "클릭·끌어 놓기로 달기 · 오른쪽 클릭 떼기 · 끌기·WASD 둘러보기 · 휠 확대"), sSmall);
+        GUI.Label(new Rect(26, y + h - 26, SW - 52, 22), (narrow ? $"장식 {ornObjs.Count}개 · " : "") + (IsMobile ? "누른 채 자리 잡고 떼면 달기 · 길게 눌러 떼기 · 두 손가락 확대" : "클릭으로 달기 · 오른쪽 클릭 떼기 · 해제 후 끌어서 둘러보기 · 휠 확대"), sSmall);
         // 화면 오른쪽, 패널 위: 카메라 움직이기 버튼 (누르고 있는 동안) — 2x2로 패널과 떨어뜨려 둠
         decoButtons = 0;
         CamPad(SW - 20 - 2 * 66 - 6, y - 2 * 44 - 18, true);
         // 모양 (실제 오너먼트 그림) — 누르면 고르기, 다시 누르면 해제, 끌어서 트리에 놓기
-        if (Event.current.type == EventType.Repaint) decoIconRects.Clear();
-        float size = 62, step = size + 6;
-        int perRow = Mathf.Max(1, (int)((SW - (narrow ? 52 : 330)) / step));
-        float viewW = Mathf.Min(perRow, ornTypes.Count) * step, contentW = ornTypes.Count * step;
-        var view = new Rect(23, y + 37, viewW + 6, size + 6);
-        float maxScroll = Mathf.Max(0, contentW - viewW);
-        // 장식 줄 스크롤: 옆으로 끌기 · 휠
-        var e = Event.current;
-        if (e.type == EventType.ScrollWheel && view.Contains(e.mousePosition)) { ornScroll += (Mathf.Abs(e.delta.x) > Mathf.Abs(e.delta.y) ? e.delta.x : e.delta.y) * 22f; e.Use(); }
-        if (e.type == EventType.MouseDown && view.Contains(e.mousePosition)) { barDrag = true; barMoved = false; barX0 = e.mousePosition.x; barY0 = e.mousePosition.y; barS0 = ornScroll; }
-        if (e.type == EventType.MouseDrag && barDrag && !dragOrn)
-        {
-            float dx = e.mousePosition.x - barX0, dy = e.mousePosition.y - barY0;
-            if (!barMoved && Mathf.Abs(dx) > 10 && Mathf.Abs(dx) > Mathf.Abs(dy)) { barMoved = true; dragCand = -1; }
-            if (barMoved) ornScroll = barS0 - dx;
-        }
-        if (e.type == EventType.MouseUp) barDrag = false;
-        if (ornSel != ornSelSeen) { ornSelSeen = ornSel; if (ornSel * step < ornScroll) ornScroll = ornSel * step; else if ((ornSel + 1) * step > ornScroll + viewW) ornScroll = (ornSel + 1) * step - viewW; }   // 키로 고르면 보이게
-        ornScroll = Mathf.Clamp(ornScroll, 0, maxScroll);
-        if (ornScroll > 1) GUI.Label(new Rect(9, y + 52, 14, 24), "<", sLabel);
-        if (ornScroll < maxScroll - 1) GUI.Label(new Rect(view.xMax + 1, y + 52, 14, 24), ">", sLabel);
-        GUI.BeginGroup(view);
-        int first = Mathf.Max(0, (int)(ornScroll / step)), last = Mathf.Min(ornTypes.Count - 1, (int)((ornScroll + viewW) / step) + 1);
-        for (int i = first; i <= last; i++)
-        {
-            var r = new Rect(3 + i * step - ornScroll, 3, size, size);
-            bool sel = i == ornSel && ornPicked;
-            GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(sel ? new Color(0.85f, 0.3f, 0.3f) : new Color(0.86f, 0.8f, 0.72f)));
-            if (icons.TryGetValue(ornTypes[i], out var rt) && rt != null) GUI.DrawTexture(r, rt, ScaleMode.ScaleToFit, false);
-            if (e.type == EventType.Repaint) { var ar = new Rect(r.x + view.x, r.y + view.y, r.width, r.height); ar = Rect.MinMaxRect(Mathf.Max(ar.xMin, view.xMin), ar.yMin, Mathf.Min(ar.xMax, view.xMax), ar.yMax); if (ar.width > 4) decoIconRects.Add((ar, i)); }
-            if (GUI.Button(r, "", GUIStyle.none) && !dragOrn && !barMoved) { if (sel) ornPicked = false; else { SetSel(i); ornPicked = true; } }
-        }
-        GUI.EndGroup();
+        int perRowW = (int)(SW - (narrow ? 52 : 330));
+        int ci = IconStrip(ornStrip, new Rect(23, y + 37, perRowW + 6, 68), ornTypes.Count, 62, i => icons.TryGetValue(ornTypes[i], out var rt) ? rt : null, ornSel, ornPicked);
+        if (ci >= 0) { if (ci == ornSel && ornPicked) ornPicked = false; else { SetSel(ci); ornPicked = true; } }
         var it = AcCatalog.Get(ornTypes[ornSel]);
-        if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "장식을 고르면 달 수 있어요 (지금은 둘러보기만)", sSmall);
+        if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "지금은 둘러보기: 끌어서 돌려 보기 · 장식을 고르면 달 수 있어요", sSmall);
         else
         {
             GUI.Label(new Rect(26, y + 104, narrow ? SW - 150 : Mathf.Min(420, SW - 290 - 130), 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 누른 높이에 한 바퀴" : it != null ? it.desc : ornTypes[ornSel], sSmall);

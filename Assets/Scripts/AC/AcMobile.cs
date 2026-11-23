@@ -97,6 +97,8 @@ public partial class AcRoom
             if (!tgt.HasValue && GroundAt(ptrPos, out var gp)) tgt = gp;
             if (tgt.HasValue) { ThrowSnowball(tgt.Value); walkTarget = null; return; }
         }
+        // 마당의 눈사람을 톡 누르면 그 눈사람 보기
+        if (Tap && Outside && PickSnowman(ptrPos, out var sid)) { FocusSnowman(sid); walkTarget = null; return; }
         // 꾸미는 중에 트리를 누른 것이면 이동하지 않음
         bool onTree = decorating && treeCol != null && treeCol.Raycast(cam.ScreenPointToRay(ptrPos), out _, 100f);
         if (ptrDown) onTreeAtDown = onTree;

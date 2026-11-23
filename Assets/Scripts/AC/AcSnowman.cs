@@ -226,7 +226,7 @@ public partial class AcRoom
         draft = new SnowData();
         var saved = PlayerPrefs.GetString("ac_snow_last", "");
         if (saved != "") try { var old = JsonUtility.FromJson<SnowData>(saved); if (old != null) { draft.tiers = old.tiers; draft.r0 = old.r0; draft.r1 = old.r1; draft.r2 = old.r2; draft.head = old.head; } } catch { }
-        snowTab = 0;
+        snowTab = 0; snowPicked = true; decoZoom = 1f; snowYaw = draftRy + 180f;
         RebuildDraft();
         walkTarget = null; followId = null;
         var look = draftPos - me.transform.position; look.y = 0;
@@ -319,9 +319,24 @@ public partial class AcRoom
     void BuildingUpdate()
     {
         if (!draftRoot) { building = false; return; }
-        if (ptrDown) longUsed = false;
         me.speed = 0;
-        bool over = !OverUI(ptrPos) && snowTab == 1;
+        // 카메라: 끌어서 눈사람 둘레를 돌기, 두 손가락·휠로 확대·축소 (장식을 고른 채 눈사람을 누르면 돌지 않고 장식 자리 잡기)
+        bool pin = PinchZoom();
+        if (ptrDown)
+        {
+            longUsed = false; if (!pinching) pinchUsed = false;
+            snowPressOn = snowTab == 1 && !OverUI(ptrStart) && PickTier(ptrStart, out _, out _, out _);
+            var u = new Vector2(ptrStart.x / UiK, (Screen.height - ptrStart.y) / UiK);
+            if (snowTab == 1) foreach (var (rr, idx) in decoIconRects) if (rr.Contains(u)) dragCand = idx;
+        }
+        if (!pin && ptrPressed && ptrMoved && !ptrOnUI && dragCand < 0 && !(snowTab == 1 && snowPicked && snowPressOn)) snowYaw += (ptrPos - lastPtr).x * 0.25f;
+        lastPtr = ptrPos;
+        { float sc = OverUI(ptrPos) ? 0 : Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 3.5f); }
+        // 장식 그림을 끌어 와서 놓기
+        if (snowTab == 1 && dragCand >= 0 && (ptrPressed || ptrUp) && !OverUI(ptrPos) && !dragOrn && !pinching) { dragOrn = true; snowDecoSel = dragCand; snowPicked = true; }
+        if (dragOrn && ptrUp) { SnowDropAt(ptrPos); dragOrn = false; dragCand = -1; return; }
+        if (!ptrPressed && !ptrUp && !ptrDown) { dragCand = -1; dragOrn = false; }
+        bool over = !OverUI(ptrPos) && snowTab == 1 && snowPicked;
         int tier = -1; Vector3 dir = Vector3.forward; float dist = 0;
         bool hit = over && PickTier(ptrPos, out tier, out dir, out dist);
         // 미리보기 장식 (가리키는 곳)
@@ -353,9 +368,9 @@ public partial class AcRoom
                 int di = PickDeco(ptrPos, hit ? dist : 50f);
                 if (di >= 0) { draft.d.RemoveAt(di); RebuildDraft(); }
             }
-            else if (Tap && hit && draft.d.Count < 60)
+            else if (snowPicked && ptrUp && !ptrOnUI && snowPressOn && !pinching && !pinchUsed && !longUsed && hit && draft.d.Count < 60)
             {
-                draft.d.Add(NewDeco(tier, dir));
+                draft.d.Add(NewDeco(tier, dir));   // 누른 채 자리 잡고 손을 떼면 붙음
                 RebuildDraft();
             }
         }
@@ -363,6 +378,15 @@ public partial class AcRoom
     }
 
     bool IsMobileTouchIdle() => IsMobile && !ptrPressed && !ptrUp;
+    bool snowPicked = true, snowPressOn; float snowYaw;
+
+    // 그림을 끌어다 눈사람 위에 놓기
+    void SnowDropAt(Vector2 screen)
+    {
+        if (!building || !draftRoot || OverUI(screen) || draft.d.Count >= 60) return;
+        if (!PickTier(screen, out int tier, out var dir, out _)) return;
+        draft.d.Add(NewDeco(tier, dir)); RebuildDraft();
+    }
 
     SnowDeco NewDeco(int tier, Vector3 dir)
     {
@@ -382,7 +406,7 @@ public partial class AcRoom
         float vfov = cam.fieldOfView * Mathf.Deg2Rad;
         float need = h / (portrait ? 0.42f : 0.55f);                 // 보여야 할 세로 길이
         if (portrait) need = Mathf.Max(need, 2.2f / cam.aspect);    // 세로 화면은 좌우도 들어오게
-        dist = need / (2f * Mathf.Tan(vfov / 2f)) + 0.6f;
+        dist = need / (2f * Mathf.Tan(vfov / 2f)) * decoZoom + 0.6f;
         pitch = 10f;
         return true;
     }
@@ -467,35 +491,17 @@ public partial class AcRoom
         }
         else if (snowTab == 1)
         {
-            GUI.Label(new Rect(lx, cy - 4, SW - 60, 22), IsMobile ? "<size=13>눈덩이를 눌러 붙이기 / 장식을 길게 눌러 떼기</size>" : "<size=13>눈덩이를 클릭해 붙이기 / 오른쪽 클릭으로 떼기</size>", sSmall);
+            GUI.Label(new Rect(lx, cy - 4, SW - 60, 22), IsMobile ? "<size=13>누른 채 자리 잡고 떼면 붙이기 · 길게 눌러 떼기 · 두 손가락 확대</size>" : "<size=13>클릭해 붙이기 · 오른쪽 클릭으로 떼기 · 끌어서 돌려 보기</size>", sSmall);
             cy += 20;
-            // 장식 모양 (그림) - 옆으로 넘기기
-            float size = narrow ? 54 : 60, gap = 6;
-            int perRow = Mathf.Max(1, (int)((SW - 52) / (size + gap)));
-            int rowsN = narrow ? 2 : 1;
-            int perPage = perRow * rowsN;
-            int start = Mathf.Clamp(snowDecoSel / perPage * perPage, 0, SnowDecoIds.Length - 1);
+            // 장식 모양 (그림): 옆으로 끌어 넘기기 · 누르면 고르기(다시 누르면 해제) · 끌어서 눈사람에 놓기
+            float size = narrow ? 54 : 60;
             var col = AcPalette.Vivid[Wrap(snowColSel, AcPalette.Vivid.Length)];
-            for (int k = 0; k < perPage && start + k < SnowDecoIds.Length; k++)
-            {
-                int i = start + k;
-                var r = new Rect(lx + (k % perRow) * (size + gap), cy + (k / perRow) * (size + gap), size, size);
-                bool sel = i == snowDecoSel;
-                GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(sel ? new Color(0.85f, 0.3f, 0.3f) : new Color(0.86f, 0.8f, 0.72f)));
-                GUI.DrawTexture(r, SnowIcon(SnowDecoIds[i], col), ScaleMode.ScaleToFit, false);
-                if (GUI.Button(r, "", GUIStyle.none)) snowDecoSel = i;
-            }
-            cy += rowsN * (size + gap) + 2;
-            int pages = (SnowDecoIds.Length + perPage - 1) / perPage;
-            if (pages > 1)
-            {
-                if (GUI.Button(new Rect(lx, cy, 34, 28), "<", sBtn)) snowDecoSel = Mathf.Max(0, start - perPage);
-                GUI.Label(new Rect(lx + 40, cy + 3, 60, 22), (start / perPage + 1) + " / " + pages, sSmall);
-                if (GUI.Button(new Rect(lx + 96, cy, 34, 28), ">", sBtn)) snowDecoSel = Mathf.Min(SnowDecoIds.Length - 1, start + perPage);
-            }
+            int ci = IconStrip(snowStrip, new Rect(lx - 3, cy, SW - 2 * lx, size + 6), SnowDecoIds.Length, size, i => SnowIcon(SnowDecoIds[i], col), snowDecoSel, snowPicked);
+            if (ci >= 0) { if (ci == snowDecoSel && snowPicked) snowPicked = false; else { snowDecoSel = ci; snowPicked = true; } }
+            cy += size + 12;
             var it = AcCatalog.Get(CurDeco);
-            float rx = lx + 150;
-            GUI.Label(new Rect(rx, cy + 3, 130, 22), it != null ? it.desc : CurDeco, sLabelSel);
+            if (snowPicked) { GUI.Label(new Rect(lx, cy + 3, 130, 22), it != null ? it.desc : CurDeco, sLabelSel); if (GUI.Button(R(new Rect(lx + 140, cy, 82, 28)), "선택 해제", sBtn)) snowPicked = false; }
+            else GUI.Label(new Rect(lx, cy + 3, SW - 60, 22), "<size=13>둘러보기: 끌어서 돌려 보기 · 장식을 고르면 붙일 수 있어요</size>", sSmall);
             cy += 34;
             float x2 = lx;
             if (DecoTintable(CurDeco))
@@ -557,5 +563,88 @@ public partial class AcRoom
         GUI.Label(new Rect(tx, vb.y + 4, vb.width - (tx - vb.x) - 4, 22), value, sSmall);
         if (GUI.Button(new Rect(x + labelW + 40 + valW, cy, 32, 28), ">", sBtn)) step(1);
         cy += 33;
+    }
+}
+
+// ===== 마당의 눈사람 보기: 눈사람을 누르면 그 눈사람을 가까이서 돌려 보고, 없앨 수도 있음 =====
+public partial class AcRoom
+{
+    string snowFocusId; float snowFocusYaw; bool snowDelAsk;
+
+    bool PickSnowman(Vector2 screen, out string id)
+    {
+        id = null; float best = 999f;
+        var ray = cam.ScreenPointToRay(screen);
+        foreach (var kv in snowObjs)
+        {
+            if (!kv.Value.go) continue;
+            var p = kv.Value.go.transform.position;
+            for (float hgt = 0.3f; hgt <= 1.5f; hgt += 0.3f)
+            {
+                var c = p + Vector3.up * hgt;
+                float along = Vector3.Dot(c - ray.origin, ray.direction);
+                if (along < 0) continue;
+                float d = Vector3.Cross(ray.direction, c - ray.origin).magnitude;
+                if (d < 0.55f && along < best) { best = along; id = kv.Key; }
+            }
+        }
+        return id != null;
+    }
+
+    void FocusSnowman(string id)
+    {
+        snowFocusId = id; snowDelAsk = false; walkTarget = null; followId = null; decoZoom = 1f;
+        var p = snowObjs[id].go.transform.position; var d = p - cam.transform.position; d.y = 0;
+        snowFocusYaw = d.sqrMagnitude > 0.01f ? Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg : 180f;
+    }
+
+    bool SnowFocusCamera(ref Vector3 focus, ref float dist, ref float pitch, ref float targetYaw)
+    {
+        if (snowFocusId == null) return false;
+        if (!snowObjs.TryGetValue(snowFocusId, out var o) || !o.go) { snowFocusId = null; return false; }
+        bool portrait = Screen.height > Screen.width;
+        focus = o.go.transform.position + Vector3.up * (portrait ? 0.45f : 0.7f);
+        dist = (portrait ? 6.2f : 4.4f) * decoZoom; pitch = 12f; targetYaw = snowFocusYaw;
+        return true;
+    }
+
+    void SnowFocusUpdate()
+    {
+        if (snowFocusId == null) return;
+        if (phase != Phase.Play || building || playingGame || Key("esc")) { snowFocusId = null; return; }
+        me.speed = 0;
+        bool pin = PinchZoom();
+        if (!pin && ptrPressed && ptrMoved && !ptrOnUI) snowFocusYaw += (ptrPos - lastPtr).x * 0.25f;
+        lastPtr = ptrPos;
+        float sc = OverUI(ptrPos) ? 0 : Scroll(); if (Mathf.Abs(sc) > 0.01f) decoZoom = Mathf.Clamp(decoZoom * (sc > 0 ? 0.9f : 1.1f), 0.5f, 2.5f);
+        var a = MoveAxis(); snowFocusYaw -= a.x * 70f * Time.unscaledDeltaTime;
+    }
+
+    void SnowFocusGUI()
+    {
+        string who = "";
+        var node = net != null ? net.Get("snow") : null;
+        if (node != null && node.TryGetValue(snowFocusId, out var v) && v is Dictionary<string, object> d) who = AcJson.S(d, "name");
+        float w = Mathf.Min(SW - 20, 460), h = 96;
+        var r = new Rect(SW / 2 - w / 2, SH - h - 12, w, h);
+        GUI.Box(R(r), "", sBox);
+        GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 26), (who != "" ? who + " 님의 눈사람" : "눈사람"), sLabel);
+        GUI.Label(new Rect(r.x + 16, r.y + 36, w - 32, 22), snowDelAsk ? "<size=13>정말 없앨까요? 모두의 마당에서 사라져요</size>" : (IsMobile ? "<size=13>끌어서 돌려 보기 · 두 손가락 확대</size>" : "<size=13>끌어서 돌려 보기 · 휠 확대</size>"), sSmall);
+        float bw = 96, by = r.y + 58;
+        if (!snowDelAsk)
+        {
+            if (GUI.Button(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 30), "없애기", sBtn)) snowDelAsk = true;
+            if (GUI.Button(new Rect(r.xMax - 16 - bw, by, bw, 30), "<b>닫기</b>", sBtn)) snowFocusId = null;
+        }
+        else
+        {
+            if (GUI.Button(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 30), "<b>없애기</b>", sBtn))
+            {
+                net?.Delete("snow/" + snowFocusId);
+                if (snowObjs.TryGetValue(snowFocusId, out var o) && o.go) Destroy(o.go);
+                snowObjs.Remove(snowFocusId); snowFocusId = null; nextSnowPoll = 0; Toast("눈사람을 없앴어요");
+            }
+            if (GUI.Button(new Rect(r.xMax - 16 - bw, by, bw, 30), "그대로 두기", sBtn)) snowDelAsk = false;
+        }
     }
 }

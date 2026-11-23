@@ -31,13 +31,18 @@ public partial class AcRoom
                 cgDisc.SetPixel(x, y, new Color(shade, shade, shade, Mathf.Clamp01(46 - d)));
             }
         cgDisc.Apply();
+        // 하트: 45도 돌린 네모(마름모) + 위쪽 두 변에 원 두 개 → 매끈한 하트, 가장자리 부드럽게
         cgHeart = new Texture2D(64, 64, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
         for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++)
             {
-                float hx = (x - 31.5f) / 24f, hy = (y - 28f) / 24f;
-                float f = Mathf.Pow(hx * hx + hy * hy - 1, 3) - hx * hx * hy * hy * hy;
-                float a = Mathf.Clamp01(-f * 40f);
-                float shade = 0.85f + 0.15f * (y / 63f);
+                const float k = 22f;
+                float px = (x + 0.5f - 32f) / k, py = (y + 0.5f - 32f) / k + 0.1035f;   // 텍스처는 아래가 y=0 → 뾰족한 끝이 아래
+                float dd = (Mathf.Abs(px) + Mathf.Abs(py) - 1f) / 1.41421f;
+                float dl = new Vector2(px + 0.5f, py - 0.5f).magnitude - 0.7071f;
+                float dr = new Vector2(px - 0.5f, py - 0.5f).magnitude - 0.7071f;
+                float d = Mathf.Min(dd, Mathf.Min(dl, dr));
+                float a = Mathf.Clamp01(0.5f - d * k);
+                float shade = 0.86f + 0.14f * (y / 63f);
                 cgHeart.SetPixel(x, y, new Color(shade, shade, shade, a));
             }
         cgHeart.Apply();
