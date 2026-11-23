@@ -209,6 +209,43 @@ public partial class AcRoom
         "picture", "curtain", "window", "ground", "path", "orn_", "tree_star", "tree_skirt", "tree_giant", "cookie_plate", "cocoa", "candle", "star_lantern",
         "snow_globe", "holly", "table_lamp", "skates", "pond", "light_arch", "sm_" };
 
+    // 아치·문 통로에 놓인 가구는 치움 (지나다닐 수 있게)
+    readonly List<(GameObject go, Obb o)> solidObjs = new List<(GameObject, Obb)>();
+    void ClearPassages()
+    {
+        var zones = new List<Rect>();   // x, z 평면
+        var bx = Bounds();
+        for (int i = 1; i < bx.Count - 1; i++) zones.Add(new Rect(bx[i] - 1.7f, ArchZ - 1.0f, 3.4f, 2.0f));
+        zones.Add(new Rect(DoorPos.x - 1.1f, -HalfZ, 2.2f, 1.9f));
+        zones.Add(new Rect(FrontGapX0 + 0.3f, HalfZ - 1.9f, FrontGapX1 - FrontGapX0 - 0.6f, 1.9f));
+        var remove = new HashSet<GameObject>();
+        foreach (var (go, o) in solidObjs)
+        {
+            if (go == null) continue;
+            foreach (var z in zones)
+            {
+                // 상자와 통로 사각형이 겹치는지 (상자 모서리·중심 + 통로 모서리·중심 검사)
+                bool hit = false;
+                var pts = new List<Vector3> { o.c };
+                for (int sx = -1; sx <= 1; sx += 2) for (int sz = -1; sz <= 1; sz += 2) pts.Add(o.c + o.rot * new Vector3(sx * o.h.x, 0, sz * o.h.y));
+                foreach (var p in pts) if (z.Contains(new Vector2(p.x, p.z))) { hit = true; break; }
+                if (!hit)
+                    foreach (var q in new[] { z.center, new Vector2(z.xMin, z.yMin), new Vector2(z.xMax, z.yMin), new Vector2(z.xMin, z.yMax), new Vector2(z.xMax, z.yMax) })
+                    {
+                        var l = o.inv * (new Vector3(q.x, 0, q.y) - o.c);
+                        if (Mathf.Abs(l.x) < o.h.x && Mathf.Abs(l.z) < o.h.y) { hit = true; break; }
+                    }
+                if (hit) { remove.Add(go); break; }
+            }
+        }
+        if (remove.Count == 0) return;
+        var keep = new List<Obb>();
+        foreach (var (go, o) in solidObjs) if (!remove.Contains(go)) keep.Add(o);
+        foreach (var g in remove) Destroy(g);
+        obstacles.Clear(); obstacles.AddRange(keep);
+        // 바깥 소품 등 solidObjs에 없는 장애물은 원래 없음 (모두 Put으로 만들어짐)
+    }
+
     void AddObstacle(string name, Vector3 pos, float rotY, float scale)
     {
         if (pos.y > 0.05f) return;

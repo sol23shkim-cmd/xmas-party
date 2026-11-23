@@ -59,7 +59,7 @@ public partial class AcRoom
         }
     }
 
-    static float DecoBase(float r) => Mathf.Clamp(r / 0.3f, 0.75f, 1.7f);
+    static float DecoBase(float r) => Mathf.Clamp(r / 0.22f, 0.9f, 2.8f);
 
     // ===== 눈사람 한 개 만들기 =====
     GameObject BuildSnowman(SnowData s, Transform parent)
@@ -377,12 +377,14 @@ public partial class AcRoom
     {
         if (!building || !draftRoot) return false;
         float h = dCenters.Count > 0 ? dCenters[dCenters.Count - 1].y + dRadii[dRadii.Count - 1].y + 0.3f : 1.5f;
-        focus = draftPos + Vector3.up * (h * 0.5f);
         bool portrait = Screen.height > Screen.width;
-        dist = (2.4f + h * 1.9f) * (portrait ? 1.5f : 1f);
-        pitch = 12f;
-        // 아래쪽 패널에 가리지 않게 살짝 아래를 비춤
-        focus -= Vector3.up * (portrait ? 0.55f : 0.35f) * h;
+        // 아래 패널(화면 약 40%) 위쪽에 눈사람 전체가 들어오게: 화면 가운데는 눈사람 아래쪽을 보게 함
+        focus = draftPos + Vector3.up * (h * (portrait ? 0.05f : 0.14f));
+        float vfov = cam.fieldOfView * Mathf.Deg2Rad;
+        float need = h / (portrait ? 0.42f : 0.55f);                 // 보여야 할 세로 길이
+        if (portrait) need = Mathf.Max(need, 2.2f / cam.aspect);    // 세로 화면은 좌우도 들어오게
+        dist = need / (2f * Mathf.Tan(vfov / 2f)) + 0.6f;
+        pitch = 10f;
         return true;
     }
 

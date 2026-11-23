@@ -121,6 +121,7 @@ public partial class AcRoom : MonoBehaviour
         BuildHouse();
         BuildOutdoors();
         BuildFurniture();
+        ClearPassages();
 
         myId = PlayerPrefs.GetString("ac_id2", "");
         if (myId == "") { myId = "p" + Guid.NewGuid().ToString("N").Substring(0, 10); PlayerPrefs.SetString("ac_id2", myId); }
@@ -234,7 +235,9 @@ public partial class AcRoom : MonoBehaviour
         go.transform.position = pos;
         go.transform.rotation = Quaternion.Euler(0, rotY, 0);
         go.transform.localScale = Vector3.one * scale;
+        int before = obstacles.Count;
         AddObstacle(name, pos, rotY, scale);
+        if (obstacles.Count > before) solidObjs.Add((go, obstacles[obstacles.Count - 1]));
         return go;
     }
 
@@ -906,7 +909,8 @@ public partial class AcRoom : MonoBehaviour
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(520, SW - 20);
-            var r = new Rect(SW / 2 - tw / 2, 18, tw, 40);
+            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : 18;
+            var r = new Rect(SW / 2 - tw / 2, ty, tw, 40);
             GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }
         // 대화 기록
