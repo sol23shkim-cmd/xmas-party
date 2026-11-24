@@ -69,8 +69,8 @@ public class AcCharacter : MonoBehaviour
             }
             pillow = new GameObject("Pillow");
             pillow.transform.SetParent(armR, false);
-            pillow.transform.localPosition = new Vector3(0, minY - 0.2f, 0.04f);
-            pillow.transform.localRotation = Quaternion.Euler(0, 90, 0);
+            pillow.transform.localPosition = new Vector3(0, minY - 0.24f, 0.06f);
+            pillow.transform.localRotation = Quaternion.Euler(0, 0, 8f);   // 넓은 면이 앞을 보게
             pillow.AddComponent<MeshFilter>().sharedMesh = PillowMesh();
             var mr = pillow.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
             var mpb = new MaterialPropertyBlock(); mr.GetPropertyBlock(mpb);
@@ -83,7 +83,7 @@ public class AcCharacter : MonoBehaviour
             // 맞거나 휘두를 때 베개도 말랑하게 출렁
             float et = Time.time - emoteT;
             float wob = (emote == "swing" || emote == "bonk") && et < 0.8f ? Mathf.Exp(-et * 6f) * Mathf.Sin(et * 30f) * 0.18f : 0;
-            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob);
+            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob) * 1.25f;
         }
     }
     void tintPillow(MeshRenderer mr)
@@ -128,6 +128,7 @@ public class AcCharacter : MonoBehaviour
             }
         pillowMesh = new Mesh { name = "pillow" };
         pillowMesh.SetVertices(vs); pillowMesh.SetNormals(ns); pillowMesh.SetColors(cs); pillowMesh.SetTriangles(ts, 0);
+        var uvs = new List<Vector2>(); for (int k = 0; k < vs.Count; k++) uvs.Add(new Vector2(1f, 0)); pillowMesh.SetUVs(0, uvs);   // uv.x = 그늘(AO) 1 = 밝게
         pillowMesh.RecalculateNormals(); pillowMesh.RecalculateBounds();
         return pillowMesh;
     }
