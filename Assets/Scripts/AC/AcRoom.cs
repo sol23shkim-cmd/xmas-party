@@ -1347,9 +1347,9 @@ public partial class AcRoom : MonoBehaviour
         foreach (var (go, b) in ovOccluders)
         {
             if (!go) continue;
-            bool block = false;
             var bb = b; bb.Expand(0.3f);
-            foreach (var t in targets)
+            bool block = Vector2.Distance(new Vector2(bb.center.x, bb.center.z), new Vector2(cp.x, cp.z)) < 7f;   // 카메라 바로 앞 소품도 숨김
+            if (!block) foreach (var t in targets)
             {
                 var d = t - cp; float len = d.magnitude;
                 if (bb.IntersectRay(new Ray(cp, d / len), out float hit) && hit < len - TreeR * 0.5f) { block = true; break; }
