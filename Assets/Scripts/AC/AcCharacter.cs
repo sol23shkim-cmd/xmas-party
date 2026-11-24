@@ -71,8 +71,9 @@ public class AcCharacter : MonoBehaviour
             pillow.transform.SetParent(armR, false);
             // 손으로 베개 아래쪽 끝을 쥔 모양: 베개는 팔 방향으로 손 너머까지 뻗음
             float ws0 = transform.lossyScale.x / Mathf.Max(0.01f, armR.lossyScale.x);
-            pillow.transform.localPosition = new Vector3(0, minY + 0.02f * ws0 - 0.21f * PillowK * ws0, 0.01f);
-            pillow.transform.localRotation = Quaternion.Euler(0, 30f, 0);
+            // 팔을 앞으로 뻗으면 베개가 손 위로 방패처럼 서 있음 (얇은 쪽이 앞, 긴 쪽이 위)
+            pillow.transform.localPosition = new Vector3(0, minY + 0.01f * ws0, 0.16f * PillowK * ws0);
+            pillow.transform.localRotation = Quaternion.Euler(90f, 0, 0);
             pillow.AddComponent<MeshFilter>().sharedMesh = PillowMesh();
             var mr = pillow.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
             var mpb = new MaterialPropertyBlock(); mr.GetPropertyBlock(mpb);
