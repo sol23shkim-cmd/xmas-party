@@ -132,6 +132,7 @@ public partial class AcRoom
         SnowFocusUpdate();
         UpdateOverviewOccluders();
         PillowUpdate(dt);
+        CandyUpdate(dt);
         if (snowMode && (!Outside || building || playingGame)) snowMode = false;
     }
 
@@ -800,7 +801,7 @@ public partial class AcRoom
             if (Time.unscaledTime - s.at < 0.2f) continue;
             pwSwings.RemoveAt(i);
             var fwd = Quaternion.Euler(0, s.yaw, 0) * Vector3.forward;
-            bool Hit(Vector3 p) { var d = p - s.from; d.y = 0; return d.magnitude < 1.8f && d.magnitude > 0.05f && Vector3.Angle(fwd, d) < 75f; }
+            bool Hit(Vector3 p) { var d = p - s.from; d.y = 0; return d.magnitude < 2.9f && d.magnitude > 0.05f && Vector3.Angle(fwd, d) < 85f; }   // 리치 길게 (내딛으며 휘두름)
             foreach (var kv in remotes)
                 if (kv.Key != s.owner && kv.Value.c && Hit(kv.Value.c.transform.position))
                 {
@@ -842,7 +843,8 @@ public partial class AcRoom
         if (pwCool > 0 || !pillowMode) return;
         pwCool = 0.5f;
         if (target.HasValue) { var d = target.Value - me.transform.position; d.y = 0; if (d.sqrMagnitude > 0.01f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; me.transform.rotation = Quaternion.Euler(0, yaw, 0); } }
-        me.PlayEmote("swing"); Sfx("whoosh", 0.5f, UnityEngine.Random.Range(0.92f, 1.1f));
+        me.PlayEmote("swing"); Sfx("whoosh", 0.55f, UnityEngine.Random.Range(0.85f, 1.0f));
+        pwKnock = Quaternion.Euler(0, yaw, 0) * Vector3.forward * 3.4f;   // 앞으로 한 발 내딛기
         AddAct("w", $"{me.transform.position.x:F2},{me.transform.position.z:F2},{yaw:F0}");
         pwSwings.Add((myId, uiName.Trim(), me.transform.position, yaw, Time.unscaledTime));
     }

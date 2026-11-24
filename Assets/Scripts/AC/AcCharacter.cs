@@ -317,14 +317,15 @@ public class AcCharacter : MonoBehaviour
                     {
                         // 어깨 위(138) → 더 뒤로 젖힘(185) → 앞으로 휙(-100, 앞쪽 수평보다 살짝 위) → 다시 어깨 위
                         float a;
-                        if (et < 0.14f) a = Mathf.Lerp(-72f, 175f, Mathf.SmoothStep(0, 1, et / 0.14f));                      // 머리 위 뒤로 들어 올리기
-                        else if (et < 0.25f) { float u = (et - 0.14f) / 0.11f; a = Mathf.Lerp(175f, -100f, 1 - (1 - u) * (1 - u)); }   // 앞으로 휙
-                        else if (et < 0.34f) a = -100f;
-                        else a = Mathf.Lerp(-100f, -72f, Mathf.SmoothStep(0, 1, Mathf.Clamp01((et - 0.34f) / 0.3f)));
+                        if (et < 0.14f) a = Mathf.Lerp(-72f, 190f, Mathf.SmoothStep(0, 1, et / 0.14f));                      // 머리 위 뒤로 크게 들어 올리기
+                        else if (et < 0.27f) { float u = (et - 0.14f) / 0.13f; a = Mathf.Lerp(190f, -115f, 1 - (1 - u) * (1 - u)); }   // 앞으로 크게 휙
+                        else if (et < 0.36f) a = -115f;
+                        else a = Mathf.Lerp(-115f, -72f, Mathf.SmoothStep(0, 1, Mathf.Clamp01((et - 0.36f) / 0.3f)));
                         if (armR) armR.localRotation = Quaternion.Euler(a, 0, 14f);
                         if (armL) armL.localRotation = Quaternion.Euler(et < 0.14f ? -50f : 40f, 0, -30f);   // 반대 팔로 균형
                         float tw = et < 0.16f ? -28f * (et / 0.16f) : Mathf.Lerp(-28f, 22f, Mathf.Clamp01((et - 0.16f) / 0.16f)) * Mathf.Clamp01((0.9f - et) * 2f);
-                        eRot = Quaternion.Euler(et > 0.16f && et < 0.5f ? 12f : 0, tw, 0);
+                        float lunge = et > 0.12f && et < 0.6f ? Mathf.Sin((et - 0.12f) / 0.48f * Mathf.PI) : 0;
+                        eRot = Quaternion.Euler(18f * lunge, tw, 0);   // 몸을 앞으로 숙이며
                         jump = et > 0.14f && et < 0.4f ? Mathf.Sin((et - 0.14f) / 0.26f * Mathf.PI) * 0.06f : 0;
                     }
                     break;

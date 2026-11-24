@@ -570,7 +570,7 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
+        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null && !candyOpen) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
@@ -1097,6 +1097,7 @@ public partial class AcRoom : MonoBehaviour
         }
         if (phase == Phase.Lobby) { LobbyGUI(); return; }
         if (playingGame) { CookieGameGUI(); return; }
+        if (candyOpen) { CandyGUI(); return; }
         NameTags();
         if (toast != null && Time.time < toastUntil)
         {

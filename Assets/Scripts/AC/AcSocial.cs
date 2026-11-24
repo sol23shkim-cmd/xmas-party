@@ -141,6 +141,7 @@ public partial class AcRoom
         else if (Outside && !snowMode) { label = "눈사람 만들기"; act = StartBuilding; }
         else if (Outside) { label = "눈싸움 그만"; act = ToggleSnowFight; }
         else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
+        else if (InPlayroom) { label = "캔디 팡 게임"; act = OpenCandy; }
         else if (piano) { label = "피아노 치기"; act = OpenPiano; }
         else if (inLibrary) { label = "크리스마스 퀴즈"; act = OpenQuiz; }
         if (label == null) return;
