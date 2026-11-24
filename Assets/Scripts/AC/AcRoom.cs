@@ -130,6 +130,7 @@ public partial class AcRoom : MonoBehaviour
         BuildFurniture();
         AttachWallDecos();
         ClearPassages();
+        CollectOverviewOccluders();
         BuildNav();
 
         myId = PlayerPrefs.GetString("ac_id2", "");
@@ -804,7 +805,7 @@ public partial class AcRoom : MonoBehaviour
         }
         // 트리를 볼 때는 카메라와 트리 사이 기둥·벽을 잘라냄 (가까운 면을 트리 바로 앞까지 당김)
         bool treeView = decorating || treeOverview;
-        float wantNear = building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? Mathf.Max(0.3f, dist - TreeR - 4.5f) : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
+        float wantNear = building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? 0.3f : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
         cam.nearClipPlane = snap ? wantNear : Mathf.Lerp(cam.nearClipPlane, wantNear, 1 - Mathf.Exp(-dt * 4f));
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
@@ -1313,6 +1314,51 @@ public partial class AcRoom : MonoBehaviour
     }
 
     // 트리 전경: 꾸미기 화면 없이 트리만, 끌어서 돌려 보고 '나가기'로 나옴
+    // 트리 전경: 바닥까지 다 보이게 가까운 면을 자르지 않는 대신, 카메라와 트리 사이를 가리는 바깥 소품(나무 등)만 잠시 숨김
+    readonly List<(GameObject go, Bounds b)> ovOccluders = new List<(GameObject, Bounds)>();
+    readonly List<GameObject> ovHidden = new List<GameObject>();
+    float ovNext;
+    void CollectOverviewOccluders()
+    {
+        ovOccluders.Clear();
+        var o = world.Find("Outdoors"); if (o == null) return;
+        foreach (Transform c in o)
+        {
+            if (c.name.StartsWith("SnowBase") || c.name.Contains("ground_snow") || c.name.Contains("path_stones")) continue;
+            var rs = c.GetComponentsInChildren<Renderer>(); if (rs.Length == 0) continue;
+            var b = rs[0].bounds; foreach (var rr in rs) b.Encapsulate(rr.bounds);
+            ovOccluders.Add((c.gameObject, b));
+        }
+    }
+    void UpdateOverviewOccluders()
+    {
+        if (!treeOverview)
+        {
+            if (ovHidden.Count > 0) { foreach (var g in ovHidden) if (g) g.SetActive(true); ovHidden.Clear(); }
+            return;
+        }
+        if (Time.unscaledTime < ovNext) return;
+        ovNext = Time.unscaledTime + 0.12f;
+        var cp = cam.transform.position;
+        var right = cam.transform.right; right.y = 0; right.Normalize();
+        var targets = new List<Vector3>();
+        for (float h = 0.3f; h <= TreeTop; h += TreeTop / 4f)
+            for (int s = -1; s <= 1; s++) targets.Add(TreePos + Vector3.up * h + right * (s * TreeR * 0.8f * (1 - h / (TreeTop + 0.5f))));
+        foreach (var (go, b) in ovOccluders)
+        {
+            if (!go) continue;
+            bool block = false;
+            var bb = b; bb.Expand(0.3f);
+            foreach (var t in targets)
+            {
+                var d = t - cp; float len = d.magnitude;
+                if (bb.IntersectRay(new Ray(cp, d / len), out float hit) && hit < len - TreeR * 0.5f) { block = true; break; }
+            }
+            if (block && go.activeSelf) { go.SetActive(false); ovHidden.Add(go); }
+            else if (!block && !go.activeSelf && ovHidden.Contains(go)) { go.SetActive(true); ovHidden.Remove(go); }
+        }
+    }
+
     void OverviewGUI()
     {
         var tr = new Rect(SW / 2 - 110, 14, 220, 40);
@@ -1320,7 +1366,7 @@ public partial class AcRoom : MonoBehaviour
         GUI.Label(tr, "<b>트리 전경</b>  <size=12>끌어서 돌려 보기</size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
         decoButtons = 0;
         float bw = IsMobile ? 150 : 130, bh = IsMobile ? 50 : 42;
-        CamPad(SW / 2 - 69, SH - bh - 20 - 58, false);
+        if (!IsMobile) CamPad(SW / 2 - 69, SH - bh - 20 - 58, false);   // 휴대폰은 끌어서 돌리면 되니 버튼 없음
         var r = new Rect(SW / 2 - bw / 2, SH - bh - 14, bw, bh);
         R(r);
         if (GUI.Button(r, "<b>나가기</b>", sBtnBig)) treeOverview = false;

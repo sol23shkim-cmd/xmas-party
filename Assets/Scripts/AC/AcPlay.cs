@@ -129,6 +129,7 @@ public partial class AcRoom
         if (quizOpen) QuizUpdate();
         SnowballUpdate(dt);
         SnowFocusUpdate();
+        UpdateOverviewOccluders();
         if (snowMode && (!Outside || building || playingGame)) snowMode = false;
     }
 
