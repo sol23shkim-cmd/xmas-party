@@ -110,7 +110,7 @@ public partial class AcRoom
         cdRnd = new System.Random(Environment.TickCount);
         var def = CdLevelDef(cdLevel);
         var rows = def.map.Split('|');
-        cdMoves = def.moves; cdMovesTotal = def.moves; cdScore = 0; cdShown = 0; cdCombo = 0; cdBonus = false; cdWin = false; cdSaved = false; cdNewBest = false;
+        cdMoves = def.moves; cdMovesTotal = def.moves; cdMovesAtClear = 0; cdScore = 0; cdShown = 0; cdCombo = 0; cdBonus = false; cdWin = false; cdSaved = false; cdNewBest = false;
         cdPrevBest = CdMyBest();
         cdParts.Clear(); cdBeams.Clear(); cdRings.Clear(); cdBolts.Clear(); cdPops.Clear(); cdFlies.Clear(); cdFlash = 0;
         int nSnow = 0, nIce = 0;
@@ -150,7 +150,8 @@ public partial class AcRoom
         cds = CdS.Play; cdsT = 0;
         cdBannerText = null; cdIntroT = 0;
     }
-    int cdMovesTotal; float cdIntroT = 9, cdFlash;
+    int cdMovesTotal, cdMovesAtClear; float cdIntroT = 9, cdFlash;
+    const float CdStar2 = 8000f, CdStar3 = 14000f, CdBarMax = 16000f;   // 별 기준 점수 (11-24 낮춤)
     CT NewT(int c, int x, int y) => new CT { c = c, sp = SpNone, id = ++cdIdSeq, x = x, y = y };
     int Mc(int x, int y) { if (x < 0 || y < 0 || x >= CW || y >= CH) return -9; var t = cdB[x, y]; if (t == null || t.sp == SpSnow || t.sp == SpBomb) return -9; return t.c; }
     bool In(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < CW && p.y < CH && !cdHole[p.x, p.y];
@@ -367,7 +368,7 @@ public partial class AcRoom
     {
         cdCombo = 0;
         bool goalsDone = cdGoalLeft.All(n => n <= 0);
-        if (goalsDone && !cdBonus) { cdBonus = true; cdBannerText = "목표 달성!"; cdp = CdP.Banner; cdpT = 0; CdSfx("candy_win", 0.8f); return; }
+        if (goalsDone && !cdBonus) { cdBonus = true; cdMovesAtClear = cdMoves; cdBannerText = "목표 달성!"; cdp = CdP.Banner; cdpT = 0; CdSfx("candy_win", 0.8f); return; }
         if (cdBonus)
         {
             if (cdMoves > 0)
@@ -417,7 +418,9 @@ public partial class AcRoom
         cdWin = win; cdp = CdP.Banner; cdpT = 0; cdBannerText = win ? "메리 크리스마스!" : "아쉬워요!";
         if (!win) CdSfx("candy_lose", 0.7f);
         int clearBonus = win ? 3000 : 0; cdScore += clearBonus;
-        cdStars = !win ? 0 : cdScore >= 30000 ? 3 : cdScore >= 18000 ? 2 : 1;
+        // 별: 점수 또는 '목표를 다 모았을 때 남은 횟수' 중 하나만 넘어도 받음
+        float leftRatio = cdMovesTotal > 0 ? (float)cdMovesAtClear / cdMovesTotal : 0;
+        cdStars = !win ? 0 : (cdScore >= CdStar3 || leftRatio >= 0.3f) ? 3 : (cdScore >= CdStar2 || leftRatio >= 0.12f) ? 2 : 1;
         cdNewBest = cdScore > cdPrevBest;
         if (win && PlayerPrefs.GetInt("candy_lv", 1) < cdLevel + 1) { PlayerPrefs.SetInt("candy_lv", Mathf.Min(cdLevel + 1, CdMaxLevel())); PlayerPrefs.Save(); }
         if (!cdSaved && net != null && cdScore > 0)
@@ -1028,14 +1031,14 @@ public partial class AcRoom
     void StarBar(Rect r)
     {
         Pill(r, new Color(0.35f, 0.25f, 0.45f, 0.35f));
-        float k = Mathf.Clamp01(cdShown / 36000f);
+        float k = Mathf.Clamp01(cdShown / CdBarMax);
         if (k > 0.01f) Pill(new Rect(r.x + 2, r.y + 2, Mathf.Max(r.height - 4, (r.width - 4) * k), r.height - 4), new Color(1f, 0.72f, 0.25f));
         var star = CTx("piece_2");
-        float[] th = { 0, 18000f / 36000f, 30000f / 36000f };
+        float[] th = { 0, CdStar2 / CdBarMax, CdStar3 / CdBarMax };
         for (int i = 0; i < 3; i++)
         {
             float px = i == 0 ? r.x + r.width * 0.25f : r.x + r.width * th[i];
-            bool on = i == 0 ? cdGoalLeft.All(n => n <= 0) : cdShown >= th[i] * 36000f;
+            bool on = i == 0 ? cdGoalLeft.All(n => n <= 0) : cdShown >= th[i] * CdBarMax;
             DT(new Rect(px - 11, r.center.y - 11, 22, 22), star, on ? Color.white : new Color(0.45f, 0.42f, 0.5f, 0.9f));
         }
     }
