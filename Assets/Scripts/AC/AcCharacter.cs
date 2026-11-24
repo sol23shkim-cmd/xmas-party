@@ -50,7 +50,7 @@ public class AcCharacter : MonoBehaviour
 
     // ===== 베개 (침실 베개 싸움) =====
     public bool holdPillow; public Color pillowColor = new Color(0.98f, 0.86f, 0.9f);
-    GameObject pillow; static Mesh pillowMesh;
+    GameObject pillow; static Mesh pillowMesh; const float PillowK = 0.85f;   // 베개 크기 (캐릭터 키의 약 절반)
     void UpdatePillow()
     {
         if (holdPillow && pillow == null && armR)
@@ -69,8 +69,10 @@ public class AcCharacter : MonoBehaviour
             }
             pillow = new GameObject("Pillow");
             pillow.transform.SetParent(armR, false);
-            pillow.transform.localPosition = new Vector3(0, minY - 0.26f * transform.lossyScale.x / Mathf.Max(0.01f, armR.lossyScale.x), 0.04f);
-            pillow.transform.localRotation = Quaternion.Euler(0, 0, 8f);   // 넓은 면이 앞을 보게
+            // 손으로 베개 아래쪽 끝을 쥔 모양: 베개는 팔 방향으로 손 너머까지 뻗음
+            float ws0 = transform.lossyScale.x / Mathf.Max(0.01f, armR.lossyScale.x);
+            pillow.transform.localPosition = new Vector3(0, minY + 0.02f * ws0 - 0.21f * PillowK * ws0, 0.01f);
+            pillow.transform.localRotation = Quaternion.Euler(0, 30f, 0);
             pillow.AddComponent<MeshFilter>().sharedMesh = PillowMesh();
             var mr = pillow.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
             var mpb = new MaterialPropertyBlock(); mr.GetPropertyBlock(mpb);
@@ -84,7 +86,7 @@ public class AcCharacter : MonoBehaviour
             float et = Time.time - emoteT;
             float wob = (emote == "swing" || emote == "bonk") && et < 0.8f ? Mathf.Exp(-et * 6f) * Mathf.Sin(et * 30f) * 0.18f : 0;
             float ws = transform.lossyScale.x / Mathf.Max(0.01f, armR ? armR.lossyScale.x : 1f);   // 팔 크기와 상관없이 캐릭터에 맞는 크기
-            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob) * 1.3f * ws;
+            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob) * PillowK * ws;
         }
     }
     void tintPillow(MeshRenderer mr)
@@ -284,7 +286,7 @@ public class AcCharacter : MonoBehaviour
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
         float et = Time.time - emoteT, jump = 0;
-        if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(-35f - sw * 0.3f, 0, 18f);   // 베개를 들고 있는 팔
+        if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(138f + sw * 0.15f + Mathf.Sin(Time.time * 2.4f) * 3f, 0, 10f);   // 베개를 어깨 위로 메고 있는 팔
         if (et < 1.8f)
         {
             float k = Mathf.Sin(Mathf.Clamp01(et / 1.8f) * Mathf.PI);   // 들었다 내리기
@@ -312,9 +314,14 @@ public class AcCharacter : MonoBehaviour
                     break;
                 case "swing":     // 베개 휘두르기: 머리 뒤로 크게 젖혔다가 앞으로 내려치기 + 몸 비틀기
                     {
-                        float a = et < 0.16f ? Mathf.SmoothStep(-35, 170, et / 0.16f) : et < 0.3f ? Mathf.Lerp(170, -75, (et - 0.16f) / 0.14f) : Mathf.Lerp(-75, -35, Mathf.Clamp01((et - 0.3f) / 0.35f));
-                        if (armR) armR.localRotation = Quaternion.Euler(a, 0, 18f);
-                        if (armL) armL.localRotation = Quaternion.Euler(30f, 0, -35f);
+                        // 어깨 위(138) → 더 뒤로 젖힘(185) → 앞으로 휙(-100, 앞쪽 수평보다 살짝 위) → 다시 어깨 위
+                        float a;
+                        if (et < 0.12f) a = Mathf.Lerp(138f, 185f, Mathf.SmoothStep(0, 1, et / 0.12f));
+                        else if (et < 0.24f) { float u = (et - 0.12f) / 0.12f; a = Mathf.Lerp(185f, -100f, 1 - (1 - u) * (1 - u)); }
+                        else if (et < 0.34f) a = -100f;
+                        else a = Mathf.Lerp(-100f, 138f, Mathf.SmoothStep(0, 1, Mathf.Clamp01((et - 0.34f) / 0.4f)));
+                        if (armR) armR.localRotation = Quaternion.Euler(a, 0, 10f);
+                        if (armL) armL.localRotation = Quaternion.Euler(et < 0.12f ? -40f : 45f, 0, -30f);   // 반대 팔로 균형
                         float tw = et < 0.16f ? -28f * (et / 0.16f) : Mathf.Lerp(-28f, 22f, Mathf.Clamp01((et - 0.16f) / 0.16f)) * Mathf.Clamp01((0.9f - et) * 2f);
                         eRot = Quaternion.Euler(et > 0.16f && et < 0.5f ? 12f : 0, tw, 0);
                         jump = et > 0.14f && et < 0.4f ? Mathf.Sin((et - 0.14f) / 0.26f * Mathf.PI) * 0.06f : 0;
@@ -330,7 +337,7 @@ public class AcCharacter : MonoBehaviour
                         float fl = Mathf.Exp(-et * 3f);
                         if (armL) armL.localRotation = Quaternion.Euler(0, 0, -110f * fl - 10f);
                         if (armR && !holdPillow) armR.localRotation = Quaternion.Euler(0, 0, 110f * fl + 10f);
-                        if (armR && holdPillow) armR.localRotation = Quaternion.Euler(-35f, 0, 18f + 90f * fl);
+                        if (armR && holdPillow) armR.localRotation = Quaternion.Euler(138f - 70f * fl, 0, 10f + 60f * fl);
                     }
                     break;
                 case "flinch":    // 작은 눈에 맞음: 짧게 움찔하며 팔로 얼굴 가리기
