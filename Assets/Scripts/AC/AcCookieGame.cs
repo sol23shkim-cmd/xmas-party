@@ -1,6 +1,6 @@
 // AcCookieGame.cs - 쿠키 공방의 '쿠키 달리기' (쿠키런 같은 3D 횡스크롤 달리기)
 // 내 캐릭터가 크리스마스 저녁 눈길(쿠키 반죽 길)을 달려요. 점프·2단 점프·슬라이드, 젤리, 아이템(거대화·자석·질주·하트), 피버 타임.
-// 점수: orn/x~score~<이름> = {name, best, look, t} → 명예의 전당(1~3등 시상대 + 4~10등 목록)
+// 점수: orn/x~score~<이름>~<시각> = {name, best, look, t} (판마다 따로, 예전 기록 x~score~<이름>도 함께 읽음) → 명예의 전당(1~3등 시상대 + 4~10등 목록)
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -917,8 +917,9 @@ public partial class AcRoom
         cgLastScore = cgScore; cgShownScore = 0;
         cgLastBest = MyBest();
         cgNewBest = cgScore > cgLastBest;
-        if (cgNewBest && net != null)
-            net.Put("scores/" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"best\":" + cgScore + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
+        // 판마다 따로 저장 (같은 사람이 명예의 전당에 여러 번 오를 수 있음)
+        if (cgScore > 0 && net != null)
+            net.Put("scores/" + myKey + "~" + AcSync.UnixMs.ToString("0"), "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"best\":" + cgScore + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
     }
 
     void PlaceHero()
@@ -1013,7 +1014,12 @@ public partial class AcRoom
         return new Rect(0, top, SW, h);
     }
 
-    int MyBest() { var s = net != null ? net.Get("scores") : null; return s != null && s.TryGetValue(myKey, out var v) && v is Dictionary<string, object> d ? (int)AcJson.D(d, "best") : 0; }
+    int MyBest()
+    {
+        var s = net != null ? net.Get("scores") : null; int best = 0;
+        if (s != null) foreach (var kv in s) if (kv.Value is Dictionary<string, object> d && NameKey(AcJson.S(d, "name")) == myKey) best = Mathf.Max(best, (int)AcJson.D(d, "best"));
+        return best;
+    }
 
     List<(string name, int best, string look)> TopScores()
     {
@@ -1025,7 +1031,7 @@ public partial class AcRoom
                 if (kv.Value is Dictionary<string, object> d)
                 {
                     string look = AcJson.S(d, "look");
-                    if (string.IsNullOrEmpty(look) && mem != null && mem.TryGetValue(kv.Key, out var mv) && mv is Dictionary<string, object> md) look = AcJson.S(md, "look");
+                    if (string.IsNullOrEmpty(look) && mem != null && mem.TryGetValue(NameKey(AcJson.S(d, "name")), out var mv) && mv is Dictionary<string, object> md) look = AcJson.S(md, "look");
                     res.Add((AcJson.S(d, "name"), (int)AcJson.D(d, "best"), look));
                 }
         return res.OrderByDescending(x => x.Item2).ToList();
