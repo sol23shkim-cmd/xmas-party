@@ -155,7 +155,7 @@ public partial class AcRoom
         var extra = new List<(string label, Action act, float w)>();
         if (Outside)
         {
-            extra.Add((me.skating ? "스케이트 벗기" : "스케이트 타기", () => { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }, IsMobile ? 132 : 120));
+            extra.Add((me.skating ? "스케이트 벗기" : "스케이트 타기", () => { me.SetSkates(!me.skating); skateVel = Vector3.zero; if (me.skating) snowMode = false; if (me.skating) Toast("씽씽! 누르거나 방향키를 계속 누르면 빨라져요"); }, IsMobile ? 132 : 120));
             if (!snowMode && label != "눈싸움 그만") extra.Add(("눈싸움", ToggleSnowFight, IsMobile ? 112 : 100));
             if (snowMode && label != "눈싸움 그만") extra.Add(("눈싸움 그만", ToggleSnowFight, IsMobile ? 112 : 100));
         }

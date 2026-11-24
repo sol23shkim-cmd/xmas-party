@@ -97,6 +97,14 @@ public partial class AcRoom
             if (!tgt.HasValue && GroundAt(ptrPos, out var gp)) tgt = gp;
             if (tgt.HasValue) { ThrowSnowball(tgt.Value); walkTarget = null; return; }
         }
+        // 베개 싸움: 톡 누르면 그쪽(또는 누른 친구)으로 베개를 휘두름 (끌면 걸어감)
+        if (pillowMode && Tap)
+        {
+            var ray = cam.ScreenPointToRay(ptrPos); Vector3? tgt = null;
+            foreach (var kv in remotes) { if (!kv.Value.c) continue; var c = kv.Value.c.transform.position + Vector3.up * 0.6f; if (Vector3.Cross(ray.direction, c - ray.origin).magnitude < 0.7f) { tgt = kv.Value.c.transform.position; break; } }
+            if (!tgt.HasValue && GroundAt(ptrPos, out var gp2)) tgt = gp2;
+            SwingPillow(tgt); walkTarget = null; return;
+        }
         // 마당의 눈사람을 톡 누르면 그 눈사람 보기
         if (Tap && Outside && PickSnowman(ptrPos, out var sid)) { FocusSnowman(sid); walkTarget = null; return; }
         // 꾸미는 중에 트리를 누른 것이면 이동하지 않음

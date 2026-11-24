@@ -48,6 +48,90 @@ public class AcCharacter : MonoBehaviour
     string emote = ""; float emoteT = -10;
     public void PlayEmote(string kind) { emote = kind; emoteT = Time.time; }
 
+    // ===== 베개 (침실 베개 싸움) =====
+    public bool holdPillow; public Color pillowColor = new Color(0.98f, 0.86f, 0.9f);
+    GameObject pillow; static Mesh pillowMesh;
+    void UpdatePillow()
+    {
+        if (holdPillow && pillow == null && armR)
+        {
+            // 팔 끝(손) 위치: 팔 모양의 가장 아래쪽
+            float minY = -0.3f;
+            foreach (var mf in armR.GetComponentsInChildren<MeshFilter>())
+            {
+                if (!mf.sharedMesh) continue; var b = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var p = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) * 2 - 1, (i & 2) - 1, ((i & 4) >> 1) - 1));
+                    var lp = armR.InverseTransformPoint(mf.transform.TransformPoint(p));
+                    minY = Mathf.Min(minY, lp.y);
+                }
+            }
+            pillow = new GameObject("Pillow");
+            pillow.transform.SetParent(armR, false);
+            pillow.transform.localPosition = new Vector3(0, minY - 0.2f, 0.04f);
+            pillow.transform.localRotation = Quaternion.Euler(0, 90, 0);
+            pillow.AddComponent<MeshFilter>().sharedMesh = PillowMesh();
+            var mr = pillow.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
+            var mpb = new MaterialPropertyBlock(); mr.GetPropertyBlock(mpb);
+            pillow.transform.localScale = Vector3.one;
+            tintPillow(mr);
+        }
+        else if (!holdPillow && pillow != null) { Destroy(pillow); pillow = null; }
+        if (pillow)
+        {
+            // 맞거나 휘두를 때 베개도 말랑하게 출렁
+            float et = Time.time - emoteT;
+            float wob = (emote == "swing" || emote == "bonk") && et < 0.8f ? Mathf.Exp(-et * 6f) * Mathf.Sin(et * 30f) * 0.18f : 0;
+            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob);
+        }
+    }
+    void tintPillow(MeshRenderer mr)
+    {
+        // 정점 색을 베개 색으로 (가장자리는 하얗게, 가운데 줄무늬)
+        var m = Instantiate(PillowMesh()); var cols = m.colors; var vs = m.vertices;
+        for (int i = 0; i < vs.Length; i++)
+        {
+            float edge = Mathf.Clamp01(Mathf.Max(Mathf.Abs(vs[i].x) / 0.3f, Mathf.Abs(vs[i].y) / 0.21f) - 0.55f) * 2f;
+            float stripe = Mathf.Abs(Mathf.Sin(vs[i].y * 30f)) > 0.85f ? 0.08f : 0f;
+            cols[i] = Color.Lerp(pillowColor, Color.white, edge * 0.7f) * (1 - stripe);
+            cols[i].a = 1;
+        }
+        m.colors = cols; mr.GetComponent<MeshFilter>().sharedMesh = m;
+    }
+    // 통통한 베개: 납작한 초타원체 + 네 귀퉁이가 살짝 뾰족
+    static Mesh PillowMesh()
+    {
+        if (pillowMesh) return pillowMesh;
+        int nu = 24, nv = 16; var vs = new List<Vector3>(); var ns = new List<Vector3>(); var cs = new List<Color>(); var ts = new List<int>();
+        Vector3 R = new Vector3(0.3f, 0.21f, 0.085f);
+        for (int j = 0; j <= nv; j++)
+        {
+            float v = -Mathf.PI / 2 + Mathf.PI * j / nv;
+            for (int i = 0; i <= nu; i++)
+            {
+                float u = -Mathf.PI + 2 * Mathf.PI * i / nu;
+                float cv = Mathf.Cos(v), sv = Mathf.Sin(v), cu = Mathf.Cos(u), su = Mathf.Sin(u);
+                float e = 0.35f;   // 네모에 가까운 둥근 모양
+                float x = Mathf.Sign(cv * cu) * Mathf.Pow(Mathf.Abs(cv * cu), e);
+                float y = Mathf.Sign(cv * su) * Mathf.Pow(Mathf.Abs(cv * su), e);
+                float z = Mathf.Sign(sv) * Mathf.Pow(Mathf.Abs(sv), 0.8f);
+                float corner = Mathf.Abs(x * y);          // 귀퉁이는 얇고 뾰족
+                var p = new Vector3(x * R.x * (1 + corner * 0.08f), y * R.y * (1 + corner * 0.08f), z * R.z * (1 - corner * 0.6f));
+                vs.Add(p); ns.Add(new Vector3(p.x / (R.x * R.x), p.y / (R.y * R.y), p.z / (R.z * R.z)).normalized); cs.Add(Color.white);
+            }
+        }
+        for (int j = 0; j < nv; j++) for (int i = 0; i < nu; i++)
+            {
+                int a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+                ts.Add(a); ts.Add(c); ts.Add(b); ts.Add(b); ts.Add(c); ts.Add(d);
+            }
+        pillowMesh = new Mesh { name = "pillow" };
+        pillowMesh.SetVertices(vs); pillowMesh.SetNormals(ns); pillowMesh.SetColors(cs); pillowMesh.SetTriangles(ts, 0);
+        pillowMesh.RecalculateNormals(); pillowMesh.RecalculateBounds();
+        return pillowMesh;
+    }
+
     public static AcCharacter Create(AcLook look, Transform parent = null)
     {
         var go = new GameObject("Character");
@@ -187,6 +271,8 @@ public class AcCharacter : MonoBehaviour
     {
         float dt = Time.deltaTime;
         if (runPose > 0) { RunAnim(dt); return; }
+        UpdatePillow();
+        Quaternion eRot = Quaternion.identity; Vector3 eScale = Vector3.one;
         float s = Mathf.Clamp01(speed / 2.2f);
         phase += dt * (4f + 6f * s);
         float sw = Mathf.Sin(phase) * 38f * s;
@@ -196,6 +282,7 @@ public class AcCharacter : MonoBehaviour
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
         float et = Time.time - emoteT, jump = 0;
+        if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(-35f - sw * 0.3f, 0, 18f);   // 베개를 들고 있는 팔
         if (et < 1.8f)
         {
             float k = Mathf.Sin(Mathf.Clamp01(et / 1.8f) * Mathf.PI);   // 들었다 내리기
@@ -220,6 +307,29 @@ public class AcCharacter : MonoBehaviour
                     if (armL) armL.localRotation = Quaternion.Euler(0, 0, -80f * k);
                     if (armR) armR.localRotation = Quaternion.Euler(0, 0, 80f * k);
                     jump = Mathf.Abs(Mathf.Sin(et * 10f)) * 0.06f * k;
+                    break;
+                case "swing":     // 베개 휘두르기: 머리 뒤로 크게 젖혔다가 앞으로 내려치기 + 몸 비틀기
+                    {
+                        float a = et < 0.16f ? Mathf.SmoothStep(-35, 170, et / 0.16f) : et < 0.3f ? Mathf.Lerp(170, -75, (et - 0.16f) / 0.14f) : Mathf.Lerp(-75, -35, Mathf.Clamp01((et - 0.3f) / 0.35f));
+                        if (armR) armR.localRotation = Quaternion.Euler(a, 0, 18f);
+                        if (armL) armL.localRotation = Quaternion.Euler(30f, 0, -35f);
+                        float tw = et < 0.16f ? -28f * (et / 0.16f) : Mathf.Lerp(-28f, 22f, Mathf.Clamp01((et - 0.16f) / 0.16f)) * Mathf.Clamp01((0.9f - et) * 2f);
+                        eRot = Quaternion.Euler(et > 0.16f && et < 0.5f ? 12f : 0, tw, 0);
+                        jump = et > 0.14f && et < 0.4f ? Mathf.Sin((et - 0.14f) / 0.26f * Mathf.PI) * 0.06f : 0;
+                    }
+                    break;
+                case "bonk":      // 베개에 맞음: 말랑하게 찌그러졌다 튕기고, 뒤로 휘청
+                    {
+                        float sq = Mathf.Exp(-et * 5.5f) * Mathf.Sin(et * 19f) * 0.3f;
+                        eScale = new Vector3(1 + sq * 0.55f, 1 - sq, 1 + sq * 0.55f);
+                        float lean = Mathf.Exp(-et * 4f) * Mathf.Sin(Mathf.Min(et * 9f, Mathf.PI * 2.5f));
+                        eRot = Quaternion.Euler(-30f * lean, Mathf.Exp(-et * 3f) * 40f * Mathf.Sin(et * 7f), 12f * lean);
+                        jump = Mathf.Max(0, Mathf.Sin(Mathf.Min(et * 6f, Mathf.PI))) * 0.16f * Mathf.Exp(-et * 2f);
+                        float fl = Mathf.Exp(-et * 3f);
+                        if (armL) armL.localRotation = Quaternion.Euler(0, 0, -110f * fl - 10f);
+                        if (armR && !holdPillow) armR.localRotation = Quaternion.Euler(0, 0, 110f * fl + 10f);
+                        if (armR && holdPillow) armR.localRotation = Quaternion.Euler(-35f, 0, 18f + 90f * fl);
+                    }
                     break;
                 case "flinch":    // 작은 눈에 맞음: 짧게 움찔하며 팔로 얼굴 가리기
                     {
@@ -251,6 +361,7 @@ public class AcCharacter : MonoBehaviour
             {
                 body.localPosition = new Vector3(push * 0.035f * st, 0.11f + Mathf.Abs(push) * 0.012f * st, 0);
                 body.localRotation = Quaternion.Euler(14f * st, push * 6f * st, -push * 9f * st);
+                body.localScale = Vector3.one;
             }
             return;
         }
@@ -260,7 +371,8 @@ public class AcCharacter : MonoBehaviour
         if (body)
         {
             body.localPosition = new Vector3(0, bob + jump + (skating ? 0.11f : 0f), 0);
-            body.localRotation = Quaternion.Euler(s * 6f, 0, Mathf.Sin(phase) * 3f * s);
+            body.localRotation = Quaternion.Euler(s * 6f, 0, Mathf.Sin(phase) * 3f * s) * eRot;
+            body.localScale = eScale;
         }
     }
 }

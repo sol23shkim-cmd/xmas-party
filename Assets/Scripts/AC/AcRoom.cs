@@ -1131,6 +1131,7 @@ public partial class AcRoom : MonoBehaviour
             ActionButtons();
             ContextButtons();
             SnowFightHUD();
+            PillowHUD();
         }
         PeopleUI();
         // 친구 가까이: 함께 하기

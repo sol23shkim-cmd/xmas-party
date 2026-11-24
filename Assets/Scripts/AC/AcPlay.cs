@@ -59,6 +59,7 @@ public partial class AcRoom
                     pianoBy[rid] = (r.net.name, Time.unscaledTime);
                 }
                 break;
+            case "w": OnRemoteSwing(rid, r, data); break;   // 베개 휘두르기
             case "qj": quizLobby[rid] = (r.net.name, Time.unscaledTime); break;   // 퀴즈 화면에 있음
             case "qa":   // 퀴즈 초대
                 if (!quizOpen) { qzInviteFrom = r.net.name; qzInviteUntil = Time.unscaledTime + 15f; qzInviteStarted = false; }
@@ -130,6 +131,7 @@ public partial class AcRoom
         SnowballUpdate(dt);
         SnowFocusUpdate();
         UpdateOverviewOccluders();
+        PillowUpdate(dt);
         if (snowMode && (!Outside || building || playingGame)) snowMode = false;
     }
 
@@ -575,6 +577,7 @@ public partial class AcRoom
     void ToggleSnowFight()
     {
         snowMode = !snowMode;
+        if (snowMode && me.skating) { me.SetSkates(false); skateVel = Vector3.zero; }   // 스케이트와 눈싸움은 함께 못 해요
         if (snowMode) Toast(IsMobile ? "눈싸움! 친구나 땅을 톡 누르면 던져요 (큰 눈·작은 눈 고르기)" : "눈싸움! 클릭한 곳으로 던져요 (F: 앞으로, 1·2: 큰 눈·작은 눈)");
     }
 
@@ -764,5 +767,119 @@ public partial class AcRoom
         {
             for (int i = 0; i < top3.Count; i++) GUI.Label(new Rect(r.x + 12, r.y + 30 + i * 20, w - 20, 20), $"{i + 1}. {Short(top3[i].Item1, 8)}  {top3[i].Item2}번 맞힘", sSmall);
         }
+    }
+}
+
+// ===== 베개 싸움: 침실에 들어가면 자동으로 베개를 들고, 톡 누르면 휘둘러요 =====
+public partial class AcRoom
+{
+    bool pillowMode, pillowWas; float pwCool, pwNextKnock; int pwHits, pwTaken; Vector3 pwKnock;
+    readonly List<(string owner, string name, Vector3 from, float yaw, float at)> pwSwings = new List<(string, string, Vector3, float, float)>();
+    readonly List<(GameObject go, Vector3 v, float life, float spin)> feathers = new List<(GameObject, Vector3, float, float)>();
+
+    bool InBedroom(Vector3 p) => InHouse(p) && AreaAt(p) == "침실";
+
+    void PillowUpdate(float dt)
+    {
+        pillowMode = phase == Phase.Play && !playingGame && !building && me != null && InBedroom(me.transform.position);
+        if (pillowMode != pillowWas)
+        {
+            pillowWas = pillowMode;
+            if (pillowMode) Toast(IsMobile ? "베개 싸움! 톡 누르면 베개를 휘둘러요 (끌면 걸어요)" : "베개 싸움! 클릭이나 F로 베개를 휘둘러요");
+        }
+        if (me) { me.holdPillow = pillowMode; me.pillowColor = Color.Lerp(me.look.sweater, Color.white, 0.55f); }
+        foreach (var r in remotes.Values) if (r.c) { r.c.holdPillow = InBedroom(r.c.transform.position); r.c.pillowColor = Color.Lerp(r.c.look.sweater, Color.white, 0.55f); }
+        pwCool -= dt;
+#if ENABLE_INPUT_SYSTEM
+        if (pillowMode && !chatting && !askOpen && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) SwingPillow(null);
+#endif
+        // 휘두른 뒤 0.2초에 맞았는지 확인 (휘두른 사람 앞쪽 1.8m, 좌우 75도 안)
+        for (int i = pwSwings.Count - 1; i >= 0; i--)
+        {
+            var s = pwSwings[i];
+            if (Time.unscaledTime - s.at < 0.2f) continue;
+            pwSwings.RemoveAt(i);
+            var fwd = Quaternion.Euler(0, s.yaw, 0) * Vector3.forward;
+            bool Hit(Vector3 p) { var d = p - s.from; d.y = 0; return d.magnitude < 1.8f && d.magnitude > 0.05f && Vector3.Angle(fwd, d) < 75f; }
+            foreach (var kv in remotes)
+                if (kv.Key != s.owner && kv.Value.c && Hit(kv.Value.c.transform.position))
+                {
+                    PillowHitFx(kv.Value.c, s.from);
+                    if (s.owner == myId) { pwHits++; Toast($"{kv.Value.net?.name} 님을 퍽! ({pwHits})"); }
+                }
+            if (s.owner == myId) foreach (var n in npcs) if (n && n.gameObject.activeSelf && Hit(n.transform.position)) PillowHitFx(n, s.from);
+            if (s.owner != myId && me && Hit(me.transform.position))
+            {
+                pwTaken++; PillowHitFx(me, s.from);
+                var away = me.transform.position - s.from; away.y = 0; pwKnock = away.normalized * 3.2f;   // 뒤로 밀려남
+                Toast($"{s.name} 님의 베개에 퍽!");
+            }
+        }
+        // 밀려나기
+        if (pwKnock.sqrMagnitude > 0.01f && me)
+        {
+            var prev = me.transform.position; var p = Collide(prev + pwKnock * dt, 0.36f);
+            me.transform.position = p; pwKnock = Vector3.MoveTowards(pwKnock, Vector3.zero, dt * 9f);
+        }
+        // 깃털: 천천히 하늘하늘 떨어짐
+        for (int i = feathers.Count - 1; i >= 0; i--)
+        {
+            var f = feathers[i]; f.life -= dt;
+            f.v.y = Mathf.Max(f.v.y - 3.5f * dt, -0.45f); f.v.x *= 1 - dt * 1.5f; f.v.z *= 1 - dt * 1.5f;
+            if (f.go)
+            {
+                f.go.transform.position += (f.v + new Vector3(Mathf.Sin(f.life * 6f + f.spin) * 0.5f, 0, Mathf.Cos(f.life * 5f + f.spin) * 0.4f)) * dt;
+                f.go.transform.rotation = Quaternion.Euler(Mathf.Sin(f.life * 4f + f.spin) * 50f, f.spin * 60f + f.life * 90f, Mathf.Cos(f.life * 5f) * 40f);
+                if (f.life < 0.5f) f.go.transform.localScale = new Vector3(0.11f, 0.02f, 0.2f) * Mathf.Max(0.01f, f.life / 0.5f);
+            }
+            feathers[i] = f;
+            if (f.life <= 0) { if (f.go) Destroy(f.go); feathers.RemoveAt(i); }
+        }
+    }
+
+    void SwingPillow(Vector3? target)
+    {
+        if (pwCool > 0 || !pillowMode) return;
+        pwCool = 0.5f;
+        if (target.HasValue) { var d = target.Value - me.transform.position; d.y = 0; if (d.sqrMagnitude > 0.01f) { yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; me.transform.rotation = Quaternion.Euler(0, yaw, 0); } }
+        me.PlayEmote("swing"); Sfx("whoosh", 0.5f, UnityEngine.Random.Range(0.92f, 1.1f));
+        AddAct("w", $"{me.transform.position.x:F2},{me.transform.position.z:F2},{yaw:F0}");
+        pwSwings.Add((myId, uiName.Trim(), me.transform.position, yaw, Time.unscaledTime));
+    }
+
+    void OnRemoteSwing(string rid, Remote r, string data)
+    {
+        var v = data.Split(',');
+        if (v.Length < 3 || !float.TryParse(v[0], out float x) || !float.TryParse(v[1], out float z) || !float.TryParse(v[2], out float yw)) return;
+        if (r.c) r.c.PlayEmote("swing");
+        if (me && Vector3.Distance(me.transform.position, new Vector3(x, 0, z)) < 14f) Sfx("whoosh", 0.35f, UnityEngine.Random.Range(0.92f, 1.1f));
+        pwSwings.Add((rid, r.net.name, new Vector3(x, 0, z), yw, Time.unscaledTime));
+    }
+
+    // 맞은 캐릭터: 말랑 찌그러짐(bonk) + 깃털 펑 + 푹신한 '퍽'
+    void PillowHitFx(AcCharacter c, Vector3 from)
+    {
+        if (!c) return;
+        c.PlayEmote("bonk");
+        var at = c.transform.position + Vector3.up * 0.9f;
+        Sfx("pillow_hit", me && Vector3.Distance(me.transform.position, at) < 12f ? 0.85f : 0.4f, UnityEngine.Random.Range(0.9f, 1.12f));
+        for (int k = 0; k < 12; k++)
+        {
+            var g = AcCatalog.Spawn("sm_snowball", world, null); if (!g) break;
+            g.transform.position = at + UnityEngine.Random.insideUnitSphere * 0.25f;
+            g.transform.localScale = new Vector3(0.11f, 0.02f, 0.2f);
+            var away = (c.transform.position - from); away.y = 0; away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.forward;
+            var v = away * UnityEngine.Random.Range(0.5f, 2f) + new Vector3(UnityEngine.Random.Range(-1.5f, 1.5f), UnityEngine.Random.Range(1.2f, 2.8f), UnityEngine.Random.Range(-1.5f, 1.5f));
+            feathers.Add((g, v, UnityEngine.Random.Range(1.6f, 2.6f), UnityEngine.Random.Range(0f, 6f)));
+        }
+    }
+
+    void PillowHUD()
+    {
+        if (!pillowMode) return;
+        float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : SW < 1000 ? 112 : 60;
+        var r = new Rect(12, top, w, 36);
+        GUI.Box(R(r), "", sBox);
+        GUI.Label(new Rect(r.x + 12, r.y + 7, w - 20, 24), $"<b>베개 싸움</b>  퍽! {pwHits} · 맞음 {pwTaken}", sSmall);
     }
 }
