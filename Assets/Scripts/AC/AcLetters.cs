@@ -211,8 +211,11 @@ public partial class AcRoom
         if (list.Count == 0)
         {
             string msg = letterTab == 0 ? "아직 나에게 온 편지가 없어요" : letterTab == 1 ? "아직 공개 편지가 없어요. 첫 편지를 써 보세요!" : "아직 보낸 편지가 없어요";
-            GUI.Label(new Rect(area.x, area.y + 30, area.width, 40), msg, new GUIStyle(sHandTitle) { alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 0.95f, 0.85f) } });
-            if (GUI.Button(new Rect(area.center.x - 70, area.y + 90, 140, 36), "편지 쓰기", sBtn)) letterTab = 3;
+            // 글씨가 커서 두 줄이 되면 잘리던 문제 → 넉넉한 높이 + 좁은 화면은 작은 글씨
+            var ms = new GUIStyle(sHandTitle) { fontSize = SW < 640 ? 30 : 38, alignment = TextAnchor.MiddleCenter, wordWrap = true, normal = { textColor = new Color(1f, 0.95f, 0.85f) } };
+            float mh = Mathf.Max(48, ms.CalcHeight(new GUIContent(msg), area.width - 20) + 8);
+            GUI.Label(new Rect(area.x + 10, area.y + 24, area.width - 20, mh), msg, ms);
+            if (GUI.Button(new Rect(area.center.x - 70, area.y + 24 + mh + 18, 140, 36), "편지 쓰기", sBtn)) letterTab = 3;
             return;
         }
         float cw = SW < 640 ? 160 : 200, ch = SW < 640 ? 185 : 215, gap = 16;
