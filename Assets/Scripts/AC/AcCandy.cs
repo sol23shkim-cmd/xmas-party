@@ -384,7 +384,12 @@ public partial class AcRoom
     }
 
     // ===== 매 프레임 =====
+    string cdErr = "";
     void CandyUpdate(float dt)
+    {
+        try { CandyUpdate0(dt); } catch (Exception ex) { cdErr = ex.GetType().Name + ":" + ex.Message; Debug.LogException(ex); }
+    }
+    void CandyUpdate0(float dt)
     {
         if (!candyOpen) return;
         dt = Mathf.Min(dt, 0.05f);
@@ -705,11 +710,17 @@ public partial class AcRoom
                         float sq = t.squash * Mathf.Sin((0.3f - Mathf.Min(0.3f, t.squash)) * 30f + 1.57f);
                         float w = s * scale * (1 + sq * 0.5f), h = s * scale * (1 - sq * 0.6f);
                         float cx = (t.x + 0.5f) * cdCell, cyy = (t.y + 0.5f) * cdCell + (s - h) * 0.45f;
-                        if (sel) cyy -= Mathf.Abs(Mathf.Sin(Time.time * 7f)) * cdCell * 0.08f;
+                        if (sel) { cyy -= Mathf.Abs(Mathf.Sin(Time.time * 7f)) * cdCell * 0.1f; w *= 1.08f; h *= 1.08f; }
                         if (pass == 0)
                         {
                             if (!t.dying) DT(new Rect(cx - w * 0.44f, (t.y + 0.5f) * cdCell + s * 0.36f - h * 0.08f, w * 0.88f, h * 0.22f), shadow, new Color(1, 1, 1, 0.55f));
-                            if (sel || hinted) DT(new Rect(cx - s * 0.62f, (t.y + 0.5f) * cdCell - s * 0.62f, s * 1.24f, s * 1.24f), CTx("dot"), sel ? new Color(1f, 1f, 0.7f, 0.85f) : new Color(1f, 1f, 1f, 0.5f));
+                            if (sel || hinted)
+                            {
+                                float pu = 0.5f + 0.5f * Mathf.Sin(Time.time * (sel ? 9f : 6f));
+                                var cr = new Rect(t.x * cdCell + 1, t.y * cdCell + 1, cdCell - 2, cdCell - 2);
+                                DT(cr, CTx("cell"), sel ? new Color(1f, 0.85f, 0.3f, 0.75f + pu * 0.25f) : new Color(1f, 1f, 1f, 0.35f + pu * 0.45f));
+                                DT(new Rect(cx - s * 0.7f, (t.y + 0.5f) * cdCell - s * 0.7f, s * 1.4f, s * 1.4f), CTx("dot"), sel ? new Color(1f, 0.95f, 0.6f, 0.9f) : new Color(1f, 1f, 1f, 0.4f * pu));
+                            }
                             continue;
                         }
                         var tex = TileTex(t);
