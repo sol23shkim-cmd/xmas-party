@@ -124,7 +124,7 @@ public class AcCharacter : MonoBehaviour
         for (int j = 0; j < nv; j++) for (int i = 0; i < nu; i++)
             {
                 int a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
-                ts.Add(a); ts.Add(c); ts.Add(b); ts.Add(b); ts.Add(c); ts.Add(d);
+                ts.Add(a); ts.Add(b); ts.Add(c); ts.Add(b); ts.Add(d); ts.Add(c);
             }
         pillowMesh = new Mesh { name = "pillow" };
         pillowMesh.SetVertices(vs); pillowMesh.SetNormals(ns); pillowMesh.SetColors(cs); pillowMesh.SetTriangles(ts, 0);
