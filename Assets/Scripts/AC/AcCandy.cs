@@ -726,19 +726,26 @@ public partial class AcRoom
         var tt = CTx("title");
         float tw = Mathf.Min(SW - 30, 520), th = tw * 300f / 1100f;
         float ty = portrait ? SH * 0.1f : 30;
+        // 화면이 낮으면 제목·사탕 고리를 줄여서 버튼이 화면 안에 들어오게
+        float ringH = portrait ? 170 : 130, rest = (portrait ? 116 : 104) + 92 + 114 + 16;
+        float need = ty + th + ringH + rest;
+        if (need > SH) { ty = 12; need = ty + th + ringH + rest; }
+        if (need > SH) { float cut = Mathf.Min(need - SH, ringH - 86); ringH -= cut; need -= cut; }
+        if (need > SH) { th = Mathf.Max(56, th - (need - SH)); tw = th * 1100f / 300f; }
+        float rk = ringH / (portrait ? 170f : 130f);
         float bob = Mathf.Sin(Time.time * 2f) * 4f;
         if (tt != null) DT(new Rect(SW / 2 - tw / 2, ty + bob, tw, th), tt, Color.white);
         // 빙글빙글 떠다니는 사탕
-        float cy = ty + th + (portrait ? 60 : 40);
+        float cy = ty + th + ringH * 0.3f;
         for (int i = 0; i < 6; i++)
         {
             float a = Time.time * 0.7f + i * Mathf.PI / 3;
-            float s = portrait ? 54 : 46;
-            var p = new Vector2(SW / 2 + Mathf.Cos(a) * Mathf.Min(SW * 0.36f, 170), cy + Mathf.Sin(a) * 34 + 30);
+            float s = (portrait ? 54 : 46) * Mathf.Lerp(0.75f, 1f, rk);
+            var p = new Vector2(SW / 2 + Mathf.Cos(a) * Mathf.Min(SW * 0.36f, 170), cy + (Mathf.Sin(a) * 34 + 30) * rk);
             DT(new Rect(p.x - s / 2 + 3, p.y - s / 2 + 6, s, s), CTx("shadow"), new Color(1, 1, 1, 0.5f));
             DT(new Rect(p.x - s / 2, p.y - s / 2, s, s), CTx("piece_" + i), Color.white);
         }
-        float py = cy + (portrait ? 110 : 90);
+        float py = ty + th + ringH;
         float pw = Mathf.Min(SW - 30, 440);
         var info = new Rect(SW / 2 - pw / 2, py, pw, portrait ? 116 : 104);
         Panel(info, new Color(1f, 0.97f, 0.93f, 0.95f));
@@ -750,6 +757,7 @@ public partial class AcRoom
         float bw = Mathf.Min(260, SW - 60), by = info.yMax + 92;
         // 스테이지 고르기 (깬 스테이지 다음 판까지)
         int unlocked = Mathf.Clamp(PlayerPrefs.GetInt("candy_lv", 1), 1, CdMaxLevel());
+        if (Application.absoluteURL.Contains("candydev")) unlocked = CdMaxLevel();   // 점검용: 주소에 candydev가 있으면 모든 스테이지 열림
         var lr = new Rect(SW / 2 - bw / 2, info.yMax + 40, bw, 40);
         Pill(lr, new Color(0.25f, 0.12f, 0.35f, 0.55f));
         CgText(new Rect(lr.x + 40, lr.y, lr.width - 80, lr.height), CdLevelTitle(cdLevel), 17, new Color(1f, 0.95f, 0.75f));
@@ -1117,23 +1125,25 @@ public partial class AcRoom
         Pill(tr, new Color(0.92f, 0.3f, 0.38f));
         CgText(tr, "명예의 전당", 28, new Color(1f, 0.93f, 0.6f), TextAnchor.MiddleCenter, 2.5f, new Color(0.45f, 0.06f, 0.12f));
         // 1·2·3등 (가운데가 1등)
-        float cw = Mathf.Min(130, (SW - 40) / 3f), top = tr.yMax + 36;
+        bool compact = SH < 720;
+        float cw = Mathf.Min(130, (SW - 40) / 3f), top = tr.yMax + (compact ? 30 : 36);
+        float cardH = compact ? 156 : portrait ? 196 : 176;
         int[] order = { 1, 0, 2 };
         var medals = new[] { cgMedalG, cgMedalS, cgMedalB };
         for (int j = 0; j < 3; j++)
         {
             int rank = order[j];
             float x = SW / 2 + (j - 1) * (cw + 8) - cw / 2;
-            float lift = rank == 0 ? 0 : rank == 1 ? 26 : 40;
+            float lift = rank == 0 ? 0 : rank == 1 ? (compact ? 16 : 26) : (compact ? 26 : 40);
             float pop = Mathf.Clamp01((cdsT - 0.15f * (2 - rank)) * 3);
-            var card = new Rect(x, top + lift + (1 - pop) * 30, cw, (portrait ? 196 : 176) - lift);
+            var card = new Rect(x, top + lift + (1 - pop) * 30, cw, cardH - lift);
             if (pop <= 0) continue;
             Panel(new Rect(card.x, card.y + 5, card.width, card.height), new Color(0.15f, 0.05f, 0.2f, 0.35f * pop));
             Panel(card, new Color(1f, 0.97f, 0.93f, pop));
             if (rank < list.Count)
             {
                 var face = CgPortrait(list[rank].look);
-                float fs = Mathf.Min(card.width - 24, 92);
+                float fs = Mathf.Min(card.width - 24, compact ? 64 : 92);
                 if (face != null) DT(new Rect(card.center.x - fs / 2, card.y + 12, fs, fs), face, new Color(1, 1, 1, pop));
                 if (rank == 0 && cgCrown != null) DT(new Rect(card.center.x - 22, card.y - 26, 44, 34), cgCrown, new Color(1, 1, 1, pop));
                 DT(new Rect(card.x + 4, card.y + 4, 36, 36), medals[rank], new Color(1, 1, 1, pop));
@@ -1144,7 +1154,7 @@ public partial class AcRoom
             else { var ns = new GUIStyle(CgStyle(14, TextAnchor.MiddleCenter)) { normal = { textColor = new Color(0.6f, 0.5f, 0.5f).linear } }; GUI.Label(new Rect(card.x, card.y, card.width, card.height), "비어 있음", ns); }
         }
         // 4~10등
-        float ly = top + (portrait ? 214 : 190), lw = Mathf.Min(SW - 30, 440), rowH = 34;
+        float ly = top + cardH + 18, lw = Mathf.Min(SW - 30, 440), rowH = compact ? 26 : 34;
         var lr = new Rect(SW / 2 - lw / 2, ly, lw, rowH * 7 + 16);
         Panel(lr, new Color(1f, 0.97f, 0.93f, 0.95f));
         for (int i = 3; i < 10; i++)
