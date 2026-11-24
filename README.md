@@ -1,4 +1,4 @@
-# 🎄 xmas-plaza
+# 🎄 xmas-party
 
 사내 크리스마스 단체 게임 "크리스마스 광장"이에요. Unity 6에 URP를 쓰고, 2.5D 쿼터뷰 방식으로 만들어요.
 
@@ -13,7 +13,7 @@
 3. 만든 프로젝트 폴더에서 아래 명령을 실행해 이 저장소와 연결해요.
    ```
    git init
-   git remote add origin https://github.com/sol23shkim-cmd/xmas-plaza.git
+   git remote add origin https://github.com/sol23shkim-cmd/xmas-party.git
    git fetch origin
    git checkout -b main --track origin/main
    git add .

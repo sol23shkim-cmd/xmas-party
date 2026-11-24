@@ -122,7 +122,7 @@ public class XmasSyncTest : MonoBehaviour
         new Zone { id = "ark",   label = "베이커리 · 선물 깨기",      art = "house_bakery", pos = new Vector3(4.8f, 0, 9f),  height = 8.5f, radius = 2.2f,
                    desc = "각자 선물 벽돌을 깨면서 상대에게 방해 선물을 보내요." },
         new Zone { id = "photo", label = "빨간 사진관 · 포토존",      art = "house_studio", pos = new Vector3(11f, 0, 7f),  height = 9f, radius = 2.2f,
-                   desc = "모여서 찰칵! 사진은 내 PC의 '사진\\XmasPlaza' 폴더에 저장돼요." },
+                   desc = "모여서 찰칵! 사진은 내 PC의 '사진\\XmasParty' 폴더에 저장돼요." },
     };
 
     // ===== UI 상태 =====
@@ -813,7 +813,7 @@ public class XmasSyncTest : MonoBehaviour
     {
         hideUI = true;
         yield return null;
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "XmasPlaza");
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "XmasParty");
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, "photo_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
         ScreenCapture.CaptureScreenshot(path);

@@ -1,4 +1,4 @@
-// AcWebBuild.cs — 메뉴 "XmasPlaza/웹 빌드 (휴대폰용)" 한 번으로 웹(WebGL) 빌드를 만들어요.
+// AcWebBuild.cs — 메뉴 "XmasParty/웹 빌드 (휴대폰용)" 한 번으로 웹(WebGL) 빌드를 만들어요.
 // 결과: <프로젝트>/Build/Web  (index.html + Build/ + StreamingAssets/)  → GitHub Pages 등에 그대로 올리면 휴대폰에서 링크로 열림
 #if UNITY_EDITOR
 using System.IO;
@@ -9,7 +9,7 @@ using UnityEngine;
 
 public static class AcWebBuild
 {
-    [MenuItem("XmasPlaza/웹 빌드 (휴대폰용)")]
+    [MenuItem("XmasParty/웹 빌드 (휴대폰용)")]
     public static void BuildWeb()
     {
         if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
@@ -24,7 +24,7 @@ public static class AcWebBuild
         PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.Minimal);
         PlayerSettings.runInBackground = true;
         PlayerSettings.productName = "크리스마스 파티";
-        PlayerSettings.companyName = "xmas-plaza";
+        PlayerSettings.companyName = "xmas-party";
 
         var scene = EditorSceneManager.GetActiveScene().path;
         if (string.IsNullOrEmpty(scene)) scene = "Assets/Scenes/SampleScene.unity";

@@ -1,6 +1,6 @@
 // ACToon.shader — 동물의 숲풍 툰 셰이더 (URP). 미리보기 렌더러(Tools/acgen/viewer.html)와 같은 계산.
 // 정점 색 RGB = 기본색, A = 색바꿈 마스크, UV0.x = AO.  _Tint는 감마 공간 값(SetVector)으로 넘김.
-Shader "XmasPlaza/ACToon"
+Shader "XmasParty/ACToon"
 {
     Properties
     {

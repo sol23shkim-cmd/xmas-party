@@ -36,7 +36,7 @@ public static class AcmLoader
             if (sharedMat == null)
             {
                 var sh = Resources.Load<Shader>("ACToon");
-                if (sh == null) sh = Shader.Find("XmasPlaza/ACToon");
+                if (sh == null) sh = Shader.Find("XmasParty/ACToon");
                 sharedMat = new Material(sh) { name = "ACToon (shared)", enableInstancing = false };
             }
             return sharedMat;

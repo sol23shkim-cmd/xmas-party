@@ -11,6 +11,7 @@ using UnityEngine.Networking;
 
 public class AcFirebase : MonoBehaviour
 {
+    // Firebase 프로젝트 ID(xmas-plaza)는 만든 뒤 바꿀 수 없어서 주소는 그대로 둠
     public const string DbUrl = "https://xmas-plaza-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 #if UNITY_WEBGL && !UNITY_EDITOR
