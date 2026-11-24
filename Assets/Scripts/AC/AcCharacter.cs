@@ -286,7 +286,7 @@ public class AcCharacter : MonoBehaviour
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
         float et = Time.time - emoteT, jump = 0;
-        if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(138f + sw * 0.15f + Mathf.Sin(Time.time * 2.4f) * 3f, 0, 10f);   // 베개를 어깨 위로 메고 있는 팔
+        if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(-72f + sw * 0.15f + Mathf.Sin(Time.time * 2.4f) * 3f, 0, 16f);   // 베개를 앞으로 들고 있는 팔
         if (et < 1.8f)
         {
             float k = Mathf.Sin(Mathf.Clamp01(et / 1.8f) * Mathf.PI);   // 들었다 내리기
@@ -316,12 +316,12 @@ public class AcCharacter : MonoBehaviour
                     {
                         // 어깨 위(138) → 더 뒤로 젖힘(185) → 앞으로 휙(-100, 앞쪽 수평보다 살짝 위) → 다시 어깨 위
                         float a;
-                        if (et < 0.12f) a = Mathf.Lerp(138f, 185f, Mathf.SmoothStep(0, 1, et / 0.12f));
-                        else if (et < 0.24f) { float u = (et - 0.12f) / 0.12f; a = Mathf.Lerp(185f, -100f, 1 - (1 - u) * (1 - u)); }
+                        if (et < 0.14f) a = Mathf.Lerp(-72f, 175f, Mathf.SmoothStep(0, 1, et / 0.14f));                      // 머리 위 뒤로 들어 올리기
+                        else if (et < 0.25f) { float u = (et - 0.14f) / 0.11f; a = Mathf.Lerp(175f, -100f, 1 - (1 - u) * (1 - u)); }   // 앞으로 휙
                         else if (et < 0.34f) a = -100f;
-                        else a = Mathf.Lerp(-100f, 138f, Mathf.SmoothStep(0, 1, Mathf.Clamp01((et - 0.34f) / 0.4f)));
-                        if (armR) armR.localRotation = Quaternion.Euler(a, 0, 10f);
-                        if (armL) armL.localRotation = Quaternion.Euler(et < 0.12f ? -40f : 45f, 0, -30f);   // 반대 팔로 균형
+                        else a = Mathf.Lerp(-100f, -72f, Mathf.SmoothStep(0, 1, Mathf.Clamp01((et - 0.34f) / 0.3f)));
+                        if (armR) armR.localRotation = Quaternion.Euler(a, 0, 14f);
+                        if (armL) armL.localRotation = Quaternion.Euler(et < 0.14f ? -50f : 40f, 0, -30f);   // 반대 팔로 균형
                         float tw = et < 0.16f ? -28f * (et / 0.16f) : Mathf.Lerp(-28f, 22f, Mathf.Clamp01((et - 0.16f) / 0.16f)) * Mathf.Clamp01((0.9f - et) * 2f);
                         eRot = Quaternion.Euler(et > 0.16f && et < 0.5f ? 12f : 0, tw, 0);
                         jump = et > 0.14f && et < 0.4f ? Mathf.Sin((et - 0.14f) / 0.26f * Mathf.PI) * 0.06f : 0;
@@ -337,7 +337,7 @@ public class AcCharacter : MonoBehaviour
                         float fl = Mathf.Exp(-et * 3f);
                         if (armL) armL.localRotation = Quaternion.Euler(0, 0, -110f * fl - 10f);
                         if (armR && !holdPillow) armR.localRotation = Quaternion.Euler(0, 0, 110f * fl + 10f);
-                        if (armR && holdPillow) armR.localRotation = Quaternion.Euler(138f - 70f * fl, 0, 10f + 60f * fl);
+                        if (armR && holdPillow) armR.localRotation = Quaternion.Euler(-72f + 60f * fl, 0, 16f + 60f * fl);
                     }
                     break;
                 case "flinch":    // 작은 눈에 맞음: 짧게 움찔하며 팔로 얼굴 가리기
