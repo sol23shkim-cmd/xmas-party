@@ -16,7 +16,7 @@ public partial class AcRoom
     enum CdP { Idle, Swap, Back, Pop, Fall, Shuffle, Banner } CdP cdp; float cdpT;
     const int CW = 8, CH = 8, CdKinds = 6, CdMovesStart = 25, CdSnowCount = 8;
     const int SpNone = 0, SpH = 1, SpV = 2, SpWrap = 3, SpBomb = 4, SpSnow = 5;
-    class CT { public int c, sp, hp, id; public float x, y, vy, pop = -1, squash, born = 1, ox, oy; public bool dying; }
+    class CT { public int c, sp, hp, id; public float x, y, vy, pop = -1, squash, born = 1, ox, oy; public bool dying, ice; }
     readonly CT[,] cdB = new CT[CW, CH];
     int cdMoves, cdScore, cdCombo, cdIdSeq; float cdShown;
     readonly List<int> cdGoalKind = new List<int>(); readonly List<int> cdGoalLeft = new List<int>(); readonly List<int> cdGoalStart = new List<int>(); float[] cdGoalPop = new float[5];
@@ -26,8 +26,9 @@ public partial class AcRoom
     Vector2 cdDownPos; float cdIdle; (Vector2Int a, Vector2Int b)? cdHint;
     string cdBannerText; float cdShake; int cdPopFrame; int cdCamMask = -1;
     Rect cdBoardR; float cdCell; readonly Rect[] cdGoalRects = new Rect[5];
-    static readonly Color[] CdCol = { new Color(0.95f, 0.25f, 0.3f), new Color(0.3f, 0.82f, 0.38f), new Color(1f, 0.84f, 0.2f), new Color(0.35f, 0.65f, 1f), new Color(0.72f, 0.42f, 0.95f), new Color(0.92f, 0.58f, 0.3f), new Color(0.85f, 0.93f, 1f) };
-    static readonly string[] CdKindKo = { "페퍼민트", "트리", "별", "눈꽃", "선물", "진저브레드", "눈덩이" };
+    static readonly Color[] CdCol = { new Color(0.95f, 0.25f, 0.3f), new Color(0.3f, 0.82f, 0.38f), new Color(1f, 0.84f, 0.2f), new Color(0.35f, 0.65f, 1f), new Color(0.72f, 0.42f, 0.95f), new Color(0.92f, 0.58f, 0.3f), new Color(0.85f, 0.93f, 1f), new Color(0.75f, 0.92f, 1f) };
+    static readonly string[] CdKindKo = { "페퍼민트", "트리", "별", "눈꽃", "선물", "진저브레드", "눈덩이", "얼음" };
+    static readonly Color CdIceCol = new Color(0.75f, 0.92f, 1f);
 
     // 효과
     struct CdPart { public Vector2 p, v; public float life, max, size, rot, vr; public Color c; public int kind; }
@@ -51,7 +52,7 @@ public partial class AcRoom
         string suf = t.sp == SpH ? "_h" : t.sp == SpV ? "_v" : t.sp == SpWrap ? "_w" : "";
         return CTx("piece_" + t.c + suf);
     }
-    Texture2D KindTex(int k) => k == 6 ? CTx("snow_2") : CTx("piece_" + k);
+    Texture2D KindTex(int k) => k == 6 ? CTx("snow_2") : k == 7 ? CTx("ice") : CTx("piece_" + k);
     void DT(Rect r, Texture t, Color c) { if (t == null || Event.current.type != EventType.Repaint) return; var k = GUI.color; GUI.color = c.linear; GUI.DrawTexture(r, t, ScaleMode.StretchToFill, true); GUI.color = k; }
     void Panel(Rect r, Color c)
     {
@@ -64,56 +65,96 @@ public partial class AcRoom
     bool InPlayroom => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "놀이방";
     void OpenCandy()
     {
+        if (candyOpen) return;   // 두 번 눌려도 한 번만 (두 번째에 '0'을 저장해 버리면 나올 때 화면이 비어 버림)
         candyOpen = true; cds = CdS.Menu; cdsT = 0; walkTarget = null; decorating = false;
-        if (cam) { cdCamMask = cam.cullingMask; cam.cullingMask = 0; }   // 게임 중엔 뒤 3D 장면을 그리지 않음
+        cdLevel = Mathf.Clamp(PlayerPrefs.GetInt("candy_lv", 1), 1, CdMaxLevel());
+        if (cam) { if (cam.cullingMask != 0) cdCamMask = cam.cullingMask; cam.cullingMask = 0; }   // 게임 중엔 뒤 3D 장면을 그리지 않음
         net?.Get("candy");
     }
     void CloseCandy()
     {
         candyOpen = false; cdParts.Clear(); cdBeams.Clear(); cdRings.Clear(); cdBolts.Clear(); cdPops.Clear(); cdFlies.Clear();
-        if (cam && cdCamMask != -1) cam.cullingMask = cdCamMask;
+        if (cam) cam.cullingMask = cdCamMask != -1 && cdCamMask != 0 ? cdCamMask : ~(1 << IconLayer);
     }
 
     // ===== 새 판 =====
+    // ===== 스테이지 =====
+    //  '.' 사탕  '#' 빈칸(판 밖)  's' 눈덩이(1번)  'S' 눈덩이(2번)  'L' 얼음에 갇힌 사탕
+    //  (moves, 사탕 목표 종류 수, 종류당 개수, 지도)
+    static readonly (int moves, int kinds, int each, string map)[] CdLevels =
+    {
+        (25, 3, 15, "........|........|........|........|...ss...|..sSSs..|........|........"),            // 1 기본
+        (24, 2, 18, "#..##..#|........|........|.L....L.|#......#|##....##|###..###|####.###"),            // 2 하트
+        (25, 2, 18, "###..###|##....##|##.LL.##|#......#|#.L..L.#|........|...ss...|###..###"),            // 3 크리스마스 트리
+        (24, 2, 16, "........|........|..#ss#..|..sSSs..|..sSSs..|..#ss#..|........|........"),            // 4 도넛
+        (26, 2, 16, "...##...|...##...|.L.##.L.|...##...|...##...|s..##..s|ss.##.ss|...##..."),            // 5 두 섬
+        (24, 2, 18, "###..###|##....##|#..LL..#|...SS...|...SS...|#..LL..#|##....##|###..###"),            // 6 다이아몬드
+        (25, 2, 18, "##....##|##.LL.##|........|.L.SS.L.|.L.SS.L.|........|##.ss.##|##....##"),            // 7 십자
+        (24, 2, 18, ".......#|......##|.....L..|....L...|...L....|ss......|SSs.....|SSSs...."),            // 8 계단
+        (25, 3, 15, "........|.#.LL.#.|........|.L.##.L.|.L.##.L.|........|.#.ss.#.|..ssss.."),            // 9 구멍 뚫린 판
+        (26, 2, 20, "#..##..#|.L....L.|..SssS..|#.s##s.#|#.s##s.#|..SssS..|.L....L.|#..##..#"),            // 10 눈 결정
+    };
+    int cdLevel = 1;
+    int CdMaxLevel() => 99;
+    (int moves, int kinds, int each, string map) CdLevelDef(int lv)
+    {
+        var d = CdLevels[(lv - 1) % CdLevels.Length];
+        int lap = (lv - 1) / CdLevels.Length;            // 10판을 다 깨면 같은 모양을 더 어렵게
+        return (Mathf.Max(16, d.moves - lap * 2), d.kinds, d.each + lap * 3, d.map);
+    }
+    static readonly string[] CdLevelName = { "기본", "하트", "크리스마스 트리", "도넛", "두 섬", "다이아몬드", "십자", "계단", "구멍 뚫린 판", "눈 결정" };
+    string CdLevelTitle(int lv) => $"스테이지 {lv}  {CdLevelName[(lv - 1) % CdLevelName.Length]}";
+
     void CdNewGame()
     {
         cdRnd = new System.Random(Environment.TickCount);
-        cdMoves = CdMovesStart; cdScore = 0; cdShown = 0; cdCombo = 0; cdBonus = false; cdWin = false; cdSaved = false; cdNewBest = false;
+        var def = CdLevelDef(cdLevel);
+        var rows = def.map.Split('|');
+        cdMoves = def.moves; cdMovesTotal = def.moves; cdScore = 0; cdShown = 0; cdCombo = 0; cdBonus = false; cdWin = false; cdSaved = false; cdNewBest = false;
         cdPrevBest = CdMyBest();
-        cdParts.Clear(); cdBeams.Clear(); cdRings.Clear(); cdBolts.Clear(); cdPops.Clear(); cdFlies.Clear();
-        // 목표: 사탕 세 가지 + 눈덩이
-        var kinds = Enumerable.Range(0, CdKinds).OrderBy(_ => cdRnd.Next()).Take(3).ToList();
+        cdParts.Clear(); cdBeams.Clear(); cdRings.Clear(); cdBolts.Clear(); cdPops.Clear(); cdFlies.Clear(); cdFlash = 0;
+        int nSnow = 0, nIce = 0;
+        for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
+            {
+                char ch = x < rows[y].Length ? rows[y][x] : '.';
+                cdHole[x, y] = ch == '#';
+                if (ch == 's' || ch == 'S') nSnow++;
+                if (ch == 'L') nIce++;
+            }
+        // 목표: 사탕 몇 가지 + (있으면) 눈덩이·얼음
+        var kinds = Enumerable.Range(0, CdKinds).OrderBy(_ => cdRnd.Next()).Take(def.kinds).ToList();
         cdGoalKind.Clear(); cdGoalLeft.Clear(); cdGoalStart.Clear();
-        foreach (var k in kinds) { int n = 18 + cdRnd.Next(4) * 3; cdGoalKind.Add(k); cdGoalLeft.Add(n); cdGoalStart.Add(n); }
-        cdGoalKind.Add(6); cdGoalLeft.Add(CdSnowCount); cdGoalStart.Add(CdSnowCount);
+        foreach (var k in kinds) { cdGoalKind.Add(k); cdGoalLeft.Add(def.each); cdGoalStart.Add(def.each); }
+        if (nSnow > 0) { cdGoalKind.Add(6); cdGoalLeft.Add(nSnow); cdGoalStart.Add(nSnow); }
+        if (nIce > 0) { cdGoalKind.Add(7); cdGoalLeft.Add(nIce); cdGoalStart.Add(nIce); }
         cdGoalPop = new float[cdGoalKind.Count];
-        for (int tries = 0; tries < 50; tries++)
+        for (int tries = 0; tries < 60; tries++)
         {
             for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
                 {
+                    cdB[x, y] = null;
+                    if (cdHole[x, y]) continue;
+                    char ch = x < rows[y].Length ? rows[y][x] : '.';
+                    if (ch == 's' || ch == 'S') { var sn = NewT(-2, x, y); sn.sp = SpSnow; sn.hp = ch == 'S' ? 2 : 1; cdB[x, y] = sn; continue; }
                     int c; int guard = 0;
                     do { c = cdRnd.Next(CdKinds); guard++; }
-                    while (guard < 30 && ((x >= 2 && Mc(x - 1, y) == c && Mc(x - 2, y) == c) || (y >= 2 && Mc(x, y - 1) == c && Mc(x, y - 2) == c)));
+                    while (guard < 30 && ((Mc(x - 1, y) == c && Mc(x - 2, y) == c) || (Mc(x, y - 1) == c && Mc(x, y - 2) == c)));
                     cdB[x, y] = NewT(c, x, y);
+                    if (ch == 'L') cdB[x, y].ice = true;
                 }
-            // 눈덩이: 아래쪽 절반에 흩어 놓기 (1~2번 맞아야 깨짐)
-            int placed = 0;
-            while (placed < CdSnowCount)
-            {
-                int x = cdRnd.Next(CW), y = 3 + cdRnd.Next(CH - 3);
-                if (cdB[x, y].sp == SpSnow) continue;
-                cdB[x, y].sp = SpSnow; cdB[x, y].c = -2; cdB[x, y].hp = 1 + cdRnd.Next(2); placed++;
-            }
-            if (CdFindMove() != null) break;
+            if (CdFindGroups().Count == 0 && CdFindMove() != null) break;
         }
         // 시작 연출: 위에서 차례로 떨어짐
-        for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; t.y = y - CH - 1.5f - (CW - x) * 0.12f; t.vy = 0; }
+        for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t == null) continue; t.y = y - CH - 1.5f - (CW - x) * 0.12f; t.vy = 0; }
         cdp = CdP.Fall; cdpT = 0; cdIdle = 0; cdHint = null; cdSel = cdDown = new Vector2Int(-1, -1);
         cds = CdS.Play; cdsT = 0;
+        cdBannerText = null; cdIntroT = 0;
     }
+    int cdMovesTotal; float cdIntroT = 9, cdFlash;
     CT NewT(int c, int x, int y) => new CT { c = c, sp = SpNone, id = ++cdIdSeq, x = x, y = y };
     int Mc(int x, int y) { if (x < 0 || y < 0 || x >= CW || y >= CH) return -9; var t = cdB[x, y]; if (t == null || t.sp == SpSnow || t.sp == SpBomb) return -9; return t.c; }
-    bool In(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < CW && p.y < CH;
+    bool In(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < CW && p.y < CH && !cdHole[p.x, p.y];
+    readonly bool[,] cdHole = new bool[CW, CH];
 
     // ===== 맞춤 찾기 =====
     class CdGroup { public HashSet<Vector2Int> cells = new HashSet<Vector2Int>(); public int color, maxRun; public bool h, v; public List<List<Vector2Int>> runs = new List<List<Vector2Int>>(); }
@@ -156,7 +197,7 @@ public partial class AcRoom
         n = 1; for (int i = y - 1; i >= 0 && Mc(x, i) == c; i--) n++; for (int i = y + 1; i < CH && Mc(x, i) == c; i++) n++;
         return n >= 3;
     }
-    bool Swappable(CT t) => t != null && t.sp != SpSnow;
+    bool Swappable(CT t) => t != null && t.sp != SpSnow && !t.ice;
     (Vector2Int, Vector2Int)? CdFindMove()
     {
         for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
@@ -188,16 +229,16 @@ public partial class AcRoom
         void Add(int x, int y) { var v = new Vector2Int(x, y); if (In(v) && set.Add(v)) q.Enqueue(v); }
         switch (t.sp)
         {
-            case SpH: for (int x = 0; x < CW; x++) Add(x, p.y); cdBeams.Add((true, p.y, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); break;
-            case SpV: for (int y = 0; y < CH; y++) Add(p.x, y); cdBeams.Add((false, p.x, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); break;
+            case SpH: for (int x = 0; x < CW; x++) Add(x, p.y); cdBeams.Add((true, p.y, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); CdLineSparks(true, p.y, col); cdFlash = Mathf.Max(cdFlash, 0.12f); break;
+            case SpV: for (int y = 0; y < CH; y++) Add(p.x, y); cdBeams.Add((false, p.x, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); CdLineSparks(false, p.x, col); cdFlash = Mathf.Max(cdFlash, 0.12f); break;
             case SpWrap:
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) Add(p.x + dx, p.y + dy);
-                cdRings.Add((CellCenter(p.x, p.y), cdCell * 2.2f, col, 0)); CdSfx("candy_boom", 0.75f); cdShake = Mathf.Max(cdShake, 8); break;
+                cdRings.Add((CellCenter(p.x, p.y), cdCell * 2.2f, col, 0)); cdRings.Add((CellCenter(p.x, p.y), cdCell * 3.2f, Color.white, 0.1f)); CdSfx("candy_boom", 0.75f); cdShake = Mathf.Max(cdShake, 8); cdFlash = Mathf.Max(cdFlash, 0.3f); CdStars(CellCenter(p.x, p.y), Color.Lerp(col, Color.white, 0.5f), 12); break;
             case SpBomb:
                 {
                     int c = bombColor >= 0 ? bombColor : MostColor();
                     for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) if (Mc(x, y) == c) { Add(x, y); cdBolts.Add((CellCenter(p.x, p.y), CellCenter(x, y), 0)); }
-                    cdRings.Add((CellCenter(p.x, p.y), cdCell * 1.6f, Color.white, 0)); CdSfx("candy_magic", 0.7f); cdShake = Mathf.Max(cdShake, 6);
+                    cdRings.Add((CellCenter(p.x, p.y), cdCell * 1.6f, Color.white, 0)); CdSfx("candy_magic", 0.7f); cdShake = Mathf.Max(cdShake, 6); cdFlash = Mathf.Max(cdFlash, 0.35f); CdStars(CellCenter(p.x, p.y), Color.white, 10);
                 }
                 break;
         }
@@ -221,7 +262,8 @@ public partial class AcRoom
                 else if (focus2.HasValue && g.cells.Contains(focus2.Value)) at = focus2.Value;
                 else if (sp == SpWrap) { var hc = g.runs.Where(r => r[0].y == r[1].y).SelectMany(r => r); var vc = g.runs.Where(r => r[0].x == r[1].x).SelectMany(r => r); at = hc.Intersect(vc).DefaultIfEmpty(g.cells.First()).First(); }
                 else { var r = g.runs.OrderByDescending(rr => rr.Count).First(); at = r[r.Count / 2]; }
-                make.Add((at, sp, sp == SpBomb ? -1 : g.color));
+                if (cdB[at.x, at.y] != null && cdB[at.x, at.y].ice) { var free = g.cells.Where(c => cdB[c.x, c.y] != null && !cdB[c.x, c.y].ice).ToList(); at = free.Count > 0 ? free[0] : new Vector2Int(-1, -1); }
+                if (at.x >= 0) make.Add((at, sp, sp == SpBomb ? -1 : g.color));
             }
             foreach (var c in g.cells) { if (set.Add(c)) q.Enqueue(c); }
             // 옆 눈덩이 한 번씩 맞음
@@ -255,7 +297,20 @@ public partial class AcRoom
             if (t.hp <= 0) set.Add(kv.Key); else set.Remove(kv.Key);
         }
         foreach (var p in set.ToList()) { var t = cdB[p.x, p.y]; if (t != null && t.sp == SpSnow && t.hp > 0) set.Remove(p); }
-        if (set.Count == 0 && snowHit.Count == 0) return false;
+        // 얼음: 맞으면 얼음만 깨지고 사탕은 남음
+        int iceN = 0;
+        foreach (var p in set.ToList())
+        {
+            var t = cdB[p.x, p.y]; if (t == null || !t.ice || t.dying) continue;
+            t.ice = false; t.squash = 0.35f; set.Remove(p); iceN++; cdScore += 100;
+            var cc = CellCenter(p.x, p.y);
+            CdBurst(cc, CdIceCol, 12, true); CdStars(cc, Color.white, 5);
+            cdRings.Add((cc, cdCell * 1.1f, CdIceCol, 0));
+            int gi = cdGoalKind.IndexOf(7);
+            if (gi >= 0 && cdGoalLeft[gi] > 0) { cdGoalLeft[gi]--; cdFlies.Add((7, cc, cdGoalRects[gi].center, 0, gi)); }
+        }
+        if (iceN > 0) CdSfx("candy_snow", 0.8f, 1.35f);
+        if (set.Count == 0 && snowHit.Count == 0 && iceN == 0) return false;
         // 터지는 칸 표시 + 목표 모으기
         int n0 = 0;
         foreach (var p in set)
@@ -265,7 +320,7 @@ public partial class AcRoom
             int kind = t.sp == SpSnow ? 6 : t.c;
             if (extra != null && !groups.Any(g => g.cells.Contains(p))) cdScore += 60;
             var cc = CellCenter(p.x, p.y);
-            if (kind >= 0) CdBurst(cc, CdCol[kind], kind == 6 ? 10 : 7, kind == 6);
+            if (kind >= 0) { CdBurst(cc, CdCol[kind], kind == 6 ? 12 : 9, kind == 6); CdStars(cc, Color.Lerp(CdCol[kind], Color.white, 0.5f), 2); cdRings.Add((cc, cdCell * 0.95f, Color.Lerp(CdCol[kind], Color.white, 0.3f), 0.12f)); }
             int gi = cdGoalKind.IndexOf(kind);
             if (gi >= 0 && cdGoalLeft[gi] > 0) { cdGoalLeft[gi]--; cdFlies.Add((kind, cc, cdGoalRects[gi].center, 0, gi)); }
         }
@@ -279,7 +334,14 @@ public partial class AcRoom
         if (make.Count > 0) CdSfx("candy_special", 0.7f);
         if (n0 > 0) CdSfx("candy_pop", 0.7f, 1f + Mathf.Min(cdCombo, 8) * 0.07f);
         cdCombo++;
-        if (cdCombo == 2) cdComboText = ("좋아요!", 0); else if (cdCombo == 3) cdComboText = ("멋져요!", 0); else if (cdCombo == 4) cdComboText = ("대단해요!", 0); else if (cdCombo >= 5) cdComboText = ("환상적이에요!", 0);
+        string ct = cdCombo == 2 ? "좋아요!" : cdCombo == 3 ? "멋져요!" : cdCombo == 4 ? "대단해요!" : cdCombo >= 5 ? "환상적이에요!" : null;
+        if (ct != null)
+        {
+            cdComboText = (ct, 0);
+            var cc0 = new Vector2(cdBoardR.center.x, cdBoardR.y + cdBoardR.height * 0.42f);
+            CdStars(cc0, new Color(1f, 0.95f, 0.6f), 6 + cdCombo * 2);
+            if (cdCombo >= 4) cdFlash = Mathf.Max(cdFlash, 0.25f);
+        }
         cdp = CdP.Pop; cdpT = 0;
         return true;
     }
@@ -290,13 +352,13 @@ public partial class AcRoom
         for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) if (cdB[x, y] != null && cdB[x, y].dying) cdB[x, y] = null;
         foreach (var m in cdMakeLater) cdB[m.p.x, m.p.y] = m.t;
         cdMakeLater.Clear();
-        // 아래로 떨어지기 + 위에서 새 사탕
+        // 아래로 떨어지기 + 위에서 새 사탕 (빈칸 '#'은 건너뜀)
         for (int x = 0; x < CW; x++)
         {
-            int w = CH - 1;
-            for (int y = CH - 1; y >= 0; y--) { var t = cdB[x, y]; if (t == null) continue; cdB[x, y] = null; cdB[x, w] = t; t.x = x; w--; }
-            int k = 0;
-            for (int y = w; y >= 0; y--) { var t = NewT(cdRnd.Next(CdKinds), x, y); t.y = -1 - k - 0.25f; t.vy = 2f; cdB[x, y] = t; k++; }
+            var cells = new List<int>(); for (int y = CH - 1; y >= 0; y--) if (!cdHole[x, y]) cells.Add(y);
+            var tiles = new List<CT>(); foreach (var y in cells) { if (cdB[x, y] != null) tiles.Add(cdB[x, y]); cdB[x, y] = null; }
+            for (int i = 0; i < tiles.Count; i++) { cdB[x, cells[i]] = tiles[i]; tiles[i].x = x; }
+            for (int i = tiles.Count, k = 0; i < cells.Count; i++, k++) { var t = NewT(cdRnd.Next(CdKinds), x, cells[i]); t.y = -1 - k - 0.25f; t.vy = 2f; cdB[x, cells[i]] = t; }
         }
         cdp = CdP.Fall; cdpT = 0;
     }
@@ -312,7 +374,7 @@ public partial class AcRoom
             {
                 // 남은 횟수 하나 = 사탕 하나가 줄무늬로
                 var cand = new List<Vector2Int>();
-                for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t != null && t.sp == SpNone && t.c >= 0) cand.Add(new Vector2Int(x, y)); }
+                for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t != null && t.sp == SpNone && t.c >= 0 && !t.ice) cand.Add(new Vector2Int(x, y)); }
                 int n = Mathf.Min(cdMoves, Mathf.Min(4, cand.Count));
                 for (int i = 0; i < n; i++)
                 {
@@ -338,7 +400,7 @@ public partial class AcRoom
     void CdShuffle()
     {
         var cells = new List<Vector2Int>();
-        for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t != null && t.sp != SpSnow) cells.Add(new Vector2Int(x, y)); }
+        for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t != null && t.sp != SpSnow && !t.ice) cells.Add(new Vector2Int(x, y)); }
         var tiles = cells.Select(p => cdB[p.x, p.y]).ToList();
         for (int tries = 0; tries < 80; tries++)
         {
@@ -357,10 +419,11 @@ public partial class AcRoom
         int clearBonus = win ? 3000 : 0; cdScore += clearBonus;
         cdStars = !win ? 0 : cdScore >= 30000 ? 3 : cdScore >= 18000 ? 2 : 1;
         cdNewBest = cdScore > cdPrevBest;
+        if (win && PlayerPrefs.GetInt("candy_lv", 1) < cdLevel + 1) { PlayerPrefs.SetInt("candy_lv", Mathf.Min(cdLevel + 1, CdMaxLevel())); PlayerPrefs.Save(); }
         if (!cdSaved && net != null && cdScore > 0)
         {
             cdSaved = true;
-            net.Put("candy/" + myKey + "~" + AcSync.UnixMs.ToString("0"), "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"best\":" + cdScore + ",\"clear\":" + (win ? 1 : 0) + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
+            net.Put("candy/" + myKey + "~" + AcSync.UnixMs.ToString("0"), "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"best\":" + cdScore + ",\"clear\":" + (win ? 1 : 0) + ",\"lv\":" + cdLevel + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
         }
         cdFinishPending = true;
     }
@@ -383,10 +446,33 @@ public partial class AcRoom
         if (cdParts.Count > 420) cdParts.RemoveRange(0, cdParts.Count - 420);
     }
 
+    void CdStars(Vector2 at, Color c, int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            float a = (float)cdRnd.NextDouble() * Mathf.PI * 2, sp = cdCell * (1.5f + (float)cdRnd.NextDouble() * 5f);
+            cdParts.Add(new CdPart { p = at, v = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * sp - Vector2.up * cdCell * 1.5f, life = 0, max = 0.5f + (float)cdRnd.NextDouble() * 0.5f, size = cdCell * (0.35f + (float)cdRnd.NextDouble() * 0.45f), rot = a * 3f, c = c, kind = 3 });
+        }
+        if (cdParts.Count > 650) cdParts.RemoveRange(0, cdParts.Count - 650);
+    }
+    void CdLineSparks(bool row, int idx, Color c)
+    {
+        var cc = Color.Lerp(c, Color.white, 0.5f);
+        for (int i = 0; i < 16; i++)
+        {
+            float u = (i + (float)cdRnd.NextDouble()) / 16f;
+            var p = row ? new Vector2(cdBoardR.x + u * cdBoardR.width, cdBoardR.y + (idx + 0.5f) * cdCell) : new Vector2(cdBoardR.x + (idx + 0.5f) * cdCell, cdBoardR.y + u * cdBoardR.height);
+            var perp = (row ? Vector2.up : Vector2.right) * ((i & 1) == 0 ? 1 : -1) * cdCell * (1.5f + (float)cdRnd.NextDouble() * 2.5f);
+            cdParts.Add(new CdPart { p = p, v = perp, life = 0, max = 0.45f + (float)cdRnd.NextDouble() * 0.3f, size = cdCell * (0.3f + (float)cdRnd.NextDouble() * 0.3f), rot = i, c = cc, kind = 3 });
+        }
+    }
+
     // ===== 매 프레임 =====
     string cdErr = "";
     void CandyUpdate(float dt)
     {
+        // 안전장치: 캔디 팡이 닫혀 있는데 장면이 안 그려지는 상태면 되돌림
+        if (!candyOpen && cam && cam.cullingMask == 0) cam.cullingMask = cdCamMask != -1 && cdCamMask != 0 ? cdCamMask : ~(1 << IconLayer);
         try { CandyUpdate0(dt); } catch (Exception ex) { cdErr = ex.GetType().Name + ":" + ex.Message; Debug.LogException(ex); }
     }
     void CandyUpdate0(float dt)
@@ -399,6 +485,8 @@ public partial class AcRoom
         cdShown = Mathf.MoveTowards(cdShown, cdScore, Mathf.Max(60, (cdScore - cdShown) * 6) * dt);
         for (int i = 0; i < cdGoalPop.Length; i++) cdGoalPop[i] = Mathf.Max(0, cdGoalPop[i] - dt * 3);
         cdShake = Mathf.MoveTowards(cdShake, 0, dt * 40);
+        cdFlash = Mathf.MoveTowards(cdFlash, 0, dt * 2.2f);
+        cdIntroT += dt;
         // 타일 움직임
         bool moving = false;
         for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
@@ -440,7 +528,7 @@ public partial class AcRoom
             case CdP.Shuffle:
                 {
                     float u = Mathf.Clamp01(cdpT / 0.5f), e = u * u * (3 - 2 * u);
-                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t == null || t.sp == SpSnow) continue; t.x = Mathf.Lerp(t.ox, x, e); t.y = Mathf.Lerp(t.oy, y, e) - Mathf.Sin(u * Mathf.PI) * 0.4f; }
+                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t == null || t.sp == SpSnow || t.ice) continue; t.x = Mathf.Lerp(t.ox, x, e); t.y = Mathf.Lerp(t.oy, y, e) - Mathf.Sin(u * Mathf.PI) * 0.4f; }
                     if (u >= 1) { cdBannerText = null; CdSettle(); }
                 }
                 break;
@@ -470,7 +558,11 @@ public partial class AcRoom
         for (int i = cdFlies.Count - 1; i >= 0; i--)
         {
             var f = cdFlies[i]; f.t += dt / 0.65f;
-            if (f.t >= 1) { if (f.goal < cdGoalPop.Length) cdGoalPop[f.goal] = 1; if (Time.unscaledTime - cdSfxCollectT > 0.06f) { cdSfxCollectT = Time.unscaledTime; Sfx("candy_collect", 0.35f, 1f + (float)cdRnd.NextDouble() * 0.2f); } cdFlies.RemoveAt(i); }
+            if (f.t >= 1)
+            {
+                if (f.goal < cdGoalPop.Length) cdGoalPop[f.goal] = 1;
+                bool lastOne = f.goal < cdGoalLeft.Count && cdGoalLeft[f.goal] <= 0 && !cdFlies.Where((x, j) => j != i && x.goal == f.goal).Any();
+                if (lastOne) { CdStars(cdGoalRects[f.goal].center, new Color(1f, 0.95f, 0.6f), 12); CdSfx("candy_special", 0.6f, 1.2f); } if (Time.unscaledTime - cdSfxCollectT > 0.06f) { cdSfxCollectT = Time.unscaledTime; Sfx("candy_collect", 0.35f, 1f + (float)cdRnd.NextDouble() * 0.2f); } cdFlies.RemoveAt(i); }
             else cdFlies[i] = f;
         }
         cdComboText.t += dt;
@@ -490,7 +582,7 @@ public partial class AcRoom
             {
                 for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) extra.Add(new Vector2Int(x, y));
                 ta.sp = tb.sp = SpNone; ta.c = tb.c = -1;
-                cdRings.Add((CellCenter(B.x, B.y), cdCell * 9f, Color.white, 0)); CdSfx("candy_magic", 0.9f); CdSfx("candy_boom", 0.9f); cdShake = 14;
+                cdRings.Add((CellCenter(B.x, B.y), cdCell * 9f, Color.white, 0)); CdSfx("candy_magic", 0.9f); CdSfx("candy_boom", 0.9f); cdShake = 14; cdFlash = 0.9f; CdStars(CellCenter(B.x, B.y), Color.white, 24);
                 cdComboText = ("크리스마스 대폭발!", 0);
             }
             else if (ta.sp == SpBomb || tb.sp == SpBomb)
@@ -504,7 +596,7 @@ public partial class AcRoom
                         if (osp == SpH || osp == SpV) t.sp = cdRnd.Next(2) == 0 ? SpH : SpV; else if (osp == SpWrap) t.sp = SpWrap;
                         extra.Add(new Vector2Int(x, y)); cdBolts.Add((CellCenter(bp.x, bp.y), CellCenter(x, y), 0));
                     }
-                cdRings.Add((CellCenter(bp.x, bp.y), cdCell * 2f, Color.white, 0)); CdSfx("candy_magic", 0.8f); cdShake = 8;
+                cdRings.Add((CellCenter(bp.x, bp.y), cdCell * 2f, Color.white, 0)); CdSfx("candy_magic", 0.8f); cdShake = 8; cdFlash = Mathf.Max(cdFlash, 0.5f); CdStars(CellCenter(bp.x, bp.y), Color.white, 14);
                 // 방울 자체는 색이 없어 맞춤에 안 들어가므로 직접 지움
                 bomb.c = c;
             }
@@ -516,7 +608,7 @@ public partial class AcRoom
                 if (r == 2)
                 {
                     for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) extra.Add(new Vector2Int(B.x + dx, B.y + dy));
-                    cdRings.Add((CellCenter(B.x, B.y), cdCell * 3.6f, CdCol[Mathf.Clamp(tb.c, 0, 5)], 0)); CdSfx("candy_boom", 0.9f); cdShake = 12;
+                    cdRings.Add((CellCenter(B.x, B.y), cdCell * 3.6f, CdCol[Mathf.Clamp(tb.c, 0, 5)], 0)); CdSfx("candy_boom", 0.9f); cdShake = 12; cdFlash = Mathf.Max(cdFlash, 0.6f); CdStars(CellCenter(B.x, B.y), Color.white, 18);
                 }
                 else
                 {
@@ -609,6 +701,15 @@ public partial class AcRoom
                 float sx = Mathf.Repeat(i * 97.3f + Mathf.Sin(Time.time * 0.6f + i) * 20f, SW), sy = Mathf.Repeat(i * 53.7f + Time.time * (18 + i % 7 * 6), SH);
                 float s = 3 + i % 4 * 2; DT(new Rect(sx - s, sy - s, s * 2, s * 2), dot, new Color(1, 1, 1, 0.55f));
             }
+            // 하늘에서 반짝이는 별
+            var star = CTx("star");
+            for (int i = 0; i < 14; i++)
+            {
+                float tw = Mathf.Sin(Time.time * (1.3f + i % 5 * 0.4f) + i * 2.1f);
+                if (tw < 0.3f) continue;
+                float sx = Mathf.Repeat(i * 131.7f, SW), sy = Mathf.Repeat(i * 71.3f, SH * 0.45f);
+                float s = (10 + i % 3 * 6) * tw; DT(new Rect(sx - s, sy - s, s * 2, s * 2), star, new Color(1f, 0.97f, 0.85f, 0.8f * tw));
+            }
         }
         switch (cds)
         {
@@ -646,8 +747,15 @@ public partial class AcRoom
             "같은 사탕 3개를 맞춰 목표를 모아요!\n4개 한 줄: 줄무늬 사탕,  ㄱ/T 모양: 포장 사탕\n5개 한 줄: 반짝 방울\n특수 사탕끼리 바꾸면 더 크게 펑!", st);
         int best = CdMyBest();
         CgText(new Rect(0, info.yMax + 8, SW, 26), best > 0 ? $"{uiName.Trim()} 님의 최고 점수  {best:#,0}" : "첫 기록을 세워 보세요!", 17, new Color(1f, 0.92f, 0.6f));
-        float bw = Mathf.Min(260, SW - 60), by = info.yMax + 46;
-        if (CgButton(new Rect(SW / 2 - bw / 2, by, bw, 58), "게임 시작!", new Color(0.92f, 0.3f, 0.38f), 24)) CdNewGame();
+        float bw = Mathf.Min(260, SW - 60), by = info.yMax + 92;
+        // 스테이지 고르기 (깬 스테이지 다음 판까지)
+        int unlocked = Mathf.Clamp(PlayerPrefs.GetInt("candy_lv", 1), 1, CdMaxLevel());
+        var lr = new Rect(SW / 2 - bw / 2, info.yMax + 40, bw, 40);
+        Pill(lr, new Color(0.25f, 0.12f, 0.35f, 0.55f));
+        CgText(new Rect(lr.x + 40, lr.y, lr.width - 80, lr.height), CdLevelTitle(cdLevel), 17, new Color(1f, 0.95f, 0.75f));
+        if (cdLevel > 1 && CgButton(new Rect(lr.x + 2, lr.y + 2, 40, 36), "<", new Color(0.55f, 0.4f, 0.8f), 18)) cdLevel--;
+        if (cdLevel < unlocked && CgButton(new Rect(lr.xMax - 42, lr.y + 2, 40, 36), ">", new Color(0.55f, 0.4f, 0.8f), 18)) cdLevel++;
+        if (CgButton(new Rect(SW / 2 - bw / 2, by, bw, 58), $"스테이지 {cdLevel} 시작!", new Color(0.92f, 0.3f, 0.38f), 23)) CdNewGame();
         float sw2 = (bw - 10) / 2;
         if (CgButton(new Rect(SW / 2 - bw / 2, by + 68, sw2, 46), "명예의 전당", new Color(0.95f, 0.65f, 0.2f), 17)) { cds = CdS.Board; cdsT = 0; }
         if (CgButton(new Rect(SW / 2 - bw / 2 + sw2 + 10, by + 68, sw2, 46), "나가기", new Color(0.45f, 0.55f, 0.7f), 17)) CloseCandy();
@@ -682,11 +790,26 @@ public partial class AcRoom
         Vector2 shake = cdShake > 0 ? new Vector2(Mathf.Sin(Time.time * 70f), Mathf.Cos(Time.time * 63f)) * cdShake * 0.5f : Vector2.zero;
         var br = new Rect(cdBoardR.x + shake.x, cdBoardR.y + shake.y, cdBoardR.width, cdBoardR.height);
         // 판 바탕
-        Panel(new Rect(br.x - 14, br.y - 10, br.width + 28, br.height + 28), new Color(0.12f, 0.06f, 0.2f, 0.35f));
-        Panel(new Rect(br.x - 12, br.y - 12, br.width + 24, br.height + 24), new Color(0.98f, 0.94f, 1f, 0.9f));
         var cell = CTx("cell");
+        // 연쇄가 길어지면 판 둘레가 금빛으로 빛남
+        if (cdCombo >= 3 || cdFlash > 0.05f)
+        {
+            float gl = Mathf.Clamp01((cdCombo - 2) * 0.25f) * (0.6f + 0.4f * Mathf.Sin(Time.time * 8f)) + cdFlash;
+            DT(new Rect(br.x - br.width * 0.25f, br.y - br.height * 0.25f, br.width * 1.5f, br.height * 1.5f), CTx("dot"), new Color(1f, 0.85f, 0.4f, Mathf.Clamp01(gl) * 0.55f));
+        }
+        // 판 모양(빈칸 '#'은 비워 둠): 그림자 → 흰 테두리 → 칸
+        float pad = 7;
+        for (int pass = 0; pass < 2; pass++)
+            for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
+                {
+                    if (cdHole[x, y]) continue;
+                    var r = new Rect(br.x + x * cdCell - pad, br.y + y * cdCell - pad, cdCell + pad * 2, cdCell + pad * 2);
+                    if (pass == 0) DT(new Rect(r.x, r.y + 5, r.width, r.height), cell, new Color(0.12f, 0.05f, 0.22f, 0.4f));
+                    else DT(r, cell, new Color(0.99f, 0.95f, 1f, 0.95f));
+                }
         for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
             {
+                if (cdHole[x, y]) continue;
                 var c = ((x + y) & 1) == 0 ? new Color(0.78f, 0.72f, 0.95f, 0.75f) : new Color(0.9f, 0.86f, 1f, 0.75f);
                 DT(new Rect(br.x + x * cdCell + 1, br.y + y * cdCell + 1, cdCell - 2, cdCell - 2), cell, c);
             }
@@ -714,6 +837,14 @@ public partial class AcRoom
                         if (pass == 0)
                         {
                             if (!t.dying) DT(new Rect(cx - w * 0.44f, (t.y + 0.5f) * cdCell + s * 0.36f - h * 0.08f, w * 0.88f, h * 0.22f), shadow, new Color(1, 1, 1, 0.55f));
+                            if (!t.dying && (t.sp == SpH || t.sp == SpV || t.sp == SpWrap || t.sp == SpBomb))
+                            {
+                                // 특수 사탕은 뒤에서 은은하게 빛남 (방울은 무지개색)
+                                float pu = 0.55f + 0.45f * Mathf.Sin(Time.time * 5f + t.id);
+                                var hc = t.sp == SpBomb ? Color.HSVToRGB(Mathf.Repeat(Time.time * 0.5f + t.id * 0.13f, 1f), 0.6f, 1f) : Color.Lerp(CdCol[Mathf.Clamp(t.c, 0, 5)], Color.white, 0.35f);
+                                float hs = s * (t.sp == SpWrap ? 1.55f : 1.4f);
+                                DT(new Rect(cx - hs / 2, cyy - hs / 2, hs, hs), CTx("dot"), new Color(hc.r, hc.g, hc.b, 0.55f * pu));
+                            }
                             if (sel || hinted)
                             {
                                 float pu = 0.5f + 0.5f * Mathf.Sin(Time.time * (sel ? 9f : 6f));
@@ -734,6 +865,13 @@ public partial class AcRoom
                         }
                         else DT(new Rect(cx - w / 2, cyy - h / 2, w, h), tex, new Color(1, 1, 1, alpha));
                         if (t.dying && t.pop < 0.5f) DT(new Rect(cx - w / 2, cyy - h / 2, w, h), CTx("dot"), new Color(1, 1, 1, (0.5f - t.pop) * 1.4f));
+                        if (t.ice) DT(new Rect(cx - cdCell * 0.49f, (t.y + 0.5f) * cdCell - cdCell * 0.49f, cdCell * 0.98f, cdCell * 0.98f), CTx("ice"), Color.white);
+                        // 줄무늬·포장 사탕 위로 가끔 반짝
+                        if (!t.dying && t.sp != SpNone && t.sp != SpSnow)
+                        {
+                            float tw = (Time.time * 1.7f + t.id * 0.37f) % 2.2f;
+                            if (tw < 0.5f) { float ss = s * 0.55f * Mathf.Sin(tw / 0.5f * Mathf.PI); DT(new Rect(cx - s * 0.22f - ss / 2, cyy - s * 0.25f - ss / 2, ss, ss), CTx("star"), Color.white); }
+                        }
                     }
         }
         GUI.EndGroup();
@@ -770,7 +908,8 @@ public partial class AcRoom
                 float ang = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg, a = 1 - bo.t / 0.4f;
                 var c = (bo.a + bo.b) / 2;
                 var m = GUI.matrix; GUIUtility.RotateAroundPivot(ang, c * UiK);
-                DT(new Rect(c.x - len / 2, c.y - cdCell * 0.25f, len, cdCell * 0.5f), CTx("beam"), new Color(0.8f, 0.9f, 1f, a));
+                var bc = Color.HSVToRGB(Mathf.Repeat(Time.time * 1.5f + len * 0.003f, 1f), 0.55f, 1f);
+                DT(new Rect(c.x - len / 2, c.y - cdCell * 0.25f, len, cdCell * 0.5f), CTx("beam"), new Color(bc.r, bc.g, bc.b, a));
                 DT(new Rect(c.x - len / 2, c.y - cdCell * 0.07f, len, cdCell * 0.14f), CTx("beam"), new Color(1, 1, 1, a));
                 GUI.matrix = m;
             }
@@ -780,6 +919,7 @@ public partial class AcRoom
             {
                 float k = p.life / p.max, a = 1 - k;
                 if (p.kind == 2) { float r = p.size * (0.5f + k * 0.8f); DT(new Rect(p.p.x - r / 2, p.p.y - r / 2, r, r), CTx("dot"), new Color(p.c.r, p.c.g, p.c.b, p.c.a * a)); continue; }
+                if (p.kind == 3) { float st = p.size * (0.6f + 0.4f * Mathf.Sin(p.life * 18f + p.rot)) * (1 - k * 0.4f); DT(new Rect(p.p.x - st / 2, p.p.y - st / 2, st, st), CTx("star"), new Color(p.c.r, p.c.g, p.c.b, a)); continue; }
                 float s = p.size * (p.kind == 1 ? (1 - k * 0.5f) : (1 - k * 0.3f));
                 var tex = p.kind == 1 ? CTx("spark") : CTx("dot");
                 var col = p.kind == 1 ? Color.Lerp(Color.white, p.c, 0.4f) : p.c;
@@ -809,7 +949,22 @@ public partial class AcRoom
             float a = Mathf.Clamp01((1.1f - k) * 3);
             var c = new Vector2(br.center.x, br.y + br.height * 0.42f);
             var m = GUI.matrix; GUIUtility.ScaleAroundPivot(new Vector2(sc, sc), c * UiK);
-            CgText(new Rect(c.x - 200, c.y - 30, 400, 60), cdComboText.s, 34, new Color(1f, 0.95f, 0.6f, a), TextAnchor.MiddleCenter, 3, new Color(0.6f, 0.1f, 0.25f, a));
+            var rc = Color.Lerp(Color.HSVToRGB(Mathf.Repeat(Time.time * 0.8f, 1f), 0.45f, 1f), new Color(1f, 0.95f, 0.6f), 0.35f);
+            CgText(new Rect(c.x - 200, c.y - 30, 400, 60), cdComboText.s, 36, new Color(rc.r, rc.g, rc.b, a), TextAnchor.MiddleCenter, 3.5f, new Color(0.55f, 0.08f, 0.3f, a));
+            GUI.matrix = m;
+        }
+        // 화면 번쩍 (큰 폭발)
+        if (cdFlash > 0.01f) DT(new Rect(0, 0, SW, SH), Texture2D.whiteTexture, new Color(1f, 0.98f, 0.92f, Mathf.Clamp01(cdFlash) * 0.55f));
+        // 스테이지 시작 알림
+        if (cdIntroT < 2.2f && cdp != CdP.Banner)
+        {
+            float k = cdIntroT, a = Mathf.Clamp01(k * 4) * Mathf.Clamp01((2.2f - k) * 3);
+            float sc = k < 0.25f ? Mathf.Lerp(0.6f, 1.08f, k / 0.25f) : k < 0.4f ? Mathf.Lerp(1.08f, 1f, (k - 0.25f) / 0.15f) : 1f;
+            var c = new Vector2(br.center.x, br.y + br.height * 0.45f);
+            Panel(new Rect(br.x - 4, c.y - 52, br.width + 8, 104), new Color(0.35f, 0.12f, 0.35f, 0.78f * a));
+            var m = GUI.matrix; GUIUtility.ScaleAroundPivot(new Vector2(sc, sc), c * UiK);
+            CgText(new Rect(c.x - 220, c.y - 44, 440, 50), CdLevelTitle(cdLevel), 30, new Color(1f, 0.93f, 0.55f, a), TextAnchor.MiddleCenter, 3, new Color(0.5f, 0.08f, 0.2f, a));
+            CgText(new Rect(c.x - 220, c.y + 6, 440, 34), $"{cdMovesTotal}번 안에 목표를 모아요!", 18, new Color(1, 1, 1, a), TextAnchor.MiddleCenter, 2, new Color(0.3f, 0.05f, 0.2f, a));
             GUI.matrix = m;
         }
         // 큰 알림 (목표 달성 / 끝)
@@ -880,6 +1035,7 @@ public partial class AcRoom
         cdGoalRects[i] = new Rect(r.x + r.width / 2 - 18, r.y, 36, 36);
         float pop = i < cdGoalPop.Length ? cdGoalPop[i] : 0;
         float s = 38 * (1 + pop * 0.25f);
+        if (cdGoalKind[i] == 7) DT(new Rect(r.center.x - s * 0.4f, r.y + 18 - s * 0.4f, s * 0.8f, s * 0.8f), CTx("piece_0"), new Color(1, 1, 1, 0.85f));
         DT(new Rect(r.center.x - s / 2, r.y + 18 - s / 2, s, s), KindTex(cdGoalKind[i]), Color.white);
         int left = cdGoalLeft[i];
         if (left <= 0)
@@ -902,7 +1058,7 @@ public partial class AcRoom
         Panel(r, new Color(1f, 0.97f, 0.93f, 1f));
         var rib = new Rect(r.x + 30, r.y - 22, r.width - 60, 52);
         Pill(rib, cdWin ? new Color(0.92f, 0.3f, 0.38f) : new Color(0.5f, 0.55f, 0.7f));
-        CgText(rib, cdWin ? "성공!" : "아쉬워요!", 28, new Color(1f, 0.95f, 0.7f), TextAnchor.MiddleCenter, 2.5f, new Color(0.4f, 0.06f, 0.15f));
+        CgText(rib, (cdWin ? "성공!" : "아쉬워요!") + $"  {cdLevel}단계", 26, new Color(1f, 0.95f, 0.7f), TextAnchor.MiddleCenter, 2.5f, new Color(0.4f, 0.06f, 0.15f));
         // 별 3개
         var star = CTx("piece_2");
         for (int i = 0; i < 3; i++)
@@ -917,7 +1073,11 @@ public partial class AcRoom
         CgText(new Rect(r.x, r.y + 120, r.width, 46), ((int)shownFinal).ToString("#,0") + "점", 34, new Color(1f, 0.82f, 0.3f), TextAnchor.MiddleCenter, 2.5f, new Color(0.45f, 0.15f, 0.2f));
         var st = new GUIStyle(CgStyle(15, TextAnchor.MiddleCenter)) { normal = { textColor = new Color(0.4f, 0.22f, 0.3f).linear } };
         GUI.Label(new Rect(r.x, r.y + 166, r.width, 22), cdNewBest ? "내 최고 기록 경신!" : (cdPrevBest > 0 ? $"내 최고 점수 {Mathf.Max(cdPrevBest, cdScore):#,0}" : ""), st);
-        if (CgButton(new Rect(r.center.x - 120, r.y + 200, 240, 54), "다시 하기", new Color(0.92f, 0.3f, 0.38f), 21)) CdNewGame();
+        if (cdWin)
+        {
+            if (CgButton(new Rect(r.center.x - 120, r.y + 200, 240, 54), $"다음 스테이지 {Mathf.Min(cdLevel + 1, CdMaxLevel())}!", new Color(0.92f, 0.3f, 0.38f), 21)) { cdLevel = Mathf.Min(cdLevel + 1, CdMaxLevel()); CdNewGame(); }
+        }
+        else if (CgButton(new Rect(r.center.x - 120, r.y + 200, 240, 54), "다시 하기", new Color(0.92f, 0.3f, 0.38f), 21)) CdNewGame();
         float bw = 115;
         if (CgButton(new Rect(r.center.x - bw - 5, r.y + 264, bw, 44), "명예의 전당", new Color(0.95f, 0.65f, 0.2f), 15)) { cds = CdS.Board; cdsT = 0; }
         if (CgButton(new Rect(r.center.x + 5, r.y + 264, bw, 44), "나가기", new Color(0.45f, 0.55f, 0.7f), 15)) CloseCandy();
