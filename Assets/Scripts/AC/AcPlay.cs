@@ -530,7 +530,7 @@ public partial class AcRoom
         {
             GUI.Label(new Rect(p.x + 20, p.y + 80, p.width - 40, 40), "퀴즈가 곧 시작해요!", big);
             GUI.Label(new Rect(p.x + 20, p.y + 130, p.width - 40, 80), $"<size=48><b>{Math.Ceiling(-el / 1000)}</b></size>", big);
-            GUI.Label(new Rect(p.x + 20, p.y + 220, p.width - 40, 24), "10문제 · 문제마다 10초", center);
+            GUI.Label(new Rect(p.x + 20, p.y + 220, p.width - 40, 24), "10문제, 문제마다 10초", center);
             return;
         }
         // 모이는 화면 (끝난 판이 있으면 결과도)
@@ -551,7 +551,7 @@ public partial class AcRoom
         y += 28;
         GUI.Label(new Rect(p.x + 16, y, p.width - 32, 44), string.Join(", ", names.Take(14).Select(n => Short(n, 6))) + (names.Count > 14 ? " …" : ""), center);
         y += 50;
-        GUI.Label(new Rect(p.x + 16, y, p.width - 32, 22), "10문제를 같이 풀어요 · 문제마다 10초", center);
+        GUI.Label(new Rect(p.x + 16, y, p.width - 32, 22), "10문제를 같이 풀어요, 문제마다 10초", center);
         y += 30;
         float bw = Mathf.Min(170, (p.width - 48) / 2);
         if (GUI.Button(new Rect(p.center.x - bw - 8, y, bw, 40), "모두에게 알리기", sBtn)) { AddAct("qa", ""); Toast("모두에게 퀴즈 소식을 보냈어요"); }
@@ -579,7 +579,7 @@ public partial class AcRoom
     {
         snowMode = !snowMode;
         if (snowMode && me.skating) { me.SetSkates(false); skateVel = Vector3.zero; }   // 스케이트와 눈싸움은 함께 못 해요
-        if (snowMode) Toast(IsMobile ? "눈싸움! 친구나 땅을 톡 누르면 던져요 (큰 눈·작은 눈 고르기)" : "눈싸움! 클릭한 곳으로 던져요 (F: 앞으로, 1·2: 큰 눈·작은 눈)");
+        if (snowMode) Toast(IsMobile ? "눈싸움! 친구나 땅을 톡 누르면 던져요 (큰 눈/작은 눈 고르기)" : "눈싸움! 클릭한 곳으로 던져요 (F: 앞으로, 1/2: 큰 눈/작은 눈)");
     }
 
     void ThrowSnowball(Vector3 target)
@@ -754,7 +754,7 @@ public partial class AcRoom
         var top3 = s == null ? new List<(string, int)>() : s.Values.OfType<Dictionary<string, object>>().Select(d => (AcJson.S(d, "name"), (int)AcJson.D(d, "hits"))).Where(x => x.Item2 > 0).OrderByDescending(x => x.Item2).Take(3).ToList();
         var r = new Rect(12, top, w, 36 + top3.Count * 20);
         GUI.Box(R(r), "", sBox);
-        GUI.Label(new Rect(r.x + 12, r.y + 6, w - 20, 24), $"<b>눈싸움</b>  맞힘 {sbHits} · 맞음 {sbTaken}", sSmall);
+        GUI.Label(new Rect(r.x + 12, r.y + 6, w - 20, 24), $"<b>눈싸움</b>  맞힘 {sbHits}, 맞음 {sbTaken}", sSmall);
         // 큰 눈 / 작은 눈 고르기
         var br = new Rect(r.x, r.yMax + 6, w, 40);
         GUI.Box(R(br), "", sBox);
@@ -882,6 +882,6 @@ public partial class AcRoom
         float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : SW < 1000 ? 112 : 60;
         var r = new Rect(12, top, w, 36);
         GUI.Box(R(r), "", sBox);
-        GUI.Label(new Rect(r.x + 12, r.y + 7, w - 20, 24), $"<b>베개 싸움</b>  퍽! {pwHits} · 맞음 {pwTaken}", sSmall);
+        GUI.Label(new Rect(r.x + 12, r.y + 7, w - 20, 24), $"<b>베개 싸움</b>  퍽! {pwHits}, 맞음 {pwTaken}", sSmall);
     }
 }

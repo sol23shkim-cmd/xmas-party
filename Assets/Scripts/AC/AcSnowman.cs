@@ -456,7 +456,7 @@ public partial class AcRoom
         float h = narrow ? 300 : 220, y = SH - h - 8;
         var box = new Rect(10, y, SW - 20, h);
         GUI.Box(R(box), "", sBox);
-        string[] tabs = { "눈덩이", "장식 붙이기", "모자·목도리" };
+        string[] tabs = { "눈덩이", "장식 붙이기", "모자/목도리" };
         float tw = narrow ? (SW - 44 - 12) / 3f : 120;
         for (int i = 0; i < tabs.Length; i++)
         {
@@ -491,7 +491,7 @@ public partial class AcRoom
         }
         else if (snowTab == 1)
         {
-            GUI.Label(new Rect(lx, cy - 4, SW - 60, 22), IsMobile ? "<size=13>누른 채 자리 잡고 떼면 붙이기 · 길게 눌러 떼기 · 두 손가락 확대</size>" : "<size=13>클릭해 붙이기 · 오른쪽 클릭으로 떼기 · 끌어서 돌려 보기</size>", sSmall);
+            GUI.Label(new Rect(lx, cy - 4, SW - 60, 22), IsMobile ? "<size=13>누른 채 자리 잡고 떼면 붙이기, 길게 눌러 떼기, 두 손가락 확대</size>" : "<size=13>클릭해 붙이기, 오른쪽 클릭으로 떼기, 끌어서 돌려 보기</size>", sSmall);
             cy += 20;
             // 장식 모양 (그림): 옆으로 끌어 넘기기 · 누르면 고르기(다시 누르면 해제) · 끌어서 눈사람에 놓기
             float size = narrow ? 54 : 60;
@@ -501,7 +501,7 @@ public partial class AcRoom
             cy += size + 12;
             var it = AcCatalog.Get(CurDeco);
             if (snowPicked) { GUI.Label(new Rect(lx, cy + 3, 130, 22), it != null ? it.desc : CurDeco, sLabelSel); if (GUI.Button(R(new Rect(lx + 140, cy, 82, 28)), "선택 해제", sBtn)) snowPicked = false; }
-            else GUI.Label(new Rect(lx, cy + 3, SW - 60, 22), "<size=13>둘러보기: 끌어서 돌려 보기 · 장식을 고르면 붙일 수 있어요</size>", sSmall);
+            else GUI.Label(new Rect(lx, cy + 3, SW - 60, 22), "<size=13>둘러보기: 끌어서 돌려 보기, 장식을 고르면 붙일 수 있어요</size>", sSmall);
             cy += 34;
             float x2 = lx;
             if (DecoTintable(CurDeco))
@@ -631,7 +631,7 @@ public partial class AcRoom
         var r = new Rect(SW / 2 - w / 2, SH - h - 12, w, h);
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 26), (who != "" ? who + " 님의 눈사람" : "눈사람"), sLabel);
-        GUI.Label(new Rect(r.x + 16, r.y + 36, w - 32, 22), snowDelAsk ? "<size=13>정말 없앨까요? 모두의 마당에서 사라져요</size>" : (IsMobile ? "<size=13>끌어서 돌려 보기 · 두 손가락 확대</size>" : "<size=13>끌어서 돌려 보기 · 휠 확대</size>"), sSmall);
+        GUI.Label(new Rect(r.x + 16, r.y + 36, w - 32, 22), snowDelAsk ? "<size=13>정말 없앨까요? 모두의 마당에서 사라져요</size>" : (IsMobile ? "<size=13>끌어서 돌려 보기, 두 손가락 확대</size>" : "<size=13>끌어서 돌려 보기, 휠 확대</size>"), sSmall);
         float bw = 96, by = r.y + 58;
         if (!snowDelAsk)
         {

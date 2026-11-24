@@ -116,7 +116,7 @@ public partial class AcRoom
                 if (lettersPrimed && l.from != myKey)
                 {
                     if (l.to == myKey) { Toast(l.fromName + " 님이 비밀 편지를 보냈어요! 입구 우편함이나 거실 벽난로 편지함에서 읽어 보세요"); Log("[편지] " + l.fromName + " 님의 비밀 편지가 도착했어요"); }
-                    else { Toast(l.fromName + " 님이 모두가 보라고 편지를 썼어요 (입구 우편함·벽난로 편지함)"); Log("[편지] " + l.fromName + " 님의 공개 편지: " + l.title); }
+                    else { Toast(l.fromName + " 님이 모두가 보라고 편지를 썼어요 (입구 우편함/벽난로 편지함)"); Log("[편지] " + l.fromName + " 님의 공개 편지: " + l.title); }
                 }
             }
         letters.RemoveAll(l => !alive.Contains(l.id));

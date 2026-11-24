@@ -645,7 +645,7 @@ public partial class AcRoom : MonoBehaviour
                 if (npcs.Count > 0) foreach (var c in npcs) c.gameObject.SetActive(false);
             }
             if (r.look != n.look) { r.look = n.look; r.c.Rebuild(AcLook.Decode(n.look)); }
-            if (!r.nameChecked && !string.IsNullOrEmpty(n.name)) { r.nameChecked = true; if (NameKey(n.name) == myKey) Toast("나와 같은 이름(" + n.name + ")으로 들어온 사람이 있어요. 편지·점수가 섞일 수 있어요"); }
+            if (!r.nameChecked && !string.IsNullOrEmpty(n.name)) { r.nameChecked = true; if (NameKey(n.name) == myKey) Toast("나와 같은 이름(" + n.name + ")으로 들어온 사람이 있어요. 편지/점수가 섞일 수 있어요"); }
             r.net = n; r.target = new Vector3(n.x, 0, n.z);
             if (r.c.skating != n.skate) r.c.SetSkates(n.skate);
             if (n.emoteT > r.lastEmoteT && AcSync.UnixMs - n.emoteT < 5000)
@@ -1226,7 +1226,7 @@ public partial class AcRoom : MonoBehaviour
             if (lobbyMsg != "") GUI.Label(new Rect(q.x + 18, q.y + 92, q.width - 36, 22), "<color=#b03030>" + lobbyMsg + "</color>", sSmall);
             if (GUI.Button(new Rect(q.x + 18, q.y + 112, bw, 42), "<b>입장하기</b>", sBtn)) Enter(false);
             if (GUI.Button(new Rect(q.x + 18 + bw + 10, q.y + 112, bw, 42), "혼자 둘러보기", sBtn)) Enter(true);
-            if (GUI.Button(new Rect(q.x + 18, q.y + 160, q.width - 36, 28), "꾸미기 · 이름 바꾸기", sBtn)) lobbyEdit = true;
+            if (GUI.Button(new Rect(q.x + 18, q.y + 160, q.width - 36, 28), "꾸미기, 이름 바꾸기", sBtn)) lobbyEdit = true;
             return;
         }
         if (Event.current.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;   // 글 칸 밖을 누르면 화살표로 꾸미기
@@ -1265,7 +1265,7 @@ public partial class AcRoom : MonoBehaviour
         if (GUI.Button(new Rect(SW - 20 - 90, y + 6, 82, 32), "<b>나오기</b>", sBtn)) { decorating = false; return; }
         if (GUI.Button(new Rect(SW - 20 - 90 - 100, y + 6, 92, 32), "트리 전경", sBtn)) { treeOverview = true; return; }
         // 도움말은 맨 아래 줄
-        GUI.Label(new Rect(26, y + h - 26, SW - 52, 22), (narrow ? $"장식 {ornObjs.Count}개 · " : "") + (IsMobile ? "누른 채 자리 잡고 떼면 달기 · 길게 눌러 떼기 · 두 손가락 확대" : "클릭으로 달기 · 오른쪽 클릭 떼기 · 해제 후 끌어서 둘러보기 · 휠 확대"), sSmall);
+        GUI.Label(new Rect(26, y + h - 26, SW - 52, 22), (narrow ? $"장식 {ornObjs.Count}개, " : "") + (IsMobile ? "누른 채 자리 잡고 떼면 달기, 길게 눌러 떼기, 두 손가락 확대" : "클릭으로 달기, 오른쪽 클릭 떼기, 해제 후 끌어서 둘러보기, 휠 확대"), sSmall);
         // 화면 오른쪽, 패널 위: 카메라 움직이기 버튼 (누르고 있는 동안) — 2x2로 패널과 떨어뜨려 둠
         decoButtons = 0;
         CamPad(SW - 20 - 2 * 66 - 6, y - 2 * 44 - 18, true);
@@ -1274,7 +1274,7 @@ public partial class AcRoom : MonoBehaviour
         int ci = IconStrip(ornStrip, new Rect(23, y + 37, perRowW + 6, 68), ornTypes.Count, 62, i => icons.TryGetValue(ornTypes[i], out var rt) ? rt : null, ornSel, ornPicked);
         if (ci >= 0) { if (ci == ornSel && ornPicked) ornPicked = false; else { SetSel(ci); ornPicked = true; } }
         var it = AcCatalog.Get(ornTypes[ornSel]);
-        if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "지금은 둘러보기: 끌어서 돌려 보기 · 장식을 고르면 달 수 있어요", sSmall);
+        if (!ornPicked) GUI.Label(new Rect(26, y + 104, Mathf.Min(460, SW - 52), 22), "지금은 둘러보기: 끌어서 돌려 보기, 장식을 고르면 달 수 있어요", sSmall);
         else
         {
             GUI.Label(new Rect(26, y + 104, narrow ? SW - 150 : Mathf.Min(420, SW - 290 - 130), 22), IsGarland(ornTypes[ornSel]) ? GarlandName(ornTypes[ornSel]) + " - 누른 높이에 한 바퀴" : it != null ? it.desc : ornTypes[ornSel], sSmall);

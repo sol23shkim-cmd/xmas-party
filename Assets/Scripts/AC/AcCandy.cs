@@ -845,6 +845,7 @@ public partial class AcRoom
                         if (pass == 0)
                         {
                             if (!t.dying) DT(new Rect(cx - w * 0.44f, (t.y + 0.5f) * cdCell + s * 0.36f - h * 0.08f, w * 0.88f, h * 0.22f), shadow, new Color(1, 1, 1, 0.55f));
+                            if (t.ice) DT(new Rect(t.x * cdCell + 2, t.y * cdCell + 2, cdCell - 4, cdCell - 4), CTx("cell"), new Color(0.65f, 0.88f, 1f, 0.9f));   // 얼음 칸 바탕
                             if (!t.dying && (t.sp == SpH || t.sp == SpV || t.sp == SpWrap || t.sp == SpBomb))
                             {
                                 // 특수 사탕은 뒤에서 은은하게 빛남 (방울은 무지개색)

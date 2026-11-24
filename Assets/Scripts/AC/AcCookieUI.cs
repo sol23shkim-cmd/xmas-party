@@ -258,7 +258,7 @@ public partial class AcRoom
         int best = MyBest();
         CgText(new Rect(0, by + 132, SW, 28), best > 0 ? $"{uiName.Trim()} 님의 최고 기록  {best:#,0}점" : "첫 기록을 세워 보세요!", 18, new Color(1f, 0.9f, 0.6f));
         if (portrait || SH > 520)
-            CgText(new Rect(0, by + 160, SW, 26), IsMobile ? "점프 버튼(두 번=2단 점프) · 슬라이드 버튼을 누르고 있기" : "스페이스: 점프(두 번=2단 점프) · 아래 화살표: 슬라이드", 15, new Color(0.95f, 0.9f, 0.85f), TextAnchor.MiddleCenter, 1.5f);
+            CgText(new Rect(0, by + 160, SW, 26), IsMobile ? "점프 버튼(두 번=2단 점프), 슬라이드 버튼을 누르고 있기" : "스페이스: 점프(두 번=2단 점프), 아래 화살표: 슬라이드", 15, new Color(0.95f, 0.9f, 0.85f), TextAnchor.MiddleCenter, 1.5f);
     }
 
     void CountGUI(Rect band)
@@ -577,7 +577,7 @@ public partial class AcRoom
             }
         }
         if (mine >= 10)
-            CgText(new Rect(list.x, list.yMax + 4, list.width, 24), $"내 순위 {mine + 1}등 · {boardList[mine].best:#,0}점", 16, new Color(1f, 0.9f, 0.6f));
+            CgText(new Rect(list.x, list.yMax + 4, list.width, 24), $"내 순위 {mine + 1}등, {boardList[mine].best:#,0}점", 16, new Color(1f, 0.9f, 0.6f));
         // 버튼
         float bw = 150, by = portrait ? SH - 62 : SH - 64;
         if (CgButton(new Rect(SW / 2 - bw - 6, by, bw, 50), "달리기 시작!", new Color(0.92f, 0.32f, 0.3f), 19)) StartRun();
