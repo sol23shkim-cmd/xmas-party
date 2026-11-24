@@ -69,7 +69,7 @@ public class AcCharacter : MonoBehaviour
             }
             pillow = new GameObject("Pillow");
             pillow.transform.SetParent(armR, false);
-            pillow.transform.localPosition = new Vector3(0, minY - 0.24f, 0.06f);
+            pillow.transform.localPosition = new Vector3(0, minY - 0.26f * transform.lossyScale.x / Mathf.Max(0.01f, armR.lossyScale.x), 0.04f);
             pillow.transform.localRotation = Quaternion.Euler(0, 0, 8f);   // 넓은 면이 앞을 보게
             pillow.AddComponent<MeshFilter>().sharedMesh = PillowMesh();
             var mr = pillow.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
@@ -83,7 +83,8 @@ public class AcCharacter : MonoBehaviour
             // 맞거나 휘두를 때 베개도 말랑하게 출렁
             float et = Time.time - emoteT;
             float wob = (emote == "swing" || emote == "bonk") && et < 0.8f ? Mathf.Exp(-et * 6f) * Mathf.Sin(et * 30f) * 0.18f : 0;
-            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob) * 1.25f;
+            float ws = transform.lossyScale.x / Mathf.Max(0.01f, armR ? armR.lossyScale.x : 1f);   // 팔 크기와 상관없이 캐릭터에 맞는 크기
+            pillow.transform.localScale = new Vector3(1 + wob, 1 - wob * 0.6f, 1 + wob) * 1.3f * ws;
         }
     }
     void tintPillow(MeshRenderer mr)
