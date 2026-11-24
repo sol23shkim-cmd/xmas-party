@@ -450,7 +450,6 @@ public partial class AcRoom
             case CdP.Idle:
                 cdIdle += dt;
                 if (cdIdle > 4.5f && cdHint == null) cdHint = CdFindMove();
-                CdInput();
                 break;
         }
         // 효과들
@@ -552,32 +551,41 @@ public partial class AcRoom
         if (!Swappable(cdB[a.x, a.y]) || !Swappable(cdB[b.x, b.y])) { CdSfx("candy_bad", 0.4f); return; }
         cdA = a; cdB2 = b; cdp = CdP.Swap; cdpT = 0; cdSel = new Vector2Int(-1, -1); CdSfx("candy_swap", 0.55f);
     }
-    void CdInput()
+    // 손가락/마우스: IMGUI 이벤트로 받음(웹·휴대폰 모두 확실하게 들어옴). 좌표는 UI 단위
+    void CdInputGUI()
     {
-        var u = new Vector2(ptrPos.x / UiK, (Screen.height - ptrPos.y) / UiK);
-        if (ptrDown)
+        var e = Event.current; if (e == null) return;
+        var et = e.type;
+        bool dn = et == EventType.MouseDown || et == EventType.TouchDown, mv = et == EventType.MouseDrag || et == EventType.TouchMove, up = et == EventType.MouseUp || et == EventType.TouchUp;
+        if (!dn && !mv && !up) return;
+        if (cds != CdS.Play) return;
+        var u = e.mousePosition;
+        bool idle = cdp == CdP.Idle;
+        if (dn)
         {
             var c = CdCellAt(u);
-            if (In(c) && Swappable(cdB[c.x, c.y])) { cdDown = c; cdDownPos = u; } else cdDown = new Vector2Int(-1, -1);
+            if (In(c) && Swappable(cdB[c.x, c.y])) { cdDown = c; cdDownPos = u; e.Use(); } else cdDown = new Vector2Int(-1, -1);
+            return;
         }
-        if (ptrPressed && In(cdDown))
+        if (!In(cdDown)) return;
+        if (mv)
         {
             var d = u - cdDownPos;
-            if (d.magnitude > cdCell * 0.32f)
+            if (d.magnitude > cdCell * 0.3f)
             {
                 var dir = Mathf.Abs(d.x) > Mathf.Abs(d.y) ? new Vector2Int(d.x > 0 ? 1 : -1, 0) : new Vector2Int(0, d.y > 0 ? 1 : -1);
                 var from = cdDown; cdDown = new Vector2Int(-1, -1);
-                CdTrySwap(from, from + dir);
-                return;
+                if (idle) CdTrySwap(from, from + dir);
             }
+            e.Use();
+            return;
         }
-        if (ptrUp && In(cdDown))
-        {
-            var c = cdDown; cdDown = new Vector2Int(-1, -1);
-            if (In(cdSel) && Mathf.Abs(cdSel.x - c.x) + Mathf.Abs(cdSel.y - c.y) == 1) CdTrySwap(cdSel, c);
-            else if (cdSel == c) cdSel = new Vector2Int(-1, -1);
-            else { cdSel = c; Sfx("click", 0.3f); }
-        }
+        // MouseUp = 톡 누르기: 고르기 / 옆 칸이면 바꾸기
+        var cc = cdDown; cdDown = new Vector2Int(-1, -1); e.Use();
+        if (!idle) return;
+        if (In(cdSel) && Mathf.Abs(cdSel.x - cc.x) + Mathf.Abs(cdSel.y - cc.y) == 1) CdTrySwap(cdSel, cc);
+        else if (cdSel == cc) cdSel = new Vector2Int(-1, -1);
+        else { cdSel = cc; Sfx("click", 0.3f); }
     }
 
     // ===== 그리기 =====
@@ -600,7 +608,7 @@ public partial class AcRoom
         switch (cds)
         {
             case CdS.Menu: CandyMenuGUI(); break;
-            case CdS.Play: CandyPlayGUI(); break;
+            case CdS.Play: CandyPlayGUI(); CdInputGUI(); break;
             case CdS.Result: CandyPlayGUI(); CandyResultGUI(); break;
             case CdS.Board: CandyBoardGUI(); break;
         }
@@ -630,7 +638,7 @@ public partial class AcRoom
         Panel(info, new Color(1f, 0.97f, 0.93f, 0.95f));
         var st = new GUIStyle(CgStyle(portrait ? 14 : 15, TextAnchor.MiddleCenter)) { wordWrap = true, normal = { textColor = new Color(0.36f, 0.2f, 0.25f).linear } };
         GUI.Label(new Rect(info.x + 14, info.y + 8, info.width - 28, info.height - 16),
-            "같은 사탕 3개를 맞춰 목표를 모아요!\n4개 한 줄 → 줄무늬 · ㄱ/T 모양 → 포장 사탕\n5개 한 줄 → 반짝 방울 · 특수 사탕끼리 바꾸면 더 크게 펑!", st);
+            "같은 사탕 3개를 맞춰 목표를 모아요!\n4개 한 줄: 줄무늬 사탕,  ㄱ/T 모양: 포장 사탕\n5개 한 줄: 반짝 방울\n특수 사탕끼리 바꾸면 더 크게 펑!", st);
         int best = CdMyBest();
         CgText(new Rect(0, info.yMax + 8, SW, 26), best > 0 ? $"{uiName.Trim()} 님의 최고 점수  {best:#,0}" : "첫 기록을 세워 보세요!", 17, new Color(1f, 0.92f, 0.6f));
         float bw = Mathf.Min(260, SW - 60), by = info.yMax + 46;
@@ -646,9 +654,9 @@ public partial class AcRoom
         if (portrait)
         {
             float headH = 132;
-            cdCell = Mathf.Floor(Mathf.Min((SW - 24) / CW, (SH - headH - 110) / CH));
+            cdCell = Mathf.Floor(Mathf.Min((SW - 44) / CW, (SH - headH - 110) / CH));
             float bw = cdCell * CW;
-            float top = 14 + headH + Mathf.Max(8, (SH - 14 - headH - bw - 70) * 0.45f);
+            float top = 14 + headH + 18 + Mathf.Max(0, (SH - 14 - headH - 18 - bw - 40) * 0.4f);
             cdBoardR = new Rect(Mathf.Round(SW / 2 - bw / 2), Mathf.Round(top), bw, bw);
             hud = new Rect(10, 12, SW - 20, headH);
         }
@@ -897,7 +905,7 @@ public partial class AcRoom
         float shownFinal = Mathf.Min(cdScore, cdScore * Mathf.Clamp01((cdsT - 0.2f) / 1.0f));
         CgText(new Rect(r.x, r.y + 120, r.width, 46), ((int)shownFinal).ToString("#,0") + "점", 34, new Color(1f, 0.82f, 0.3f), TextAnchor.MiddleCenter, 2.5f, new Color(0.45f, 0.15f, 0.2f));
         var st = new GUIStyle(CgStyle(15, TextAnchor.MiddleCenter)) { normal = { textColor = new Color(0.4f, 0.22f, 0.3f).linear } };
-        GUI.Label(new Rect(r.x, r.y + 166, r.width, 22), cdNewBest ? "★ 내 최고 기록! ★" : (cdPrevBest > 0 ? $"내 최고 점수 {Mathf.Max(cdPrevBest, cdScore):#,0}" : ""), st);
+        GUI.Label(new Rect(r.x, r.y + 166, r.width, 22), cdNewBest ? "내 최고 기록 경신!" : (cdPrevBest > 0 ? $"내 최고 점수 {Mathf.Max(cdPrevBest, cdScore):#,0}" : ""), st);
         if (CgButton(new Rect(r.center.x - 120, r.y + 200, 240, 54), "다시 하기", new Color(0.92f, 0.3f, 0.38f), 21)) CdNewGame();
         float bw = 115;
         if (CgButton(new Rect(r.center.x - bw - 5, r.y + 264, bw, 44), "명예의 전당", new Color(0.95f, 0.65f, 0.2f), 15)) { cds = CdS.Board; cdsT = 0; }
@@ -984,7 +992,7 @@ public partial class AcRoom
             else GUI.Label(new Rect(r.x + 40, r.y, 200, r.height), "-", ns);
         }
         int mine = list.FindIndex(b => NameKey(b.name) == myKey);
-        if (mine >= 0) CgText(new Rect(0, lr.yMax + 6, SW, 24), $"내 순위 {mine + 1}등 · {list[mine].best:#,0}점", 16, new Color(1f, 0.9f, 0.6f));
+        if (mine >= 0) CgText(new Rect(0, lr.yMax + 6, SW, 24), $"내 순위 {mine + 1}등,  {list[mine].best:#,0}점", 16, new Color(1f, 0.9f, 0.6f));
         float bw = 140, by = Mathf.Min(SH - 62, lr.yMax + 40);
         if (CgButton(new Rect(SW / 2 - bw - 6, by, bw, 50), "게임 시작!", new Color(0.92f, 0.3f, 0.38f), 18)) CdNewGame();
         if (CgButton(new Rect(SW / 2 + 6, by, bw, 50), "돌아가기", new Color(0.45f, 0.55f, 0.7f), 18)) { cds = CdS.Menu; cdsT = 0; }
