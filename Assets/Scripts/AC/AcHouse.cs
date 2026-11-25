@@ -423,22 +423,21 @@ public partial class AcRoom
 
     void FillGreenhouse(Vector3 c, Transform t)
     {
-        string[] trees = { "pine_small", "pine_snowy", "birch", "fruit_tree", "palm_cedar" };
-        var pos = new[] { new Vector3(-4.6f, 0, -5.4f), new Vector3(-1.5f, 0, -5.6f), new Vector3(1.8f, 0, -5.5f), new Vector3(4.7f, 0, -5.2f), new Vector3(-5.0f, 0, 4.4f) };
+        // 뒤쪽은 나무, 가운데 돌길 양옆으로 화분 12개 (AcGreenhouse.cs, 11-26)
+        string[] trees = { "pine_small", "pine_snowy", "birch", "fruit_tree" };
+        var pos = new[] { new Vector3(-4.6f, 0, -5.4f), new Vector3(-1.5f, 0, -5.6f), new Vector3(1.8f, 0, -5.5f), new Vector3(4.7f, 0, -5.2f) };
         for (int i = 0; i < pos.Length; i++) Put(trees[i], c + V(pos[i].x, 0, pos[i].z), i * 47, i == 1 ? 0.65f : 0.75f, null, t);
-        Put("bush_round", c + V(-3.0f, 0, -3.6f), 0, 1.1f, null, t);
-        Put("bush_holly", c + V(3.2f, 0, -3.5f), 0, 1.1f, null, t);
-        Put("bush_snowy", c + V(5.0f, 0, 3.6f), 0, 1.1f, null, t);
-        for (int i = 0; i < 4; i++) Put("poinsettia", c + V(-3.5f + i * 2.3f, 0, 5.6f), i * 30, 1.3f, null, t);
         for (int i = 0; i < 6; i++) Put("path_stones", c + V(0.2f * (i % 2), 0, -3.6f + i * 1.9f), i * 51, 1.0f, null, t);
-        Put("bench", c + V(-2.4f, 0, 1.0f), 90, 1.2f, null, t);
-        Put("bench", c + V(2.4f, 0, 1.0f), -90, 1.2f, null, t);
-        Put("lantern_ground", c + V(-1.2f, 0, -1.8f), 0, 1.2f, null, t);
-        Put("lantern_ground", c + V(1.4f, 0, 3.2f), 0, 1.2f, null, t);
-        Put("snowman_small", c + V(4.2f, 0, -0.5f), -40, 1.2f, null, t);
-        Put("rock_small", c + V(-4.3f, 0, 0.8f), 30, 1.3f, null, t);
-        Put("rock_small", c + V(-4.8f, 0, 1.5f), 120, 0.9f, null, t);
-        Put("snowball_pile", c + V(3.6f, 0, 0.8f), 0, 1.0f, null, t);
+        foreach (float lz in new[] { -1.5f, 1.5f })
+        {
+            Put("lantern_ground", c + new Vector3(-0.85f, 0, lz), 0, 1.1f, null, t);
+            Put("lantern_ground", c + new Vector3(0.85f, 0, lz), 0, 1.1f, null, t);
+        }
+        Put("poinsettia", c + new Vector3(-4.1f, 0, 5.3f), 20, 1.3f, null, t);
+        Put("poinsettia", c + new Vector3(4.1f, 0, 5.3f), -20, 1.3f, null, t);
+        Put("bush_holly", c + new Vector3(-4.0f, 0, 4.4f), 0, 0.9f, null, t);
+        Put("bush_round", c + new Vector3(4.0f, 0, 4.4f), 0, 0.9f, null, t);
+        GreenFill(c, t);
     }
 
     void FillPlayroom(Vector3 c, Transform t)

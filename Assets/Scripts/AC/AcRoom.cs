@@ -571,14 +571,14 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null && !candyOpen) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
+        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null && !candyOpen && !GreenBusy && !GiftBusy && waterSlot < 0) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
         UpdateRemotes(dt);
         UpdateCamera(dt, false);
 
-        if (!chatting && !askOpen && !lettersOpen && !building && !playingGame && !showMap)
+        if (!chatting && !askOpen && !lettersOpen && !building && !playingGame && !showMap && !GiftBusy && !GreenBusy)
         {
             if (Key("c") && !decorating) showCustom = !showCustom;
             if (Key("f2")) { showNpcs = !showNpcs; foreach (var n in npcs) n.gameObject.SetActive(showNpcs); }
@@ -597,6 +597,9 @@ public partial class AcRoom : MonoBehaviour
         UpdateWalls(dt);
         if (decorating && !chatting && !askOpen && !treeOverview) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
         if (building) BuildingUpdate();
+        GreenUpdate(dt);
+        GiftUpdate(dt);
+        FxUpdate(dt);
         ProcessSnowIcons();
         if (playingGame) CookieGameUpdate(dt);
         PlayUpdate(dt);
@@ -774,9 +777,11 @@ public partial class AcRoom : MonoBehaviour
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
+        if (GiftCamera(dt, snap)) { orbitOn = false; return; }   // 선물 포장·풀어보기: 따로 떨어진 무대
         float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = 180f;   // 실내·앞마당·옆마당: 남쪽(+z)에서, 뒷마당: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
         if (SnowCamera(ref focus, ref dist, ref pitch)) { targetYaw = snowYaw; }
         else if (SnowFocusCamera(ref focus, ref dist, ref pitch, ref targetYaw)) { }
+        else if (PlantCamera(ref focus, ref dist, ref pitch, ref targetYaw)) { }
         else if (treeOverview)
         {
             // 트리 전경: 꼭대기 별까지 한눈에 (끌어서 돌려 봄)
@@ -796,7 +801,7 @@ public partial class AcRoom : MonoBehaviour
             focus -= Vector3.up * 0.9f;   // 아래 패널을 피해서 살짝 위쪽이 보이게
         }
         // 스케이트를 타면 조금 멀리서 (빨리 다니니까 넓게 보이게)
-        bool special = building || snowFocusId != null || treeOverview || decorating;
+        bool special = building || snowFocusId != null || treeOverview || decorating || GreenBusy;
         skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && (me.skating || snowMode) ? 1.45f : 1f, dt * 0.9f);   // 스케이트·눈싸움: 넓게
         if (!special) dist *= skateZoom;
         if (phase == Phase.Lobby)
@@ -809,14 +814,14 @@ public partial class AcRoom : MonoBehaviour
         }
         // 트리를 볼 때는 카메라와 트리 사이 기둥·벽을 잘라냄 (가까운 면을 트리 바로 앞까지 당김)
         bool treeView = decorating || treeOverview;
-        float wantNear = building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? 0.3f : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
+        float wantNear = GreenBusy ? Mathf.Max(0.3f, dist - 1.1f) : building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? 0.3f : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
         cam.nearClipPlane = snap ? wantNear : Mathf.Lerp(cam.nearClipPlane, wantNear, 1 - Mathf.Exp(-dt * 4f));
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);
         if (snap) { cam.transform.position = want; cam.transform.rotation = rotq; return; }
         // 트리·눈사람을 볼 때: 그 중심축을 기준으로 궤도처럼 돌기 (항상 화면 가운데)
-        if (treeView || building || snowFocusId != null)
+        if (treeView || building || snowFocusId != null || GreenBusy)
         {
             if (!orbitOn)
             {
@@ -1102,7 +1107,9 @@ public partial class AcRoom : MonoBehaviour
         if (phase == Phase.Lobby) { LobbyGUI(); return; }
         if (playingGame) { CookieGameGUI(); return; }
         if (candyOpen) { CandyGUI(); return; }
+        if (GiftBusy) { GiftGUI(); return; }
         NameTags();
+        GreenTags();
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(520, SW - 20);
@@ -1124,6 +1131,7 @@ public partial class AcRoom : MonoBehaviour
         if (snowFocusId != null) { SnowFocusGUI(); return; }
         if (pianoOpen) { PianoGUI(); return; }
         if (quizOpen) { QuizGUI(); return; }
+        if (GreenBusy) { GreenGUI(); return; }
         if (decorating) DecorateBar();
         else if (building) SnowBar();
         else
@@ -1135,6 +1143,7 @@ public partial class AcRoom : MonoBehaviour
             }
             ActionButtons();
             ContextButtons();
+            GiftHUD();
             SnowFightHUD();
             PillowHUD();
         }
@@ -1147,7 +1156,7 @@ public partial class AcRoom : MonoBehaviour
             GUI.Box(R(r), "", sBox);
             GUI.Label(new Rect(r.x + 14, r.y + 6, 380, 22), near.net.name + " 님과", sSmall);
             if (GUI.Button(new Rect(r.x + 14, r.y + 28, 120, 26), "하이파이브", sBtn)) { Emote("highfive", near.net.id); FaceTo(near.c.transform.position); }
-            if (GUI.Button(new Rect(r.x + 140, r.y + 28, 120, 26), "선물 주기", sBtn)) { Emote("gift", near.net.id); FaceTo(near.c.transform.position); }
+            if (GUI.Button(new Rect(r.x + 140, r.y + 28, 120, 26), HeldGift != null ? "<b>선물 전달하기</b>" : "선물 주기", sBtn)) { if (HeldGift != null) GiveGift(near); else Emote("gift", near.net.id); FaceTo(near.c.transform.position); }
             if (GUI.Button(new Rect(r.x + 266, r.y + 28, 120, 26), "인사", sBtn)) { Emote("wave", near.net.id); FaceTo(near.c.transform.position); }
         }
         if (chatting) ChatBox();

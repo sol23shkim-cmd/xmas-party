@@ -510,7 +510,66 @@ public partial class AcRoom
         cgThings.Add(new CgThing { kind = kind, go = g, pool = key, p = new Vector3(x, y, 0), baseY = y, half = new Vector2(0.5f, 0.5f), spin = 0 });
     }
 
-    static readonly string[] LowObs = { "candy_cane_big", "snowman_small", "gift_box", "present_sack", "snowball_pile" };
+    // 지팡이 사탕은 먹는 사탕과 헷갈려서 장애물에서 뺌 (11-26)
+    static readonly string[] LowObs = { "snowman_small", "gift_box", "present_sack", "snowball_pile" };
+
+    // ===== 장애물 빨간 테두리 (11-26): 뒷면을 부풀린 단색 테두리 + 깜빡임 =====
+    Material cgOutlineMat;
+    readonly Dictionary<Mesh, Mesh> cgSmoothMesh = new Dictionary<Mesh, Mesh>();
+    Mesh SmoothNormals(Mesh m)
+    {
+        if (m == null) return null;
+        if (cgSmoothMesh.TryGetValue(m, out var sm)) return sm;
+        sm = m;
+        try
+        {
+            var v = m.vertices; var n = m.normals;
+            if (v.Length > 0 && n.Length == v.Length)
+            {   // 같은 자리 정점의 법선을 평균 → 각진 모델도 테두리가 끊기지 않게
+                var sum = new Dictionary<Vector3Int, Vector3>();
+                Vector3Int K(Vector3 p) => new Vector3Int(Mathf.RoundToInt(p.x * 1000), Mathf.RoundToInt(p.y * 1000), Mathf.RoundToInt(p.z * 1000));
+                for (int i = 0; i < v.Length; i++) { var k = K(v[i]); sum.TryGetValue(k, out var a); sum[k] = a + n[i]; }
+                var nn = new Vector3[v.Length];
+                for (int i = 0; i < v.Length; i++) { var a = sum[K(v[i])]; nn[i] = a.sqrMagnitude > 1e-6f ? a.normalized : n[i]; }
+                sm = new Mesh { name = m.name + "_ol", indexFormat = m.indexFormat, vertices = v, normals = nn };
+                sm.subMeshCount = m.subMeshCount;
+                for (int s = 0; s < m.subMeshCount; s++) sm.SetTriangles(m.GetTriangles(s), s);
+                sm.RecalculateBounds();
+            }
+        }
+        catch (Exception) { sm = m; }
+        cgSmoothMesh[m] = sm;
+        return sm;
+    }
+    void AddOutline(GameObject g, float width)
+    {
+        if (g == null) return;
+        if (cgOutlineMat == null)
+        {
+            var sh = Resources.Load<Shader>("ACOutline");
+            if (sh == null) sh = Shader.Find("XmasParty/ACOutline");
+            if (sh == null) return;
+            cgOutlineMat = new Material(sh) { name = "CgOutline" };
+            cgOutlineMat.SetColor("_Color", new Color(0.92f, 0.08f, 0.14f));
+            cgOutlineMat.SetFloat("_Width", width);
+        }
+        foreach (var mf in g.GetComponentsInChildren<MeshFilter>(true).ToArray())
+        {
+            if (mf.sharedMesh == null || mf.name == "ol") continue;
+            var o = new GameObject("ol");
+            o.transform.SetParent(mf.transform, false);
+            o.AddComponent<MeshFilter>().sharedMesh = SmoothNormals(mf.sharedMesh);
+            var r = o.AddComponent<MeshRenderer>(); r.sharedMaterial = cgOutlineMat;
+            r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+        }
+    }
+    void PulseOutline()
+    {
+        if (cgOutlineMat == null) return;
+        float k = 0.5f + 0.5f * Mathf.Sin(Time.time * 7f);
+        cgOutlineMat.SetColor("_Color", Color.Lerp(new Color(0.85f, 0.05f, 0.12f), new Color(1f, 0.35f, 0.3f), k));
+        cgOutlineMat.SetFloat("_Width", 0.045f + 0.02f * k);
+    }
     static readonly string[] TallObs = { "snowman_big", "pine_small", "gift_tall" };
     void Obstacle(float x, int kind)   // 20 낮은(점프) 21 높은(2단 점프) 22 매달린(슬라이드)
     {
@@ -555,6 +614,7 @@ public partial class AcRoom
             };
             half = new Vector2(0.38f, 9f); cy = 0.82f + 9f;
         }
+        var mk = make; make = () => { var o = mk(); AddOutline(o, 0.05f); return o; };
         var g = Take(key, make);
         g.transform.localPosition = new Vector3(x, 0, 0); g.transform.localRotation = Quaternion.Euler(0, kind == 22 ? 0 : -20 + cgRnd.Next(40), 0);
         cgThings.Add(new CgThing { kind = kind, go = g, pool = key, p = new Vector3(x, cy, 0), half = half });
@@ -718,6 +778,7 @@ public partial class AcRoom
         if (!playingGame || cgRoot == null) return;
         dt = Mathf.Min(dt, 0.05f);
         cgStateT += dt;
+        PulseOutline();
         CgInput(out bool jump, out bool slideHeld);
         if (Key("esc")) { if (cg == CgState.Play) Die(); else if (cg == CgState.Board || cg == CgState.Result) SetCg(CgState.Menu); else { CloseCookieGame(); return; } }
         switch (cg)

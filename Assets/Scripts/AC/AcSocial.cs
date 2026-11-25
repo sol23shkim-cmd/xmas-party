@@ -144,6 +144,9 @@ public partial class AcRoom
         else if (InPlayroom) { label = "캔디 팡 게임"; act = OpenCandy; }
         else if (piano) { label = "피아노 치기"; act = OpenPiano; }
         else if (inLibrary) { label = "크리스마스 퀴즈"; act = OpenQuiz; }
+        var gextra = new List<(string, Action, float)>();
+        if (label == null && GreenContext(out var gl, out var ga, gextra)) { label = gl; act = ga; }
+        if (label == null && InGiftRoom) { label = "선물 포장하기"; act = OpenWrap; }
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
@@ -163,6 +166,7 @@ public partial class AcRoom
         if (NearTree && !InStudy) extra.Add(("트리 전경", () => { treeOverview = true; decoYaw = 180f; decoZoom = 1f; }, IsMobile ? 112 : 100));
         if (inLibrary && label != "크리스마스 퀴즈") extra.Add(("크리스마스 퀴즈", OpenQuiz, IsMobile ? 150 : 136));
         if (piano && label != "피아노 치기") extra.Add(("피아노 치기", OpenPiano, IsMobile ? 112 : 100));
+        foreach (var ge in gextra) extra.Add(ge);
         if (extra.Count == 0) return;
         float bh = h - 12, total = extra.Sum(e => e.w) + 10 * (extra.Count - 1);
         bool right = r.xMax + 14 + total <= SW - 8;
