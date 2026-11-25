@@ -242,7 +242,7 @@ public partial class AcRoom
         float gap = 6, bw = Mathf.Min(IsMobile ? 70 : 62, (SW - 30) / 5f - gap), bh = IsMobile ? 46 : 36;
         string[] labels = { "말하기", "인사", "하트", "만세", "꾸미기" };
         float x = SW - (bw + gap) * labels.Length - 10, y = SH - bh - 12;
-        GUI.Box(R(new Rect(x - 8, y - 8, (bw + gap) * labels.Length + 10, bh + 16)), "", sBox);
+        R(new Rect(x - 4, y - 4, (bw + gap) * labels.Length + 2, bh + 8));   // 뒤 판 없이 버튼만 (터치 영역은 그대로 등록)
         for (int i = 0; i < labels.Length; i++)
         {
             if (GUI.Button(new Rect(x + i * (bw + gap), y, bw, bh), labels[i], sBtn))

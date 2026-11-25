@@ -461,14 +461,13 @@ public partial class AcRoom
         for (int i = 0; i < tabs.Length; i++)
         {
             var tr = new Rect(22 + i * (tw + 6), y + 8, tw, 30);
-            if (i == snowTab) GUI.DrawTexture(new Rect(tr.x - 2, tr.y - 2, tr.width + 4, tr.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
+            if (i == snowTab) AcUiTheme.Ring(tr, AcUiTheme.Accent, 3);
             if (GUI.Button(tr, tabs[i], sBtn)) snowTab = i;
         }
         float bw = narrow ? 84 : 90;
         // 좁은 화면: 취소·완성은 패널 위 오른쪽에 따로 (탭과 겹치지 않게)
         float by = narrow ? y - 48 : y + 8, bh = narrow ? 38 : 30;
         var cr = new Rect(SW - 20 - bw * 2 - 18, by, bw, bh); var fr = new Rect(SW - 20 - bw - 8, by, bw, bh);
-        if (narrow) GUI.Box(R(new Rect(cr.x - 6, by - 5, bw * 2 + 22, bh + 10)), "", sBox);
         R(cr); R(fr);
         if (GUI.Button(cr, "취소", sBtn)) { StopBuilding(); return; }
         if (GUI.Button(fr, "<b>완성!</b>", sBtn)) { FinishSnowman(); return; }
@@ -518,7 +517,7 @@ public partial class AcRoom
             for (int i = 0; i < 3; i++)
             {
                 var r = new Rect(x2 + 40 + i * 58, cy, 54, 28);
-                if (i == snowSizeSel) GUI.DrawTexture(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
+                if (i == snowSizeSel) AcUiTheme.Ring(r, AcUiTheme.Accent, 3);
                 if (GUI.Button(r, DecoSizeKo[i], sBtn)) snowSizeSel = i;
             }
             if (draft.d.Count > 0 && GUI.Button(new Rect(SW - 20 - 110, cy, 100, 28), "하나 되돌리기", sBtn)) { draft.d.RemoveAt(draft.d.Count - 1); RebuildDraft(); }

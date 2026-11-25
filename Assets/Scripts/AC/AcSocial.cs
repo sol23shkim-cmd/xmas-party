@@ -149,7 +149,7 @@ public partial class AcRoom
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
         var r = new Rect(SW / 2 - w / 2, y, w, h);
         float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 3f);
-        GUI.DrawTexture(new Rect(r.x - 4, r.y - 4, r.width + 8, r.height + 8), AcPalette.Tex(Color.Lerp(new Color(0.85f, 0.3f, 0.3f), new Color(0.98f, 0.78f, 0.32f), pulse)));
+        AcUiTheme.DrawGlow(r, pulse);   // 네모난 깜빡이 테두리 대신 은은한 빛
         R(r);
         if (GUI.Button(r, "<b>" + label + "</b>", sBtnBig)) act();
         // 작은 버튼들: 오른쪽에 자리가 있으면 옆으로, 없으면 큰 버튼 위 한 줄로
@@ -271,9 +271,9 @@ public partial class AcRoom
     void SocialStyles()
     {
         if (sCard != null) return;
-        sCard = new GUIStyle(GUIStyle.none) { padding = new RectOffset(8, 8, 4, 6), margin = new RectOffset(0, 0, 2, 4), normal = { background = AcPalette.Tex(new Color(0.99f, 0.96f, 0.9f)) } };
-        sCardSel = new GUIStyle(sCard) { normal = { background = AcPalette.Tex(new Color(1f, 0.9f, 0.78f)) } };
+        sCard = AcUiTheme.Card(new Color(1f, 1f, 1f));
+        sCardSel = AcUiTheme.Card(new Color(1f, 0.92f, 0.86f));
         sSmallWrap = new GUIStyle(sSmall) { wordWrap = true };
-        sBtnBig = new GUIStyle(sBtn) { fontSize = 18 };
+        sBtnBig = AcUiTheme.BigButton(GUI.skin.button, 18);
     }
 }

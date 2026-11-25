@@ -39,7 +39,7 @@ public partial class AcRoom
         {
             var r = new Rect(3 + i * step - st.scroll, 3, size, size);
             bool on = i == sel && picked;
-            GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(on ? new Color(0.85f, 0.3f, 0.3f) : new Color(0.86f, 0.8f, 0.72f)));
+            AcUiTheme.Fill(r, on ? new Color(1f, 0.93f, 0.8f) : new Color(1f, 1f, 1f, 0.85f), 3); if (on) AcUiTheme.Ring(r, AcUiTheme.Accent, 3);
             var tex = icon(i); if (tex != null) GUI.DrawTexture(r, tex, ScaleMode.ScaleToFit, false);
             if (e.type == EventType.Repaint)
             {

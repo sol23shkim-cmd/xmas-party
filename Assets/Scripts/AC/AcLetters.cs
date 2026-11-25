@@ -190,7 +190,7 @@ public partial class AcRoom
         for (int i = 0; i < tabs.Length; i++)
         {
             var r = narrow ? new Rect(tx + (i % 2) * (tw + 6), ty + (i / 2) * (th + 6), tw, th) : new Rect(tx + i * (tw + 6), ty, tw, th);
-            if (i == letterTab && openLetter == null) GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(new Color(0.98f, 0.78f, 0.32f)));
+            if (i == letterTab && openLetter == null) AcUiTheme.Ring(r, AcUiTheme.Gold, 3);
             if (GUI.Button(r, tabs[i], sBtn)) { letterTab = i; openLetter = null; }
         }
         if (GUI.Button(new Rect(table.xMax - 82, ty, 70, th), "나오기", sBtn) || Key("esc")) { lettersOpen = false; openLetter = null; return; }

@@ -229,7 +229,7 @@ public partial class AcRoom
         {
             var r = new Rect(bx + i * (bw + 6), by, bw, 30);
             bool sel = pianoSong == i - 1;
-            if (sel) GUI.DrawTexture(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
+            if (sel) AcUiTheme.Ring(r, AcUiTheme.Accent, 3);
             if (GUI.Button(r, Short(names[i], narrow ? 4 : 9), sBtn)) { pianoSong = i - 1; pianoStep = 0; }
         }
         int next = pianoSong >= 0 && pianoStep < PianoSongs[pianoSong].notes.Length ? PianoSongs[pianoSong].notes[pianoStep] : -1;
@@ -504,7 +504,7 @@ public partial class AcRoom
                 if (answered && mine == i) border = new Color(0.25f, 0.5f, 0.9f);
                 if (reveal && i == qz.correct) border = new Color(0.3f, 0.7f, 0.35f);
                 else if (reveal && answered && mine == i) border = new Color(0.9f, 0.3f, 0.3f);
-                GUI.DrawTexture(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), AcPalette.Tex(border));
+                AcUiTheme.Ring(r, border, 3);
                 var cs = new GUIStyle(sBtn) { wordWrap = true }; if (qz.choices[i].Length > 14) cs.fontSize = Mathf.Max(11, sBtn.fontSize - 3);
                 if (GUI.Button(r, "<b>" + (i + 1) + ". " + qz.choices[i] + "</b>", cs) && !reveal && !answered)
                 { myQuizAnswer[round] = i; AddAct("q", round + ":" + i); Sfx("click", 0.6f); }
@@ -762,7 +762,7 @@ public partial class AcRoom
         {
             var b = new Rect(br.x + 8 + i * ((w - 22) / 2 + 6), br.y + 5, (w - 22) / 2, 30);
             bool on = (i == 0) == sbBig;
-            if (on) GUI.DrawTexture(new Rect(b.x - 2, b.y - 2, b.width + 4, b.height + 4), AcPalette.Tex(new Color(0.85f, 0.3f, 0.3f)));
+            if (on) AcUiTheme.Ring(b, AcUiTheme.Accent, 3);
             if (GUI.Button(b, i == 0 ? "큰 눈 (세게)" : "작은 눈 (멀리)", sBtn)) sbBig = i == 0;
         }
         {

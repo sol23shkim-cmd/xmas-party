@@ -81,7 +81,7 @@ public partial class AcRoom : MonoBehaviour
     class Remote { public AcCharacter c; public string look; public AcNet net; public Vector3 target; public double lastEmoteT, lastChatT; public bool nameChecked; }
     readonly Dictionary<string, Remote> remotes = new Dictionary<string, Remote>();
     readonly List<string> chatLog = new List<string>();
-    bool ChatLogVisible => chatLog.Count > 0 && (Time.time - chatLogT < 12f || chatting);   // 새 말이 오면 12초 동안만 보임 (11-25)
+    bool ChatLogVisible => chatLog.Count > 0 && (Time.time - chatLogT < 9f || chatting);   // 새 말이 오면 9초 동안만 보임 (11-25)
     string toast; float toastUntil;
     GUIStyle sBox, sLabel, sSmall, sBtn;
 
@@ -959,7 +959,7 @@ public partial class AcRoom : MonoBehaviour
 
     void StartDecorating()
     {
-        decorating = true; treeOverview = false; ornPicked = true; decoZoom = 1f; walkTarget = null; followId = null;
+        decorating = true; treeOverview = false; ornPicked = false; decoZoom = 3.5f;   // 처음엔 가장 멀리서 트리 전체 + 장식은 고르지 않은 상태 (11-25) walkTarget = null; followId = null;
         var d = cam.transform.position - TreePos; d.y = 0;
         decoYaw = d.sqrMagnitude > 0.01f ? Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg : 180f;
         decoH = Mathf.Clamp(2.2f, 0.8f, TreeTop);
@@ -1043,12 +1043,12 @@ public partial class AcRoom : MonoBehaviour
         if (sBox != null) return;
         if (uiFont == null) uiFont = Resources.Load<Font>("Fonts/Jua-Regular");   // 둥근 한글 글꼴 (웹에서도 한글이 나오게)
         if (uiFont != null) GUI.skin.font = uiFont;
-        var bg = new Texture2D(1, 1); bg.SetPixel(0, 0, new Color(1f, 0.98f, 0.93f, 0.94f)); bg.Apply();
-        sBox = new GUIStyle(GUI.skin.box) { normal = { background = bg }, padding = new RectOffset(14, 14, 10, 10) };
-        sLabel = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.42f, 0.3f, 0.22f) }, richText = true };
+        // 11-25 디자인 다듬기: 아이보리 네모 판·회색 기본 버튼 → 둥근 유리판·둥근 칩 (AcUiTheme)
+        sBox = AcUiTheme.Panel(GUI.skin.box);
+        sLabel = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = AcUiTheme.Ink.linear }, richText = true };
         sSmall = new GUIStyle(sLabel) { fontSize = 13, fontStyle = FontStyle.Normal };
-        sBtn = new GUIStyle(GUI.skin.button) { fontSize = 14, richText = true };
-        sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.75f, 0.25f, 0.2f) } };
+        sBtn = AcUiTheme.Button(GUI.skin.button, 14);
+        sLabelSel = new GUIStyle(sSmall) { fontStyle = FontStyle.Bold, normal = { textColor = AcUiTheme.Accent.linear } };
     }
 
     static float UiK => IsMobile ? Mathf.Max(Mathf.Min(Screen.height / 560f, Screen.width / 400f), 0.6f) : Mathf.Clamp(Screen.height / 860f, 0.75f, 2.2f);   // 휴대폰은 손가락 크기에 맞게 크게
