@@ -16,7 +16,7 @@ public partial class AcRoom
     enum CdP { Idle, Swap, Back, Pop, Fall, Shuffle, Banner } CdP cdp; float cdpT;
     const int CW = 8, CH = 8, CdKinds = 6, CdMovesStart = 25, CdSnowCount = 8;
     const int SpNone = 0, SpH = 1, SpV = 2, SpWrap = 3, SpBomb = 4, SpSnow = 5;
-    class CT { public int c, sp, hp, id; public float x, y, vy, pop = -1, squash, born = 1, ox, oy; public bool dying, ice; }
+    class CT { public int c, sp, hp, id; public float x, y, vy, pop = -1, squash, born = 1, ox, oy; public bool dying, ice, armed; }
     readonly CT[,] cdB = new CT[CW, CH];
     int cdMoves, cdScore, cdCombo, cdIdSeq; float cdShown;
     readonly List<int> cdGoalKind = new List<int>(); readonly List<int> cdGoalLeft = new List<int>(); readonly List<int> cdGoalStart = new List<int>(); float[] cdGoalPop = new float[5];
@@ -233,17 +233,40 @@ public partial class AcRoom
             case SpH: for (int x = 0; x < CW; x++) Add(x, p.y); cdBeams.Add((true, p.y, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); CdLineSparks(true, p.y, col); cdFlash = Mathf.Max(cdFlash, 0.12f); break;
             case SpV: for (int y = 0; y < CH; y++) Add(p.x, y); cdBeams.Add((false, p.x, col, 0)); CdSfx("candy_line", 0.6f); cdShake = Mathf.Max(cdShake, 4); CdLineSparks(false, p.x, col); cdFlash = Mathf.Max(cdFlash, 0.12f); break;
             case SpWrap:
-                for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) Add(p.x + dx, p.y + dy);
-                cdRings.Add((CellCenter(p.x, p.y), cdCell * 2.2f, col, 0)); cdRings.Add((CellCenter(p.x, p.y), cdCell * 3.2f, Color.white, 0.1f)); CdSfx("candy_boom", 0.75f); cdShake = Mathf.Max(cdShake, 8); cdFlash = Mathf.Max(cdFlash, 0.3f); CdStars(CellCenter(p.x, p.y), Color.Lerp(col, Color.white, 0.5f), 12); break;
+                {
+                    // 포장 사탕: 1차 폭발(3×3) 뒤 사탕은 남아서(불붙은 상태) 아래로 떨어지고, 판이 멈추면 2차 폭발
+                    bool second = t.armed;
+                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) Add(p.x + dx, p.y + dy);
+                    var cc = CellCenter(p.x, p.y);
+                    cdRings.Add((cc, cdCell * (second ? 2.8f : 2.2f), col, 0)); cdRings.Add((cc, cdCell * (second ? 4f : 3.2f), Color.white, 0.1f));
+                    if (second) cdRings.Add((cc, cdCell * 5f, new Color(1f, 0.85f, 0.4f), 0.18f));
+                    CdSfx("candy_boom", second ? 0.95f : 0.75f, second ? 0.85f : 1f); cdShake = Mathf.Max(cdShake, second ? 12 : 8); cdFlash = Mathf.Max(cdFlash, second ? 0.5f : 0.3f);
+                    CdStars(cc, Color.Lerp(col, Color.white, 0.5f), second ? 20 : 12); CdBurst(cc, col, second ? 18 : 10, false);
+                    if (!second) { t.armed = true; t.squash = 0.35f; return; }   // 1차: 특수 그대로 둠 (아래에서 터지는 칸 목록에서 빠짐)
+                    t.armed = false;
+                }
+                break;
             case SpBomb:
                 {
                     int c = bombColor >= 0 ? bombColor : MostColor();
-                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) if (Mc(x, y) == c) { Add(x, y); cdBolts.Add((CellCenter(p.x, p.y), CellCenter(x, y), 0)); }
+                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) if (Mc(x, y) == c) { Add(x, y); cdBolts.Add((CellCenter(p.x, p.y), CellCenter(x, y), 0)); CdBombAdj(x, y, Add); }
                     cdRings.Add((CellCenter(p.x, p.y), cdCell * 1.6f, Color.white, 0)); CdSfx("candy_magic", 0.7f); cdShake = Mathf.Max(cdShake, 6); cdFlash = Mathf.Max(cdFlash, 0.35f); CdStars(CellCenter(p.x, p.y), Color.white, 10);
                 }
                 break;
         }
         t.sp = SpNone;   // 한 번만 터짐
+    }
+
+    // 반짝 방울: 지운 칸 옆의 눈덩이(완전히)·얼음도 함께 부숨
+    void CdBombAdj(int x, int y, Action<int, int> add)
+    {
+        foreach (var d in new[] { Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down })
+        {
+            var n = new Vector2Int(x + d.x, y + d.y); if (!In(n)) continue;
+            var t = cdB[n.x, n.y]; if (t == null) continue;
+            if (t.sp == SpSnow) { t.hp = 1; add(n.x, n.y); cdBolts.Add((CellCenter(x, y), CellCenter(n.x, n.y), 0.1f)); }
+            else if (t.ice) add(n.x, n.y);
+        }
     }
 
     // 맞춤(+ 조합으로 생긴 칸)을 터뜨림. 아무것도 없으면 false
@@ -288,6 +311,8 @@ public partial class AcRoom
             if (t.sp == SpSnow) { snowHit[p] = 1; continue; }
             if (t.sp == SpH || t.sp == SpV || t.sp == SpWrap || t.sp == SpBomb) { cdScore += 200; Detonate(p, t, set, q); }
         }
+        // 1차 폭발한 포장 사탕은 살아남음
+        foreach (var p in set.ToList()) { var t = cdB[p.x, p.y]; if (t != null && t.armed && t.sp == SpWrap) set.Remove(p); }
         // 눈덩이
         foreach (var kv in snowHit)
         {
@@ -526,7 +551,15 @@ public partial class AcRoom
                 if (cdpT >= 0.22f) CdAfterPop();
                 break;
             case CdP.Fall:
-                if (!moving && cdpT > 0.08f) { if (!CdResolve(null)) CdSettle(); }
+                if (!moving && cdpT > 0.08f)
+                {
+                    // 떨어진 뒤: 불붙은 포장 사탕이 있으면 2차 폭발 (잠깐 부풀었다가)
+                    var armed = new HashSet<Vector2Int>();
+                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++) { var t = cdB[x, y]; if (t != null && t.armed && t.sp == SpWrap) armed.Add(new Vector2Int(x, y)); }
+                    if (armed.Count > 0 && cdpT < 0.38f) break;
+                    if (armed.Count > 0) { CdResolve(armed); break; }
+                    if (!CdResolve(null)) CdSettle();
+                }
                 break;
             case CdP.Shuffle:
                 {
@@ -598,6 +631,7 @@ public partial class AcRoom
                         var t = cdB[x, y]; if (t == null || t.c != c || t.sp == SpSnow) continue;
                         if (osp == SpH || osp == SpV) t.sp = cdRnd.Next(2) == 0 ? SpH : SpV; else if (osp == SpWrap) t.sp = SpWrap;
                         extra.Add(new Vector2Int(x, y)); cdBolts.Add((CellCenter(bp.x, bp.y), CellCenter(x, y), 0));
+                        CdBombAdj(x, y, (ax, ay) => extra.Add(new Vector2Int(ax, ay)));   // 그 색 주변의 눈덩이·얼음도 한 번에 부숨
                     }
                 cdRings.Add((CellCenter(bp.x, bp.y), cdCell * 2f, Color.white, 0)); CdSfx("candy_magic", 0.8f); cdShake = 8; cdFlash = Mathf.Max(cdFlash, 0.5f); CdStars(CellCenter(bp.x, bp.y), Color.white, 14);
                 // 방울 자체는 색이 없어 맞춤에 안 들어가므로 직접 지움
@@ -845,6 +879,7 @@ public partial class AcRoom
                         float w = s * scale * (1 + sq * 0.5f), h = s * scale * (1 - sq * 0.6f);
                         float cx = (t.x + 0.5f) * cdCell, cyy = (t.y + 0.5f) * cdCell + (s - h) * 0.45f;
                         if (sel) { cyy -= Mathf.Abs(Mathf.Sin(Time.time * 7f)) * cdCell * 0.1f; w *= 1.08f; h *= 1.08f; }
+                        if (t.armed && !t.dying) { float wb = 1.06f + 0.08f * Mathf.Sin(Time.time * 22f); w *= wb; h *= 2.12f - wb; cx += Mathf.Sin(Time.time * 40f) * cdCell * 0.03f; }   // 불붙은 포장 사탕: 부들부들
                         if (pass == 0)
                         {
                             if (!t.dying) DT(new Rect(cx - w * 0.44f, (t.y + 0.5f) * cdCell + s * 0.36f - h * 0.08f, w * 0.88f, h * 0.22f), shadow, new Color(1, 1, 1, 0.55f));
@@ -854,7 +889,8 @@ public partial class AcRoom
                                 // 특수 사탕은 뒤에서 은은하게 빛남 (방울은 무지개색)
                                 float pu = 0.55f + 0.45f * Mathf.Sin(Time.time * 5f + t.id);
                                 var hc = t.sp == SpBomb ? Color.HSVToRGB(Mathf.Repeat(Time.time * 0.5f + t.id * 0.13f, 1f), 0.6f, 1f) : Color.Lerp(CdCol[Mathf.Clamp(t.c, 0, 5)], Color.white, 0.35f);
-                                float hs = s * (t.sp == SpWrap ? 1.55f : 1.4f);
+                                if (t.armed) { pu = 0.6f + 0.4f * Mathf.Sin(Time.time * 18f); hc = Color.Lerp(new Color(1f, 0.45f, 0.2f), new Color(1f, 0.95f, 0.5f), pu); }
+                                float hs = s * (t.armed ? 2.0f : t.sp == SpWrap ? 1.55f : 1.4f);
                                 DT(new Rect(cx - hs / 2, cyy - hs / 2, hs, hs), CTx("dot"), new Color(hc.r, hc.g, hc.b, 0.55f * pu));
                             }
                             if (sel || hinted)
