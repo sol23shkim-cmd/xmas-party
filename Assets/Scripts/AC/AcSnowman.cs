@@ -2,6 +2,7 @@
 //               장식을 눈덩이에 눌러서 붙이기, 모자·목도리. 완성하면 그 자리에 세워지고 모두에게 보임 (rooms/<방>/snow/<id>)
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -412,13 +413,36 @@ public partial class AcRoom
     }
 
     // ===== 아이콘 (실제 모양) =====
-    readonly Dictionary<string, RenderTexture> snowIcons = new Dictionary<string, RenderTexture>();
+    // 아이콘은 화면 그리기(OnGUI) 중에 만들지 않고, 필요한 것만 적어 두었다가 Update에서 만듦 (11-25: 색을 바꾸면 까맣게 나오던 문제)
+    readonly Dictionary<string, Texture2D> snowIcons = new Dictionary<string, Texture2D>();
+    readonly Dictionary<string, (string model, Color c)> snowIconWant = new Dictionary<string, (string, Color)>();
+    readonly Dictionary<string, Texture2D> snowIconLast = new Dictionary<string, Texture2D>();   // 모양별 마지막으로 성공한 그림 (새 색 그리는 동안 보여 줌)
 
     Texture SnowIcon(string model, Color c)
     {
         string key = model + HexOf(c);
-        if (snowIcons.TryGetValue(key, out var rt) && rt) return rt;
+        if (snowIcons.TryGetValue(key, out var tex) && tex) return tex;
+        snowIconWant[key] = (model, c);
+        return snowIconLast.TryGetValue(model, out var last) && last ? last : null;
+    }
+
+    void ProcessSnowIcons()
+    {
+        if (snowIconWant.Count == 0) return;
         EnsureIconCam();
+        int n = 0;
+        foreach (var kv in snowIconWant.ToList())
+        {
+            if (n++ >= 8) break;   // 한 프레임에 너무 많이 만들지 않기
+            var tex = MakeSnowIcon(kv.Value.model, kv.Value.c);
+            if (tex == null) continue;   // 실패하면 남겨 두고 다음 프레임에 다시
+            snowIcons[kv.Key] = tex; snowIconLast[kv.Value.model] = tex;
+            snowIconWant.Remove(kv.Key);
+        }
+    }
+
+    Texture2D MakeSnowIcon(string model, Color c)
+    {
         var it = AcCatalog.Get(model);
         var tints = c.a > 0 && it != null && it.groups != null && it.groups.Length > 0 ? new Dictionary<string, Color> { { it.groups[0], c } } : null;
         var obj = AcCatalog.Spawn(model, null, tints);
@@ -427,25 +451,9 @@ public partial class AcRoom
         var bounds = new Bounds(); bool first = true;
         foreach (var r in obj.GetComponentsInChildren<MeshRenderer>()) { if (first) { bounds = r.bounds; first = false; } else bounds.Encapsulate(r.bounds); }
         obj.transform.position = new Vector3(0, -500, 0) - bounds.center;
-        foreach (var tr in obj.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = IconLayer;
-        foreach (var r in obj.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
-        var oldPos = iconCam.transform.position; float oldSize = iconCam.orthographicSize;
-        iconCam.transform.position = new Vector3(0, -500, 2.5f);
-        iconCam.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y) * 1.25f + 0.005f;
-        iconCam.farClipPlane = 6f;
-        rt = new RenderTexture(96, 96, 16, RenderTextureFormat.ARGB32) { name = "sicon_" + key }; rt.Create();
-        bool done = false;
-        try
-        {
-            var req = new RenderPipeline.StandardRequest();
-            if (RenderPipeline.SupportsRenderRequest(iconCam, req)) { req.destination = rt; RenderPipeline.SubmitRenderRequest(iconCam, req); done = true; }
-        }
-        catch { }
-        if (!done) { iconCam.targetTexture = rt; iconCam.Render(); iconCam.targetTexture = null; }
+        var tex = RenderIconTex(obj, new Vector3(0, -500, 2.5f), Mathf.Max(bounds.extents.x, bounds.extents.y) * 1.25f + 0.005f, 6f);
         DestroyImmediate(obj);
-        iconCam.transform.position = oldPos; iconCam.orthographicSize = oldSize; iconCam.farClipPlane = 5f;
-        snowIcons[key] = rt;
-        return rt;
+        return tex;
     }
 
     // ===== 화면 아래 패널 =====

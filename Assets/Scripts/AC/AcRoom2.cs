@@ -149,14 +149,16 @@ public partial class AcRoom
     // 오너먼트 아이콘 (실제 모양을 작은 사진으로)
     const int IconLayer = 30;
     Camera iconCam;
-    readonly Dictionary<string, RenderTexture> icons = new Dictionary<string, RenderTexture>();
+    // 장식 아이콘: 렌더 텍스처를 그대로 쓰면 색을 바꿀 때 가끔 까맣게 남음(렌더가 안 된 채 비어 있음)
+    //  → 매번 임시 렌더 텍스처에 그린 뒤 Texture2D로 복사해 보관하고, 실패(까만 칸)면 예전 그림을 두고 다음 프레임에 다시 (11-25)
+    readonly Dictionary<string, Texture2D> icons = new Dictionary<string, Texture2D>();
     Color iconsColor = new Color(-1, 0, 0);
 
     void RenderIcons(Color c)
     {
         if (iconsColor == c && icons.Count == ornTypes.Count) return;
-        iconsColor = c;
         EnsureIconCam();
+        bool allOk = true;
         foreach (var t in ornTypes)
         {
             GameObject obj;
@@ -167,19 +169,43 @@ public partial class AcRoom
                 obj.transform.position = new Vector3(0, -500, 0);
                 obj.transform.rotation = Quaternion.Euler(0, 15, 0);
             }
-            foreach (var tr in obj.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = IconLayer;
-            foreach (var r in obj.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
-            if (!icons.TryGetValue(t, out var rt) || rt == null) { rt = new RenderTexture(96, 96, 16, RenderTextureFormat.ARGB32) { name = "icon_" + t }; rt.Create(); icons[t] = rt; }
-            bool done = false;
-            try
-            {
-                var req = new RenderPipeline.StandardRequest();
-                if (RenderPipeline.SupportsRenderRequest(iconCam, req)) { req.destination = rt; RenderPipeline.SubmitRenderRequest(iconCam, req); done = true; }
-            }
-            catch { }
-            if (!done) { iconCam.targetTexture = rt; iconCam.Render(); iconCam.targetTexture = null; }
+            var tex = RenderIconTex(obj, null, 0, 0);
             DestroyImmediate(obj);
+            if (tex == null) { allOk = false; continue; }
+            if (icons.TryGetValue(t, out var old) && old) Destroy(old);
+            icons[t] = tex;
         }
+        if (allOk) iconsColor = c;   // 하나라도 실패하면 다음 프레임에 다시
+    }
+
+    // obj를 아이콘 카메라로 찍어 96px Texture2D로 돌려줌. 렌더가 안 됐으면(가장자리가 까맘) null
+    Texture2D RenderIconTex(GameObject obj, Vector3? camPos, float ortho, float far)
+    {
+        foreach (var tr in obj.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = IconLayer;
+        foreach (var r in obj.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
+        var oldPos = iconCam.transform.position; float oldSize = iconCam.orthographicSize, oldFar = iconCam.farClipPlane;
+        if (camPos.HasValue) iconCam.transform.position = camPos.Value;
+        if (ortho > 0) iconCam.orthographicSize = ortho;
+        if (far > 0) iconCam.farClipPlane = far;
+        var rt = RenderTexture.GetTemporary(96, 96, 16, RenderTextureFormat.ARGB32);
+        bool done = false;
+        try
+        {
+            var req = new RenderPipeline.StandardRequest();
+            if (RenderPipeline.SupportsRenderRequest(iconCam, req)) { req.destination = rt; RenderPipeline.SubmitRenderRequest(iconCam, req); done = true; }
+        }
+        catch { }
+        if (!done) { iconCam.targetTexture = rt; iconCam.Render(); iconCam.targetTexture = null; }
+        var prev = RenderTexture.active; RenderTexture.active = rt;
+        var tex = new Texture2D(96, 96, TextureFormat.RGBA32, false) { name = "icon", hideFlags = HideFlags.DontSave };
+        tex.ReadPixels(new Rect(0, 0, 96, 96), 0, 0); tex.Apply();
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+        iconCam.transform.position = oldPos; iconCam.orthographicSize = oldSize; iconCam.farClipPlane = oldFar;
+        // 배경은 크림색이라 네 귀퉁이가 새까맣다면 그려지지 않은 것
+        var p0 = tex.GetPixel(1, 1); var p1 = tex.GetPixel(94, 94);
+        if (p0.r + p0.g + p0.b < 0.05f && p1.r + p1.g + p1.b < 0.05f) { Destroy(tex); return null; }
+        return tex;
     }
 
     void EnsureIconCam()

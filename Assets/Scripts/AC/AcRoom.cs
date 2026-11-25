@@ -597,6 +597,7 @@ public partial class AcRoom : MonoBehaviour
         UpdateWalls(dt);
         if (decorating && !chatting && !askOpen && !treeOverview) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
         if (building) BuildingUpdate();
+        ProcessSnowIcons();
         if (playingGame) CookieGameUpdate(dt);
         PlayUpdate(dt);
         UpdateAudio(dt);
