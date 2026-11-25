@@ -191,9 +191,9 @@ public partial class AcRoom
         {
             var r = narrow ? new Rect(tx + (i % 2) * (tw + 6), ty + (i / 2) * (th + 6), tw, th) : new Rect(tx + i * (tw + 6), ty, tw, th);
             if (i == letterTab && openLetter == null) AcUiTheme.Ring(r, AcUiTheme.Gold, 3);
-            if (GUI.Button(r, tabs[i], sBtn)) { letterTab = i; openLetter = null; }
+            if (GUI.Button(r, tabs[i], sBtn)) { letterTab = i; openLetter = null; pickTo = false; }
         }
-        if (GUI.Button(new Rect(table.xMax - 82, ty, 70, th), "나오기", sBtn) || Key("esc")) { lettersOpen = false; openLetter = null; return; }
+        if (GUI.Button(new Rect(table.xMax - 82, ty, 70, th), "나오기", sBtn) || (Key("esc") && !pickTo)) { lettersOpen = false; pickTo = false; openLetter = null; return; }
         float top = ty + (narrow ? 2 * (th + 6) : th + 10) + 4;
         var area = new Rect(table.x + 12, top, table.width - 24, table.yMax - top - 12);
         if (openLetter != null) ReadLetterView(area);
@@ -291,10 +291,15 @@ public partial class AcRoom
         float ix = paper.x + 20, iw = paper.width - 40, y = paper.y + 12;
         var ppl = Recipients();
         writeTo = Mathf.Clamp(writeTo, 0, ppl.Count - 1);
+        bool en = GUI.enabled; if (pickTo) GUI.enabled = false;   // 목록이 떠 있으면 뒤 버튼은 눌리지 않게
         GUI.Label(new Rect(ix, y + 4, 80, 30), "받는 사람", sSmall);
         if (GUI.Button(new Rect(ix + 84, y, 34, 32), "<", sBtn)) writeTo = Wrap(writeTo - 1, ppl.Count);
-        GUI.DrawTexture(new Rect(ix + 122, y, iw - 122 - 40, 32), AcPalette.Tex(new Color(1f, 0.93f, 0.82f)));
-        GUI.Label(new Rect(ix + 130, y + 1, iw - 122 - 50, 32), ppl[writeTo].name, new GUIStyle(sHand) { fontSize = 24, wordWrap = false });
+        // 받는 사람 칸을 누르면 목록에서 바로 고르기 (한 번이라도 들어왔던 사람 모두, 지금 접속 중인 사람이 위)
+        var toR = new Rect(ix + 122, y, iw - 122 - 40, 32);
+        GUI.DrawTexture(toR, AcPalette.Tex(new Color(1f, 0.93f, 0.82f)));
+        GUI.Label(new Rect(ix + 130, y + 1, iw - 122 - 50 - 40, 32), ppl[writeTo].name, new GUIStyle(sHand) { fontSize = 24, wordWrap = false, clipping = TextClipping.Clip });
+        GUI.Label(new Rect(toR.xMax - 46, y + 6, 44, 22), $"<size=11>{ppl.Count - 1}명</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleRight });
+        if (GUI.Button(toR, "", GUIStyle.none)) { pickTo = true; pickScroll = Vector2.zero; }
         if (GUI.Button(new Rect(ix + iw - 34, y, 34, 32), ">", sBtn)) writeTo = Wrap(writeTo + 1, ppl.Count);
         y += 38;
         GUI.Label(new Rect(ix, y, iw, 22), writeTo == 0 ? "<size=12>공개 편지: 테이블에 올려 두면 모두 읽을 수 있고, 모두에게 알림이 가요</size>"
@@ -314,5 +319,33 @@ public partial class AcRoom
         else writeBody = GUI.TextArea(bodyR, writeBody, 1500, sHandArea);
         GUI.Label(new Rect(ix, paper.yMax - 46, iw - 120, 30), "From. " + uiName.Trim(), new GUIStyle(sHand) { fontSize = 22 });
         if (GUI.Button(new Rect(paper.xMax - 116, paper.yMax - 46, 100, 34), "<b>보내기</b>", sBtn)) SendLetter();
+        GUI.enabled = en;
+        if (pickTo) RecipientPicker(ppl, area);
+    }
+
+    bool pickTo; Vector2 pickScroll;
+    void RecipientPicker(List<(string id, string name)> ppl, Rect area)
+    {
+        GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.08f, 0.06f, 0.12f, 0.45f)));
+        float w = Mathf.Min(360, SW - 30), rowH = 44;
+        float listH = Mathf.Min(ppl.Count * (rowH + 6), SH - 220);
+        var p = new Rect(SW / 2 - w / 2, Mathf.Max(30, SH / 2 - (listH + 110) / 2), w, listH + 110);
+        GUI.Box(R(p), "", sBox);
+        GUI.Label(new Rect(p.x + 16, p.y + 12, p.width - 32, 26), "<b>받는 사람 고르기</b>", sLabel);
+        GUI.Label(new Rect(p.x + 16, p.y + 38, p.width - 32, 20), "<size=12>한 번이라도 들어왔던 사람에게 남길 수 있어요. 다음에 들어오면 받아요</size>", sSmall);
+        var view = new Rect(p.x + 12, p.y + 64, p.width - 24, listH);
+        float contentH = ppl.Count * (rowH + 6);
+        DragScrollArea("pickTo", view, ref pickScroll);
+        pickScroll.y = Mathf.Clamp(pickScroll.y, 0, Mathf.Max(0, contentH - view.height));
+        GUI.BeginGroup(view);
+        for (int i = 0; i < ppl.Count; i++)
+        {
+            var r = new Rect(0, i * (rowH + 6) - pickScroll.y, view.width, rowH);
+            if (r.yMax < 0 || r.y > view.height) continue;
+            if (i == writeTo) AcUiTheme.Ring(r, AcUiTheme.Accent, 2);
+            if (GUI.Button(r, (i == 0 ? "<b>" : "") + ppl[i].name + (i == 0 ? "</b>" : ""), sBtn)) { writeTo = i; pickTo = false; }
+        }
+        GUI.EndGroup();
+        if (GUI.Button(new Rect(p.center.x - 60, p.yMax - 40, 120, 32), "닫기", sBtn) || Key("esc")) pickTo = false;
     }
 }
