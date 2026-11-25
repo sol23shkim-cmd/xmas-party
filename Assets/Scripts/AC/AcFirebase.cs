@@ -212,9 +212,9 @@ public class AcFirebase : MonoBehaviour
                 decorating = AcJson.B(d, "decorating"), skate = AcJson.B(d, "skate"), act = AcJson.S(d, "act"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
             };
             // 오래 안 바뀐 기록(꺼진 사람)은 빼기
-            if (now > 0 && n.t > 0 && now - n.t > 10000) continue;
+            if (now > 0 && n.t > 0 && now - n.t > 30000) continue;   // 휴대폰이 잠깐 화면을 끄거나 다른 앱에 가도 바로 나간 걸로 보지 않게 (11-25: 10초 → 30초)
             if (!seen.TryGetValue(n.id, out var s) || s.seq != n.seq) seen[n.id] = (n.seq, Time.unscaledTime);
-            else if (Time.unscaledTime - s.at > 8f) continue;
+            else if (Time.unscaledTime - s.at > 25f) continue;
             list.Add(n);
         }
         return list;

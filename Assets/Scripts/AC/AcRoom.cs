@@ -81,6 +81,7 @@ public partial class AcRoom : MonoBehaviour
     class Remote { public AcCharacter c; public string look; public AcNet net; public Vector3 target; public double lastEmoteT, lastChatT; public bool nameChecked; }
     readonly Dictionary<string, Remote> remotes = new Dictionary<string, Remote>();
     readonly List<string> chatLog = new List<string>();
+    bool ChatLogVisible => chatLog.Count > 0 && (Time.time - chatLogT < 12f || chatting);   // 새 말이 오면 12초 동안만 보임 (11-25)
     string toast; float toastUntil;
     GUIStyle sBox, sLabel, sSmall, sBtn;
 
@@ -622,7 +623,9 @@ public partial class AcRoom : MonoBehaviour
         Log(uiName + ": " + text);
     }
 
-    void Log(string line) { chatLog.Add(line); if (chatLog.Count > 6) chatLog.RemoveAt(0); }
+    void Log(string line) { chatLog.Add(line); if (chatLog.Count > 6) chatLog.RemoveAt(0); chatLogT = Time.time; }
+    float chatLogT = -99;
+    readonly Dictionary<string, float> recentLeft = new Dictionary<string, float>();   // 이름 → 나간 시각 (금방 다시 들어오면 알림 안 띄움)
 
     // 다른 참가자
     void UpdateRemotes(float dt)
@@ -640,8 +643,8 @@ public partial class AcRoom : MonoBehaviour
                                  lastEmoteT = n.emoteT, lastChatT = n.chatT };
                 r.c.transform.position = r.target; r.c.name = "Peer " + n.name;
                 remotes[n.id] = r;
-                Toast(n.name + " 님이 들어왔어요");
-                Log("- " + n.name + " 님 입장");
+                // 들어옴 알림: 잠깐 끊겼다 다시 들어온 경우(5분 안)는 조용히. 대화 기록에는 넣지 않음
+                if (!(recentLeft.TryGetValue(n.name ?? "", out var lt) && Time.time - lt < 300f)) Toast(n.name + " 님이 들어왔어요");
                 if (npcs.Count > 0) foreach (var c in npcs) c.gameObject.SetActive(false);
             }
             if (r.look != n.look) { r.look = n.look; r.c.Rebuild(AcLook.Decode(n.look)); }
@@ -663,7 +666,7 @@ public partial class AcRoom : MonoBehaviour
         }
         var gone = new List<string>();
         foreach (var kv in remotes) if (!alive.Contains(kv.Key)) gone.Add(kv.Key);
-        foreach (var id in gone) { Log("- " + (remotes[id].net?.name ?? "") + " 님 퇴장"); Destroy(remotes[id].c.gameObject); remotes.Remove(id); }
+        foreach (var id in gone) { recentLeft[remotes[id].net?.name ?? ""] = Time.time; Destroy(remotes[id].c.gameObject); remotes.Remove(id); }
         foreach (var r in remotes.Values)
         {
             var p = r.c.transform.position;
@@ -1102,12 +1105,12 @@ public partial class AcRoom : MonoBehaviour
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(520, SW - 20);
-            float ty = chatLog.Count > 0 && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : SW / 2 + tw / 2 > SW - 250 ? 64 : 18;   // 위 오른쪽 버튼과 겹치면 그 아래
+            float ty = ChatLogVisible && SW / 2 - tw / 2 < 380 ? 30 + 22 * chatLog.Count : SW / 2 + tw / 2 > SW - 250 ? 64 : 18;   // 위 오른쪽 버튼과 겹치면 그 아래
             var r = new Rect(SW / 2 - tw / 2, ty, tw, 40);
             GUI.Box(R(r), "", sBox); GUI.Label(new Rect(r.x + 16, r.y + 9, r.width - 32, 24), toast, sSmall);
         }
         // 대화 기록
-        if (chatLog.Count > 0)
+        if (ChatLogVisible)
         {
             var lr = new Rect(14, 14, 360, 22 * chatLog.Count + 16);
             GUI.Box(R(lr), "", sBox);
