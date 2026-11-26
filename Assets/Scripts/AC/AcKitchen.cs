@@ -941,7 +941,7 @@ public partial class AcRoom
         int n = Mathf.Max(1, ks.orders.Count);
         float cw = Mathf.Min(92, (SW - 20 - 5 * 6) / 5f), chh = cw + 36;
         float x = 10, top = 8;
-        var center = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+        var center = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow, wordWrap = false };
         foreach (var o in ks.orders.OrderBy(q => q.id))
         {
             float left = Mathf.Clamp01(1f - (ks.t - o.t0) / o.life);
@@ -957,7 +957,8 @@ public partial class AcRoom
             AcUiTheme.Fill(new Rect(tb.x, tb.y, Mathf.Max(6, tb.width * left), tb.height), tcol, 0);
             if (hurry) AcUiTheme.Ring(r, new Color(0.92f, 0.25f, 0.22f, 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)), 2);
             var tex = KIcon(RecipeItem(o.r)); if (tex) GUI.DrawTexture(new Rect(r.x + 8, r.y + 15, cw - 16, cw - 26), tex, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(r.x, r.y + cw - 12, cw, 18), "<size=12><b>" + Kc.RecipeKo[o.r] + "</b></size>", center);
+            string nm = Kc.RecipeKo[o.r];
+            GUI.Label(new Rect(r.x, r.y + cw - 12, cw, 18), "<size=" + (nm.Length > 6 ? 10 : 12) + "><b>" + nm + "</b></size>", center);
             var steps = RecipeSteps[o.r]; float iw = Mathf.Min(24, (cw - 10) / steps.Length);
             float sx = r.x + cw / 2 - iw * steps.Length / 2;
             for (int k = 0; k < steps.Length; k++)

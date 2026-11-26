@@ -553,8 +553,8 @@ public partial class AcRoom
                         bx.Star(new Vector3(0, 0.07f, 0.082f), Vector3.forward, Vector3.up, 0.04f, 0.017f, 0.006f, yellow2);
                         bx.Cylinder(new Vector3(0.082f, 0.07f, 0), new Vector3(0.11f, 0.07f, 0), 0.006f, 0.006f, yellow2, 8);   // 태엽 손잡이
                         bx.Box(new Vector3(0.115f, 0.085f, 0), new Vector3(0.008f, 0.04f, 0.012f), yellow2);
-                        var lidB = new AcPB(); lidB.Box(new Vector3(0.08f, 0.006f, 0), new Vector3(0.165f, 0.012f, 0.165f), red2);
-                        var lidGo = ProcObj("jlid", lidB.M("jlid"), root.transform); lidGo.transform.localPosition = new Vector3(-0.08f, 0.14f, 0); lidGo.transform.localRotation = Quaternion.Euler(0, 0, 115);
+                        var lidB = new AcPB(); lidB.Box(new Vector3(0, 0.006f, 0.08f), new Vector3(0.165f, 0.012f, 0.165f), red2);   // 뒤쪽 경첩
+                        var lidGo = ProcObj("jlid", lidB.M("jlid"), root.transform); lidGo.transform.localPosition = new Vector3(0, 0.14f, -0.08f); lidGo.transform.localRotation = Quaternion.Euler(-120, 0, 0);
                     }
                     else if (id == "p_snakecan")
                     {   // 땅콩 캔 (상표 띠) + 옆으로 날아간 뚜껑
