@@ -981,9 +981,9 @@ public partial class AcRoom
             var k = c + new Vector2(kStick.x, -kStick.y) * 44f;
             AcUiTheme.Fill(new Rect(k.x - 26, k.y - 26, 52, 52), new Color(1f, 1f, 1f, 0.85f), 26);
         }
-        else if (IsMobile)
+        else if (IsMobile && km != KMode.Lobby)
             GUI.Label(new Rect(16, SH - 60, SW * 0.5f, 40), "<size=12>왼쪽을 누른 채 끌어서 이동</size>", new GUIStyle(sSmall) { normal = { textColor = new Color(0.35f, 0.3f, 0.3f) } });
-        else
+        else if (km != KMode.Lobby)
             GUI.Label(new Rect(16, SH - 34, SW * 0.6f, 24), "<size=12>WASD/방향키 이동 · 스페이스 잡기/놓기 · E 문지르기</size>", sSmall);
         KTouch();
     }
