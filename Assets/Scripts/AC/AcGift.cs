@@ -704,7 +704,7 @@ public partial class AcRoom
                 }
             case "p_glasses":
                 {   // 콧수염 변장 안경: 까만 테 + 큰 코 + 덥수룩 콧수염 + 눈썹
-                    var fr = new Color(0.12f, 0.12f, 0.15f), skin = new Color(1f, 0.75f, 0.65f);
+                    Color fr = new Color(0.12f, 0.12f, 0.15f), skin = new Color(1f, 0.75f, 0.65f);
                     foreach (float sx in new[] { -0.045f, 0.045f }) { b.Torus(new Vector3(sx, 0.1f, 0), Vector3.forward, 0.035f, 0.007f, fr, 20, 6); b.Disk(new Vector3(sx, 0.1f, -0.002f), Vector3.forward, 0.032f, new Color(0.85f, 0.95f, 1f), 18); }
                     b.Tube(new[] { new Vector3(-0.012f, 0.105f, 0), new Vector3(0, 0.11f, 0), new Vector3(0.012f, 0.105f, 0) }, new[] { 0.005f, 0.005f, 0.005f }, fr, 5);
                     foreach (float sx in new[] { -1f, 1f }) b.Tube(new[] { new Vector3(sx * 0.08f, 0.1f, 0), new Vector3(sx * 0.085f, 0.1f, -0.08f), new Vector3(sx * 0.08f, 0.085f, -0.1f) }, new[] { 0.004f, 0.004f, 0.004f }, fr, 5);
