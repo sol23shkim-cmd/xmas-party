@@ -35,8 +35,26 @@ public class AcPB
     }
     public void Quad(int a, int b, int d, int e) { Tri(a, b, d); Tri(a, d, e); }
 
+    HashSet<int> badV; static bool warnedBad;
     public Mesh M(string name)
     {
+        // 계산 실수로 NaN/무한대 정점이 생기면 그 삼각형을 빼고 정점은 원점으로 (메시 전체가 사라지는 것 방지)
+        int bad = 0;
+        for (int i = 0; i < v.Count; i++)
+        {
+            var p = v[i];
+            if (float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsNaN(p.z) || float.IsInfinity(p.x) || float.IsInfinity(p.y) || float.IsInfinity(p.z)) { v[i] = Vector3.zero; bad++; if (badV == null) badV = new HashSet<int>(); badV.Add(i); }
+            var q = n[i];
+            if (float.IsNaN(q.x) || float.IsNaN(q.y) || float.IsNaN(q.z)) n[i] = Vector3.up;
+        }
+        if (bad > 0)
+        {
+            var nt = new List<int>(t.Count);
+            for (int i = 0; i + 2 < t.Count; i += 3)
+                if (!badV.Contains(t[i]) && !badV.Contains(t[i + 1]) && !badV.Contains(t[i + 2])) { nt.Add(t[i]); nt.Add(t[i + 1]); nt.Add(t[i + 2]); }
+            t.Clear(); t.AddRange(nt); badV.Clear();
+            if (!warnedBad) { warnedBad = true; Debug.LogWarning("[AcPB] " + name + ": NaN 정점 " + bad + "개 정리"); }
+        }
         var m = new Mesh { name = name };
         if (v.Count > 65000) m.indexFormat = IndexFormat.UInt32;
         m.SetVertices(v); m.SetNormals(n); m.SetColors(c); m.SetUVs(0, uv); m.SetTriangles(t, 0);
