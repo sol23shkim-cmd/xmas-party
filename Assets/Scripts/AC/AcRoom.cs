@@ -825,6 +825,7 @@ public partial class AcRoom : MonoBehaviour
         bool treeView = decorating || treeOverview;
         float wantNear = GreenBusy ? Mathf.Max(0.3f, dist - 1.1f) : building || snowFocusId != null ? Mathf.Max(0.3f, dist - 1.6f) : treeOverview ? 0.3f : treeView ? Mathf.Max(0.3f, dist - TreeR - 0.9f) : phase == Phase.Lobby ? 0.3f : Mathf.Min(2.0f, dist * 0.15f);   // 바로 앞을 지나는 눈송이는 안 그림
         cam.nearClipPlane = snap ? wantNear : Mathf.Lerp(cam.nearClipPlane, wantNear, 1 - Mathf.Exp(-dt * 4f));
+        cam.farClipPlane = 200f;
         camYawCur = snap ? targetYaw : Mathf.LerpAngle(camYawCur, targetYaw, 1 - Mathf.Exp(-dt * 3f));
         var rotq = Quaternion.Euler(pitch, camYawCur, 0);
         var want = focus + rotq * new Vector3(0, 0, -dist);

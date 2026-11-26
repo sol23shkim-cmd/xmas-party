@@ -953,7 +953,9 @@ public partial class AcRoom
         camStudioPos = Vector3.Lerp(camStudioPos, want, 1 - Mathf.Exp(-dt * 6f));
         cam.transform.position = camStudioPos;
         cam.transform.rotation = Quaternion.LookRotation(focus - camStudioPos);
-        cam.nearClipPlane = 0.05f;
+        // 깊이 정밀도: 휴대폰은 깊이 버퍼가 거칠어서 가까운 면/먼 면 비율이 크면 맞닿은 면이 지글지글 깨짐 → 무대 크기에 맞게 좁힘
+        cam.nearClipPlane = Mathf.Clamp(dist * 0.35f, 0.2f, 1f);
+        cam.farClipPlane = 30f;
         return true;
     }
 
