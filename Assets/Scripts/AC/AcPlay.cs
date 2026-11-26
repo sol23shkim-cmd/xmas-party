@@ -151,6 +151,8 @@ public partial class AcRoom
         ("반짝반짝 작은 별", new[] { 60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60 }),
     };
 
+    static readonly string[] PianoShort = { "자유", "징글벨", "고요한 밤", "기쁘다", "반짝반짝" };
+
     bool NearPiano(out bool musicRoom)
     {
         musicRoom = !Outside && AreaAt(me.transform.position) == "음악실";
@@ -231,7 +233,7 @@ public partial class AcRoom
             var r = new Rect(bx + i * (bw + 6), by, bw, 30);
             bool sel = pianoSong == i - 1;
             if (sel) AcUiTheme.Ring(r, AcUiTheme.Accent, 3);
-            if (GUI.Button(r, Short(names[i], narrow ? 4 : 9), sBtn)) { pianoSong = i - 1; pianoStep = 0; }
+            if (GUI.Button(r, narrow ? PianoShort[i] : names[i], sBtn)) { pianoSong = i - 1; pianoStep = 0; }   // 좁은 화면: 잘리지 않는 짧은 이름
         }
         int next = pianoSong >= 0 && pianoStep < PianoSongs[pianoSong].notes.Length ? PianoSongs[pianoSong].notes[pianoStep] : -1;
         GUI.Label(new Rect(panel.x + 14, by + 34, panel.width - 28, 22), pianoSong < 0 ? (IsMobile ? "건반을 눌러 연주해요. 가까이 있는 사람에게도 들려요" : "건반을 누르거나 자판 A~' (흰 건반), W E T Y U O P (검은 건반)") : $"빛나는 건반을 차례로 눌러요  ({pianoStep}/{PianoSongs[pianoSong].notes.Length})", sSmall);
@@ -488,7 +490,8 @@ public partial class AcRoom
         {
             int qi = (int)(el / QzPerMs); double inq = el - qi * QzPerMs; bool reveal = inq >= QzAnswerMs;
             var qz = QzSet()[qi]; long round = QzRound(qi);
-            GUI.Label(new Rect(p.x + 160, p.y + 14, 200, 22), $"<b>{qi + 1} / {QzCount}</b> 문제", sSmall);
+            int myNow = 0; foreach (var sc0 in QzScores()) if (sc0.name == uiName.Trim()) { myNow = sc0.score; break; }
+            GUI.Label(new Rect(p.x + 140, p.y + 14, 220, 22), $"<b>{qi + 1} / {QzCount}</b> 문제   <color=#2e7d32>맞힌 수 {myNow}</color>", sSmall);   // 내 점수도 보이게
             if (!reveal)
             {
                 float frac = (float)(1 - inq / QzAnswerMs);
@@ -787,7 +790,7 @@ public partial class AcRoom
         if (pillowMode != pillowWas)
         {
             pillowWas = pillowMode;
-            if (pillowMode) Toast(IsMobile ? "베개 싸움! 톡 누르면 베개를 휘둘러요 (끌면 걸어요)" : "베개 싸움! 클릭이나 F로 베개를 휘둘러요");
+            if (pillowMode) Toast(IsMobile ? "베개 싸움! '베개 휘두르기'를 누르거나 화면을 톡 눌러요" : "베개 싸움! 클릭이나 F, '베개 휘두르기'로 휘둘러요");
         }
         if (me) { me.holdPillow = pillowMode; me.pillowColor = Color.Lerp(me.look.sweater, Color.white, 0.55f); }
         foreach (var r in remotes.Values) if (r.c) { r.c.holdPillow = InBedroom(r.c.transform.position); r.c.pillowColor = Color.Lerp(r.c.look.sweater, Color.white, 0.55f); }

@@ -148,6 +148,7 @@ public partial class AcRoom
         var gextra = new List<(string, Action, float)>();
         if (label == null && GreenContext(out var gl, out var ga, gextra)) { label = gl; act = ga; }
         if (label == null && InGiftRoom) { label = "선물 포장하기"; act = OpenWrap; }
+        if (label == null && pillowMode) { label = "베개 휘두르기"; act = () => SwingPillow(null); }   // 침실: 화면 아무 데나 누르는 대신 버튼으로
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
@@ -208,7 +209,9 @@ public partial class AcRoom
         float w = Mathf.Min(300, SW - 24), top = br.yMax + (followId != null ? bh + 12 : 6);
         float h = Mathf.Min(SH - top - (IsMobile ? 90 : 70), 520);
         var panel = new Rect(SW - w - 12, top, w, h);
+        AcUiTheme.Fill(panel, new Color(1f, 0.995f, 0.985f, 1f), 0);   // 뒤 글자가 비치지 않게 불투명 바탕
         GUI.Box(R(panel), "", sBox);
+        if (GUI.Button(R(new Rect(panel.xMax - 70, panel.y + 8, 60, 28)), "닫기", sBtn)) { showPeople = false; return; }
         GUILayout.BeginArea(new Rect(panel.x + 10, panel.y + 8, panel.width - 20, panel.height - 16));
         peopleScroll = BeginDragScroll("people", peopleScroll);
         GUILayout.Label("참가자", sLabel);

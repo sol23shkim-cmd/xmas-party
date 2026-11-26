@@ -237,7 +237,7 @@ public partial class AcRoom
         // 속 상자 (뚜껑 없는 상자) + 뚜껑
         float lidH = Mathf.Min(0.1f, H * 0.28f);
         var inner = new AcPB();
-        Color cream = new Color(0.98f, 0.95f, 0.9f), inside = new Color(0.86f, 0.8f, 0.72f);
+        Color cream = new Color(0.86f, 0.66f, 0.45f), inside = new Color(0.72f, 0.54f, 0.36f);   // 속 상자: 크라프트 종이 색 (흰 상자는 밋밋해 보였음)
         float hb = H - lidH * 0.55f;
         Face(inner, new Vector3(0, 0.002f, 0), Vector3.down, Vector3.right, Vector3.forward, W, D, cream * 0.9f);
         Face(inner, new Vector3(0, 0.006f, 0), Vector3.up, Vector3.right, Vector3.forward, W - 0.01f, D - 0.01f, inside);
@@ -939,11 +939,12 @@ public partial class AcRoom
         if (giftMode == GiftMode.None) { camStudioInit = false; return false; }
         float objH = 0.5f;
         if (wrapBox != null) objH = Mathf.Max(objH, wrapBox.size.y + 0.15f);
-        if (giftMode == GiftMode.Wrap && wrapTab == 0) objH = Mathf.Max(0.5f, GiftItemById(wrapDraft.item).h + 0.1f);
-        if (giftMode == GiftMode.Unwrap && unPhase >= 3) objH = (wrapBox != null ? wrapBox.size.y : 0.4f) + (openItemDef != null ? openItemDef.h : 0.4f) + 0.2f;
+        float objW = wrapBox != null ? Mathf.Sqrt(wrapBox.size.x * wrapBox.size.x + wrapBox.size.z * wrapBox.size.z) + 0.3f : 0.7f;   // 돌려 봐도 옆이 안 잘리게 대각선 폭
+        if (giftMode == GiftMode.Wrap && wrapTab == 0) { float ih = GiftItemById(wrapDraft.item).h; objH = Mathf.Max(0.32f, ih * 1.5f); objW = Mathf.Max(0.5f, ih * 1.6f); }
+        if (giftMode == GiftMode.Unwrap && unPhase >= 3) objH = (wrapBox != null ? wrapBox.size.y : 0.4f) + (openItemDef != null ? openItemDef.h * RevealK : 0.4f) + 0.25f;
         bool portrait = Screen.height > Screen.width;
         float vfov = cam.fieldOfView * Mathf.Deg2Rad;
-        float need = Mathf.Max(objH / (portrait ? 0.42f : 0.6f), 0.8f / Mathf.Max(0.3f, cam.aspect));
+        float need = Mathf.Max(objH / (portrait ? 0.42f : 0.6f), objW / Mathf.Max(0.3f, cam.aspect) / 0.85f);
         float dist = need / (2f * Mathf.Tan(vfov / 2f)) * studioZoom + 0.3f;
         var focus = StudioPos + Vector3.up * (TableY + objH * (portrait ? 0.18f : 0.38f));
         float pitch = 22f;
@@ -1193,7 +1194,7 @@ public partial class AcRoom
         giftInbox.Sort((a, b) => a.ct.CompareTo(b.ct));
         if (fresh > 0)
         {
-            Toast(giftPrimed ? freshFrom + " 님이 선물을 줬어요! '선물 풀어보기'를 눌러요" : $"받은 선물이 {giftInbox.Count}개 있어요! '선물 풀어보기'를 눌러요");
+            Toast(giftPrimed ? freshFrom + " 님이 선물을 줬어요! 오른쪽 위 '선물 열기'를 눌러요" : $"받은 선물이 {giftInbox.Count}개 있어요! 오른쪽 위 '선물 열기'를 눌러요");
             Sfx("heart", 0.5f);
         }
         giftPrimed = true;
@@ -1252,7 +1253,8 @@ public partial class AcRoom
                     var tgt = bowRest + gb.root.InverseTransformVector(off);
                     gb.bow.transform.localPosition = Vector3.Lerp(gb.bow.transform.localPosition, tgt, 1 - Mathf.Exp(-dt * 18f));
                     float st = 1 + off.magnitude * 0.6f;
-                    gb.bandX.transform.localScale = new Vector3(1, st, 1); gb.bandZ.transform.localScale = new Vector3(1, st, 1);
+                    if (gb.bandX) gb.bandX.transform.localScale = new Vector3(1, st, 1);
+                    if (gb.bandZ) gb.bandZ.transform.localScale = new Vector3(1, st, 1);
                     gb.bow.transform.localRotation = Quaternion.Euler(0, Mathf.Sin(unT * 3) * 6f, Mathf.Sin(unT * 4.3f) * 4f);
                     if (ptrUp && !ptrOnUI && ptrMoved && (ptrPos - ptrStart).magnitude > Screen.height * 0.06f)
                     {
@@ -1260,17 +1262,20 @@ public partial class AcRoom
                         Sfx("untie", 0.6f, 0.9f + pullCount * 0.1f);
                         FxBurst("conf", gb.bow.transform.position, 6, 1.2f, 0.035f, new[] { Hex(openData.ribbon) }, 0.9f, 3f);
                         float sf = gb.bow.transform.localScale.x;
-                        gb.bow.transform.localScale = Vector3.one * sf * 0.82f;
+                        gb.bow.transform.localScale = Vector3.one * sf * 0.85f;
+                        // 당길 때마다 눈에 띄게 한 갈래씩 풀림: 1번째 가로 끈, 2번째 세로 끈, 3번째 리본 매듭
+                        if (pullCount == 1 && gb.bandX) { FlyOff(gb.bandX, Vector3.up * 1.4f + cam.transform.right * 0.9f, 1.0f); gb.bandX = null; camShakeStudio = 0.12f; }
+                        if (pullCount == 2 && gb.bandZ) { FlyOff(gb.bandZ, Vector3.up * 1.4f - cam.transform.right * 0.9f, 1.0f); gb.bandZ = null; camShakeStudio = 0.12f; }
                         if (pullCount >= 3)
                         {
                             var up = Vector3.up * 1.6f;
                             FlyOff(gb.bow, up + off.normalized * 1.2f + cam.transform.right * 0.5f, 1.2f); gb.bow = null;
-                            FlyOff(gb.bandX, up + cam.transform.right * 0.8f, 1.0f); gb.bandX = null;
-                            FlyOff(gb.bandZ, up - cam.transform.right * 0.8f, 1.0f); gb.bandZ = null;
+                            if (gb.bandX) { FlyOff(gb.bandX, up + cam.transform.right * 0.8f, 1.0f); gb.bandX = null; }
+                            if (gb.bandZ) { FlyOff(gb.bandZ, up - cam.transform.right * 0.8f, 1.0f); gb.bandZ = null; }
                             unPhase = 1; Sfx("candy_special", 0.4f, 1.2f);
                         }
                     }
-                    if (!ptrPressed && gb.bandX) { gb.bandX.transform.localScale = Vector3.Lerp(gb.bandX.transform.localScale, Vector3.one, dt * 10); gb.bandZ.transform.localScale = gb.bandX.transform.localScale; }
+                    if (!ptrPressed) { if (gb.bandX) gb.bandX.transform.localScale = Vector3.Lerp(gb.bandX.transform.localScale, Vector3.one, dt * 10); if (gb.bandZ) gb.bandZ.transform.localScale = Vector3.Lerp(gb.bandZ.transform.localScale, Vector3.one, dt * 10); }
                     break;
                 }
             case 1: // 포장지 찢기: 문지른 곳 조각을 표시했다가 손을 떼면 찢김 (한 번에 최대 6조각)
@@ -1330,9 +1335,9 @@ public partial class AcRoom
                     if (openItem)
                     {
                         float r = Mathf.Clamp01((unT - 0.1f) / 0.7f);
-                        float s = Mathf.Lerp(0.2f, 1f, Mathf.SmoothStep(0, 1, r)) * (1 + 0.2f * Mathf.Sin(r * Mathf.PI));
+                        float s = Mathf.Lerp(0.2f, RevealK, Mathf.SmoothStep(0, 1, r)) * (1 + 0.25f * Mathf.Sin(r * Mathf.PI));
                         openItem.transform.localScale = Vector3.one * s;
-                        openItem.transform.localPosition = new Vector3(0, TableY + Mathf.Lerp(0.02f, gb.size.y + 0.03f, Mathf.SmoothStep(0, 1, r)) + Mathf.Sin(r * Mathf.PI) * 0.15f, 0);
+                        openItem.transform.localPosition = new Vector3(0, TableY + Mathf.Lerp(0.02f, gb.size.y + 0.03f, Mathf.SmoothStep(0, 1, r)) + Mathf.Sin(r * Mathf.PI) * 0.35f, 0);   // 높이 튀어 올랐다가 상자 위에 내려앉음
                         openItem.transform.localRotation = Quaternion.Euler(0, r * 360f, 0);
                     }
                     if (unT > 0.3f && unT - dt <= 0.3f)
@@ -1347,7 +1352,7 @@ public partial class AcRoom
                 }
             case 4: // 짠!
                 {
-                    if (openItem) { openItem.transform.localScale = Vector3.one; AnimItem(openItem, openItemDef, unT, new Vector3(0, TableY + gb.size.y + 0.03f, 0), 0); }
+                    if (openItem) { AnimItem(openItem, openItemDef, unT, new Vector3(0, TableY + gb.size.y + 0.03f, 0), 0); openItem.transform.localScale *= RevealK; }
                     if (Mathf.Repeat(unT, 2.2f) < dt) FxBurst("star", gb.root.position + Vector3.up * (gb.size.y + openItemDef.h * 0.8f), 3, 0.6f, 0.04f, FxGold, 1f, -0.3f);
                     StudioDragInput();
                     break;
@@ -1357,6 +1362,7 @@ public partial class AcRoom
         if (Key("esc")) { if (unPhase == 4) LeaveStudio(); else LeaveStudio(); }
     }
     float camShakeStudio;
+    const float RevealK = 1.5f;   // 짠! 나온 내용물은 상자보다 돋보이게 1.5배
 
     void OpenBox()
     {
@@ -1397,11 +1403,28 @@ public partial class AcRoom
         switch (unPhase)
         {
             case 0:
-                Hint(hy, $"리본을 쭉 끌어당겨 풀어요!  ({pullCount}/3)", big);
+                Hint(hy, $"리본을 위로 쭉 끌어당겨요!  ({pullCount}/3)", big);
+                if (!ptrPressed && wrapBox != null && wrapBox.bow)
+                {   // 손가락 안내: 리본에서 위로 올라가는 동그라미
+                    var sp = cam.WorldToScreenPoint(wrapBox.bow.transform.position);
+                    if (sp.z > 0)
+                    {
+                        float t = Mathf.Repeat(Time.time, 1.4f) / 1.1f;
+                        if (t <= 1f)
+                        {
+                            float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK - t * 110f;
+                            var k0 = GUI.color; GUI.color = new Color(1, 1, 1, Mathf.Sin(t * Mathf.PI));
+                            AcUiTheme.Circle(new Rect(x - 20, y - 20, 40, 40), new Color(1f, 1f, 1f, 0.85f));
+                            AcUiTheme.CircleRing(new Rect(x - 20, y - 20, 40, 40), AcUiTheme.Accent);
+                            GUI.color = k0;
+                        }
+                    }
+                }
                 break;
             case 1:
                 {
-                    Hint(hy, "포장지를 쓱쓱 문질러 찢어요!", big);
+                    if (wrapBox != null && wrapBox.paper != null) { int all = wrapBox.paper.Count, torn = wrapBox.paper.Count(pp => pp.torn); Hint(hy, $"포장지를 쓱쓱 문질러 찢어요!  ({Mathf.RoundToInt(100f * torn / Mathf.Max(1, all))}%)", big); }
+                    else Hint(hy, "포장지를 쓱쓱 문질러 찢어요!", big);
                     break;
                 }
             case 2:
@@ -1449,14 +1472,15 @@ public partial class AcRoom
     void GiftHUD()
     {
         if (phase != Phase.Play) return;
-        float y = SH * 0.36f;
+        // 받은 선물: 오른쪽 위(참가자 버튼 아래) 작은 배지 — 캐릭터 옆을 가리지 않게
         if (giftInbox.Count > 0)
         {
-            var r = new Rect(12, y, IsMobile ? 170 : 160, IsMobile ? 50 : 42);
+            float w = IsMobile ? 150 : 140, h = IsMobile ? 42 : 36;
+            var r = new Rect(SW - 12 - w, (IsMobile ? 104 : 96), w, h);
             AcUiTheme.DrawGlow(r, 0.5f + 0.5f * Mathf.Sin(Time.time * 3f));
-            if (GUI.Button(R(r), $"<b>선물 풀어보기 ({giftInbox.Count})</b>", sBtnBig)) OpenUnwrap(0);
-            y = r.yMax + 10;
+            if (GUI.Button(R(r), $"<b>선물 열기 ({giftInbox.Count})</b>", sBtnBig)) OpenUnwrap(0);
         }
+        // 들고 있는 선물은 손에 보이므로 글자는 생략. 친구 가까이에서만 '전달하기'
         var g = HeldGift;
         if (g != null)
         {
@@ -1467,12 +1491,6 @@ public partial class AcRoom
                 var r = new Rect(SW / 2 - w / 2, SH - (IsMobile ? 46 : 36) - 12 - 16 - 52 - 10 - h - 66, w, h);
                 AcUiTheme.DrawGlow(r, 0.5f + 0.5f * Mathf.Sin(Time.time * 4f));
                 if (GUI.Button(R(r), "<b>" + near.net.name + " 님에게 전달하기</b>", sBtnBig)) GiveGift(near);
-            }
-            else
-            {
-                var r = new Rect(12, y, IsMobile ? 170 : 160, 30);
-                GUI.Box(R(r), "", sBox);
-                GUI.Label(new Rect(r.x + 10, r.y + 5, r.width - 16, 22), "<size=12>선물을 들고 있어요</size>", sSmall);
             }
         }
     }

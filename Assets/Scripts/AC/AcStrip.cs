@@ -30,8 +30,9 @@ public partial class AcRoom
         if (e.type == EventType.MouseUp) st.drag = false;
         if (sel != st.selSeen) { st.selSeen = sel; if (sel * step < st.scroll) st.scroll = sel * step; else if ((sel + 1) * step > st.scroll + viewW) st.scroll = (sel + 1) * step - viewW; }
         st.scroll = Mathf.Clamp(st.scroll, 0, maxScroll);
-        if (st.scroll > 1) GUI.Label(new Rect(view.x - 14, view.y + size / 2 - 12, 14, 24), "<", sLabel);
-        if (st.scroll < maxScroll - 1) GUI.Label(new Rect(view.xMax + 1, view.y + size / 2 - 12, 14, 24), ">", sLabel);
+        // 양 끝 화살표: 누르면 한 화면씩 넘김 (예전엔 글자만 있어서 눌러도 안 넘어갔음)
+        if (st.scroll > 1) { var ar = new Rect(view.x - 18, view.y + size / 2 - 18, 20, 36); R(ar); GUI.Label(ar, "<", sLabel); if (GUI.Button(ar, "", GUIStyle.none)) st.scroll = Mathf.Max(0, st.scroll - viewW * 0.8f); }
+        if (st.scroll < maxScroll - 1) { var ar = new Rect(view.xMax - 2, view.y + size / 2 - 18, 20, 36); R(ar); GUI.Label(ar, ">", sLabel); if (GUI.Button(ar, "", GUIStyle.none)) st.scroll = Mathf.Min(maxScroll, st.scroll + viewW * 0.8f); }
         int clicked = -1;
         GUI.BeginGroup(view);
         int first = Mathf.Max(0, (int)(st.scroll / step)), last = Mathf.Min(count - 1, (int)((st.scroll + viewW) / step) + 1);

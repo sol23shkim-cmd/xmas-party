@@ -604,10 +604,16 @@ public partial class AcRoom
         cdComboText.t += dt;
     }
 
+    // '그만'은 한 번 더 눌러야 끝남 (실수로 판을 날리지 않게, 2.5초 안에)
+    bool cdQuitAsk => Time.unscaledTime - cdQuitAt < 2.5f;
+    float cdQuitAt = -99f;
+    void CdQuitTap() { if (cdQuitAsk) { cds = CdS.Menu; cdsT = 0; cdQuitAt = -99f; } else cdQuitAt = Time.unscaledTime; }
+
     void CdAfterSwap()
     {
         var ta = cdB[cdA.x, cdA.y]; var tb = cdB[cdB2.x, cdB2.y];   // 바꾼 뒤: ta는 A자리에 온 것(원래 B), tb는 B자리에 온 것
         cdHint = null; cdCombo = 0;
+        if (cdIntroT < 1.9f) cdIntroT = 1.9f;   // 첫 수를 두면 시작 알림은 바로 사라짐
         // 특수 조합
         if (ta.sp == SpBomb || tb.sp == SpBomb || (ta.sp != SpNone && tb.sp != SpNone))
         {
@@ -1039,7 +1045,7 @@ public partial class AcRoom
             CgText(new Rect(mr.x, mr.y + 6, mr.width, 44), cdMoves.ToString(), 32, Color.white, TextAnchor.MiddleCenter, 2, new Color(0.2f, 0.05f, 0.25f, 0.8f));
             CgText(new Rect(mr.x, mr.y + 46, mr.width, 22), "남은 횟수", 12, Color.white, TextAnchor.MiddleCenter, 1.5f, new Color(0.2f, 0.05f, 0.25f, 0.8f));
             // 그만 버튼
-            if (cds == CdS.Play && CgButton(new Rect(hud.xMax - 74, hud.y + 8, 66, 30), "그만", new Color(0.55f, 0.6f, 0.72f), 14)) { cds = CdS.Menu; cdsT = 0; }
+            if (cds == CdS.Play && CgButton(new Rect(hud.xMax - 74, hud.y + 8, 66, 30), cdQuitAsk ? "정말?" : "그만", cdQuitAsk ? new Color(0.9f, 0.35f, 0.35f) : new Color(0.55f, 0.6f, 0.72f), 14)) CdQuitTap();
             // 점수
             CgText(new Rect(mr.xMax + 8, hud.y + 8, 200, 34), ((int)cdShown).ToString("#,0"), 26, new Color(1f, 0.85f, 0.35f), TextAnchor.MiddleLeft, 2, new Color(0.45f, 0.15f, 0.2f));
             StarBar(new Rect(mr.xMax + 10, hud.y + 46, hud.xMax - mr.xMax - 26, 14));
@@ -1061,7 +1067,7 @@ public partial class AcRoom
             float gy = mr.yMax + 100;
             int cols = 2; float gw = (hud.width - 24) / cols;
             for (int i = 0; i < cdGoalKind.Count; i++) GoalCell(i, new Rect(hud.x + 12 + (i % cols) * gw, gy + (i / cols) * 64, gw, 58));
-            if (cds == CdS.Play && CgButton(new Rect(hud.center.x - 50, hud.yMax - 48, 100, 36), "그만", new Color(0.55f, 0.6f, 0.72f), 15)) { cds = CdS.Menu; cdsT = 0; }
+            if (cds == CdS.Play && CgButton(new Rect(hud.center.x - 50, hud.yMax - 48, 100, 36), cdQuitAsk ? "정말?" : "그만", cdQuitAsk ? new Color(0.9f, 0.35f, 0.35f) : new Color(0.55f, 0.6f, 0.72f), 15)) CdQuitTap();
         }
     }
     void StarBar(Rect r)

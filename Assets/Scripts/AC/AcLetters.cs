@@ -75,9 +75,11 @@ public partial class AcRoom
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                float g = Mathf.Sin(y * 0.35f + Mathf.Sin(x * Mathf.PI * 2f / w * 3f) * 2.5f) * 0.5f + 0.5f;   // 가로로 이어 붙여도 이음새가 안 보이게
-                float plank = (y % 32) < 1 ? 0.6f : 1f;
-                var c = Color.Lerp(new Color(0.55f, 0.34f, 0.2f), new Color(0.66f, 0.43f, 0.27f), g) * plank;
+                // 잔잔한 나뭇결 (예전 굵은 물결은 물처럼 보였음): 가는 결 + 아주 약한 굽이, 판자 사이 얇은 틈
+                float u = x * Mathf.PI * 2f / w;
+                float g = 0.5f + 0.3f * Mathf.Sin(y * 1.9f + Mathf.Sin(u) * 0.9f) + 0.2f * Mathf.Sin(y * 0.6f + Mathf.Sin(u * 2f) * 0.5f + 1.3f);
+                float plank = (y % 32) < 1 ? 0.72f : 1f;
+                var c = Color.Lerp(new Color(0.62f, 0.42f, 0.27f), new Color(0.68f, 0.47f, 0.31f), g) * plank;
                 c.a = 1; t.SetPixel(x, y, c);
             }
         t.Apply(); return t;
@@ -214,6 +216,7 @@ public partial class AcRoom
             // 글씨가 커서 두 줄이 되면 잘리던 문제 → 넉넉한 높이 + 좁은 화면은 작은 글씨
             var ms = new GUIStyle(sHandTitle) { fontSize = SW < 640 ? 30 : 38, alignment = TextAnchor.MiddleCenter, wordWrap = true, normal = { textColor = new Color(1f, 0.95f, 0.85f) } };
             float mh = Mathf.Max(48, ms.CalcHeight(new GUIContent(msg), area.width - 20) + 8);
+            AcUiTheme.Fill(new Rect(area.x + 10, area.y + 18, area.width - 20, mh + 12), new Color(0.3f, 0.18f, 0.1f, 0.35f), 0);   // 글씨가 나무 위에서 잘 보이게
             GUI.Label(new Rect(area.x + 10, area.y + 24, area.width - 20, mh), msg, ms);
             if (GUI.Button(new Rect(area.center.x - 70, area.y + 24 + mh + 18, 140, 36), "편지 쓰기", sBtn)) letterTab = 3;
             return;

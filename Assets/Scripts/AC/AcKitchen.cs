@@ -97,7 +97,7 @@ public partial class AcRoom
             AddAct("ks", kSid + "," + kStage + "," + seed + "," + kT0.ToString("0") + "," + string.Join("/", ids));
         }
         me.transform.position = KSpawn(0);
-        km = KMode.Count;
+        km = KMode.Count; toastUntil = 0;   // 대기실 안내는 게임이 시작되면 지움
     }
 
     // 다른 사람이 보낸 주방 사건
@@ -118,7 +118,7 @@ public partial class AcRoom
                     BuildArena(stage);
                     int myIdx = Array.IndexOf(v[4].Split('/'), myId);
                     me.transform.position = KSpawn(Mathf.Max(0, myIdx));
-                    km = KMode.Count;
+                    km = KMode.Count; toastUntil = 0;   // 대기실 안내는 게임이 시작되면 지움
                     Toast(r.net.name + " 님이 주방 게임을 시작해요!");
                     break;
                 }
@@ -854,9 +854,11 @@ public partial class AcRoom
         }
         // 내는 곳 / 쓰레기통 이름 (대기실·처음 20초)
         if (km == KMode.Lobby || ks.t < 20f)
+            var labeled = new HashSet<char>();   // 같은 종류는 이름표 하나만 (번잡하지 않게)
             for (int i = 0; i < Kc.W * Kc.H; i++)
             {
                 char c = Kc.At(s, i);
+                if ((c == 'X' || c == 'O' || c == 'H') && !labeled.Add(c)) continue;
                 if (c == 'V' || c == 'R') KSmallTag(KPos(i) + Vector3.up * (c == 'V' ? 2.2f : 1.2f), c == 'V' ? "내는 곳" : "쓰레기통");
                 else if (c == 'X') KSmallTag(KPos(i) + Vector3.up * 1.15f, "도마");
                 else if (c == 'O') KSmallTag(KPos(i) + Vector3.up * 1.6f, "오븐");
@@ -865,7 +867,8 @@ public partial class AcRoom
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(460, SW - 20);
-            var r = new Rect(SW / 2 - tw / 2, SH * 0.52f, tw, 40);
+            float ty = km == KMode.Lobby ? 10 : Mathf.Min(92, (SW - 20 - 5 * 6) / 5f) + 36 + 8 + 8 + 36 + 8;   // 대기실: 맨 위 / 게임: 주문표·점수 줄 바로 아래 (주방을 가리지 않게)
+            var r = new Rect(SW / 2 - tw / 2, ty, tw, 40);
             GUI.Box(r, "", sBox); GUI.Label(new Rect(r.x + 14, r.y + 9, r.width - 28, 24), "<size=13>" + toast + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
         }
         if (kDebug) { var c0 = KCell(me.transform.position); GUI.Label(new Rect(8, SH - 20, SW, 20), $"<size=11>cell {c0.x},{c0.y} tgt {kTarget} yaw {yaw:0} pos {me.transform.position.x - KO.x:0.00},{me.transform.position.z - KO.z:0.00} hand {ks.hands.FirstOrDefault(q => q.id == myId)?.it}</size>", sSmall); }

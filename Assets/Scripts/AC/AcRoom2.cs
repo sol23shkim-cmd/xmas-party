@@ -320,7 +320,7 @@ public partial class AcRoom
             var d = new Vector2(p.x - c.x, p.z - c.y); float rr = c.z + r;
             if (d.sqrMagnitude < rr * rr && d.sqrMagnitude > 1e-8f) { d = d.normalized * rr; p.x = c.x + d.x; p.z = c.y + d.y; }
         }
-        return p;
+        return PushFromPeers(p, 0.28f);   // 다른 참가자와 겹치지 않게
     }
 
     // 이동 범위: 마당 끝 + 벽 (문·아치·앞 출입구로만 지나감)
@@ -456,7 +456,7 @@ public partial class AcRoom
         // 작은 이십면체에 가까운 공 (지름 약 7cm)
         var m = new Mesh { name = "flake" };
         var verts = new List<Vector3>(); var tris = new List<int>();
-        int seg = 5, ring = 3; float rad = 0.04f;
+        int seg = 8, ring = 4; float rad = 0.04f;   // 5x3이면 가까이서 육각형으로 보여서 조금 더 둥글게
         for (int j = 0; j <= ring; j++)
             for (int i = 0; i <= seg; i++)
             {

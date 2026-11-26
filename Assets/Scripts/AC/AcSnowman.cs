@@ -227,6 +227,13 @@ public partial class AcRoom
         draft = new SnowData();
         var saved = PlayerPrefs.GetString("ac_snow_last", "");
         if (saved != "") try { var old = JsonUtility.FromJson<SnowData>(saved); if (old != null) { draft.tiers = old.tiers; draft.r0 = old.r0; draft.r1 = old.r1; draft.r2 = old.r2; draft.head = old.head; } } catch { }
+        if (!CharHead(draft.head))
+        {   // 처음부터 얼굴이 있게: 숯 눈 둘 + 당근 코 (원하면 '하나 되돌리기'로 뺄 수 있음)
+            int ht = draft.tiers - 1;
+            draft.d.Add(new SnowDeco { m = "sm_coal", t = ht, x = -0.33f, y = 0.28f, z = 0.9f, s = 1f });
+            draft.d.Add(new SnowDeco { m = "sm_coal", t = ht, x = 0.33f, y = 0.28f, z = 0.9f, s = 1f });
+            draft.d.Add(new SnowDeco { m = "sm_carrot", t = ht, x = 0f, y = 0f, z = 1f, s = 1f });
+        }
         snowTab = 0; snowPicked = true; decoZoom = 1f; snowYaw = draftRy + 180f;
         RebuildDraft();
         walkTarget = null; followId = null;
@@ -484,7 +491,7 @@ public partial class AcRoom
         bool changed = false;
         if (snowTab == 0)
         {
-            ArrowRow(ref cy, lx, labelW, valW, "단", draft.tiers + "단", d => { draft.tiers = draft.tiers == 2 ? 3 : 2; changed = true; });
+            ArrowRow(ref cy, lx, labelW, valW, "단", draft.tiers + "단", d => { int oldTop = draft.tiers - 1; draft.tiers = draft.tiers == 2 ? 3 : 2; foreach (var dd in draft.d) if (dd.t == oldTop) dd.t = draft.tiers - 1; changed = true; });   // 맨 위 장식(얼굴)은 새 맨 위로 옮김
             for (int i = 0; i < draft.tiers; i++)
             {
                 int ti = i == draft.tiers - 1 ? 2 : i;

@@ -78,6 +78,8 @@ public partial class AcRoom
             if (rr.width < nm.Length * fs * 0.95f && nm.Contains(" ")) nm = nm.Replace(" ", "\n");
             if (me2) { GUI.color = (new Color(0.9f, 0.3f, 0.3f, 0.25f)).linear; GUI.DrawTexture(rr, Texture2D.whiteTexture); GUI.color = Color.white; }
             MapLabel(rr, nm, fs, me2);
+            if (RoomActs.TryGetValue(a.name, out var act))   // 방에서 할 수 있는 것 (작은 글씨)
+                CgText(new Rect(rr.x - 10, rr.yMax - fs - 6, rr.width + 20, fs + 2), act, Mathf.Max(10, fs - 4), new Color(1f, 0.95f, 0.8f), TextAnchor.MiddleCenter, 1.2f, new Color(0.3f, 0.18f, 0.1f, 0.9f));
         }
         MapLabel(WR(-HalfX, HalfX, -HalfZ, -HalfZ + 4), "트리 거실", fs, here == "트리 거실");
         MapLabel(WR(-HalfX, HalfX, HouseZ0, -HalfZ), "안뜰", fs, false);
@@ -110,6 +112,22 @@ public partial class AcRoom
         }
     }
 
+    static readonly System.Collections.Generic.Dictionary<string, string> RoomActs = new System.Collections.Generic.Dictionary<string, string>
+    {
+        { "침실", "베개 싸움" }, { "선물 포장실", "선물 만들기" }, { "쿠키 공방", "쿠키 달리기" }, { "겨울 온실", "화분 키우기" },
+        { "음악실", "피아노" }, { "놀이방", "캔디 팡" }, { "부엌", "주방 게임" }, { "서재", "퀴즈, 편지" },
+    };
+
+    // 받침에 따라 '으로' / '로' (받침 없음·ㄹ받침 → 로)
+    static string EuroRo(string w)
+    {
+        if (string.IsNullOrEmpty(w)) return "로";
+        char c = w[w.Length - 1];
+        if (c < 0xAC00 || c > 0xD7A3) return "로";
+        int jong = (c - 0xAC00) % 28;
+        return jong == 0 || jong == 8 ? "로" : "으로";
+    }
+
     void MapLabel(Rect r, string text, int size, bool hl)
     {
         var lines = text.Split('\n');
@@ -139,13 +157,14 @@ public partial class AcRoom
     void TeleportTo(Vector3 p)
     {
         var q = NearestWalkable(p);
+        if (InHouse(q) && AreaAt(q) == "트리 거실") q = NearestWalkable(TreePos + new Vector3(0, 0, TreeR + 2.6f));   // 트리 거실: 트리 바로 앞(남쪽)에 서서 트리가 화면에 보이게
         decorating = false; treeOverview = false; followId = null; walkTarget = null; showMap = false;
         if (building) StopBuilding();
         if (InHouse(q) && me.skating) { me.SetSkates(false); skateVel = Vector3.zero; }
         me.transform.position = q;
         UpdateCamera(0, true);
         string where = InHouse(q) ? AreaAt(q) : q.z > HalfZ ? "앞마당" : Mathf.Abs(q.x) < HalfX && q.z > HouseZ0 ? "안뜰" : q.z < HouseZ0 ? "뒷마당" : "옆마당";
-        Toast(where + "(으)로 왔어요");
+        Toast(where + EuroRo(where) + " 왔어요");
         CheckArea();
     }
 }
