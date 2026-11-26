@@ -854,6 +854,7 @@ public partial class AcRoom
         }
         // 내는 곳 / 쓰레기통 이름 (대기실·처음 20초)
         if (km == KMode.Lobby || ks.t < 20f)
+        {
             var labeled = new HashSet<char>();   // 같은 종류는 이름표 하나만 (번잡하지 않게)
             for (int i = 0; i < Kc.W * Kc.H; i++)
             {
@@ -864,6 +865,7 @@ public partial class AcRoom
                 else if (c == 'O') KSmallTag(KPos(i) + Vector3.up * 1.6f, "오븐");
                 else if (c == 'H') KSmallTag(KPos(i) + Vector3.up * 1.35f, "냄비");
             }
+        }
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(460, SW - 20);
