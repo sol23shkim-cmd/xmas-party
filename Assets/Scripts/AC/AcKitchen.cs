@@ -178,6 +178,7 @@ public partial class AcRoom
         SyncArena(dt);
     }
     int kCountShown; bool kLostHost;
+    bool kDebug => Application.absoluteURL.Contains("kdebug");
 
     void ReadSnapshot(List<string> evs)
     {
@@ -334,7 +335,7 @@ public partial class AcRoom
                 int x = cell.x + dx, z = cell.y + dz;
                 if (x < 0 || z < 0 || x >= Kc.W || z >= Kc.H || Kc.Walkable(KAt(x, z))) continue;
                 var d = KPos(x, z) - pos; d.y = 0;
-                float dist = d.magnitude; if (dist > 1.55f) continue;
+                float dist = d.magnitude; if (dist > 1.85f) continue;   // 한 칸 반쯤까지 (손가락 조작이 너그럽게)
                 float s = Vector3.Dot(f, d / dist) - dist * 0.25f;
                 if (s > bs && Vector3.Dot(f, d / dist) > 0.35f) { bs = s; best = Kc.Idx(x, z); }
             }
@@ -860,6 +861,7 @@ public partial class AcRoom
             var r = new Rect(SW / 2 - tw / 2, SH * 0.52f, tw, 40);
             GUI.Box(r, "", sBox); GUI.Label(new Rect(r.x + 14, r.y + 9, r.width - 28, 24), "<size=13>" + toast + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
         }
+        if (kDebug) { var c0 = KCell(me.transform.position); GUI.Label(new Rect(8, SH - 20, SW, 20), $"<size=11>cell {c0.x},{c0.y} tgt {kTarget} yaw {yaw:0} pos {me.transform.position.x - KO.x:0.00},{me.transform.position.z - KO.z:0.00} hand {ks.hands.FirstOrDefault(q => q.id == myId)?.it}</size>", sSmall); }
         if (km == KMode.Lobby) { KitchenLobbyGUI(); KControls(); return; }
         OrdersGUI();
         if (km == KMode.Count)
