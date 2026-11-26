@@ -142,6 +142,7 @@ public partial class AcRoom
         else if (Outside) { label = "눈싸움 그만"; act = ToggleSnowFight; }
         else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
         else if (InPlayroom) { label = "캔디 팡 게임"; act = OpenCandy; }
+        else if (InKitchenRoom) { label = "크리스마스 주방 게임"; act = OpenKitchen; }
         else if (piano) { label = "피아노 치기"; act = OpenPiano; }
         else if (inLibrary) { label = "크리스마스 퀴즈"; act = OpenQuiz; }
         var gextra = new List<(string, Action, float)>();

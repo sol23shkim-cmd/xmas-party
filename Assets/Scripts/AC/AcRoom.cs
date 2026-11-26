@@ -496,6 +496,7 @@ public partial class AcRoom : MonoBehaviour
             case "enter": return kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
             case "left": return kb.leftArrowKey.wasPressedThisFrame; case "right": return kb.rightArrowKey.wasPressedThisFrame;
             case "up": return kb.upArrowKey.wasPressedThisFrame; case "down": return kb.downArrowKey.wasPressedThisFrame;
+            case "space": return kb.spaceKey.wasPressedThisFrame; case "j": return kb.jKey.wasPressedThisFrame; case "k": return kb.kKey.wasPressedThisFrame;
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9')
         {
@@ -514,6 +515,7 @@ public partial class AcRoom : MonoBehaviour
             case "enter": return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
             case "left": return Input.GetKeyDown(KeyCode.LeftArrow); case "right": return Input.GetKeyDown(KeyCode.RightArrow);
             case "up": return Input.GetKeyDown(KeyCode.UpArrow); case "down": return Input.GetKeyDown(KeyCode.DownArrow);
+            case "space": return Input.GetKeyDown(KeyCode.Space); case "j": return Input.GetKeyDown(KeyCode.J); case "k": return Input.GetKeyDown(KeyCode.K);
         }
         if (k.Length == 1 && k[0] >= '1' && k[0] <= '9') return Input.GetKeyDown(KeyCode.Alpha1 + (k[0] - '1'));
         return false;
@@ -571,14 +573,14 @@ public partial class AcRoom : MonoBehaviour
             if (d.magnitude < 0.08f) { autoWalk = null; phase = Phase.Play; }
             else { me.transform.position += d.normalized * Mathf.Min(2.4f * dt, d.magnitude); me.speed = 2.4f; }
         }
-        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null && !candyOpen && !GreenBusy && !GiftBusy && waterSlot < 0) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
+        else if (!showCustom && !chatting && !building && !lettersOpen && !askOpen && !decorating && !playingGame && !showMap && !treeOverview && !pianoOpen && !quizOpen && snowFocusId == null && !candyOpen && !GreenBusy && !GiftBusy && waterSlot < 0 && !kitchenOpen) { UpdateFollow(); MovePlayer(dt); TapMove(dt); }
         else me.speed = 0;
 
         UpdateNpcs(dt);
         UpdateRemotes(dt);
         UpdateCamera(dt, false);
 
-        if (!chatting && !askOpen && !lettersOpen && !building && !playingGame && !showMap && !GiftBusy && !GreenBusy)
+        if (!chatting && !askOpen && !lettersOpen && !building && !playingGame && !showMap && !GiftBusy && !GreenBusy && !kitchenOpen)
         {
             if (Key("c") && !decorating) showCustom = !showCustom;
             if (Key("f2")) { showNpcs = !showNpcs; foreach (var n in npcs) n.gameObject.SetActive(showNpcs); }
@@ -599,6 +601,7 @@ public partial class AcRoom : MonoBehaviour
         if (building) BuildingUpdate();
         GreenUpdate(dt);
         GiftUpdate(dt);
+        KitchenUpdate(dt);
         FxUpdate(dt);
         ProcessSnowIcons();
         if (playingGame) CookieGameUpdate(dt);
@@ -777,7 +780,8 @@ public partial class AcRoom : MonoBehaviour
     void UpdateCamera(float dt, bool snap)
     {
         Vector3 focus = me.transform.position + new Vector3(0, 1.0f, 0);
-        if (GiftCamera(dt, snap)) { orbitOn = false; return; }   // 선물 포장·풀어보기: 따로 떨어진 무대
+        if (GiftCamera(dt, snap)) { orbitOn = false; return; }
+        if (KitchenCamera(dt, snap)) { orbitOn = false; return; }   // 주방 게임: 위에서 내려다보기   // 선물 포장·풀어보기: 따로 떨어진 무대
         float dist = Screen.height > Screen.width ? 18f : 14f, pitch = 36f, targetYaw = 180f;   // 실내·앞마당·옆마당: 남쪽(+z)에서, 뒷마당: 집 반대편에서 / 세로 화면은 좌우가 좁아서 더 멀리
         if (SnowCamera(ref focus, ref dist, ref pitch)) { targetYaw = snowYaw; }
         else if (SnowFocusCamera(ref focus, ref dist, ref pitch, ref targetYaw)) { }
@@ -1108,6 +1112,7 @@ public partial class AcRoom : MonoBehaviour
         if (playingGame) { CookieGameGUI(); return; }
         if (candyOpen) { CandyGUI(); return; }
         if (GiftBusy) { GiftGUI(); return; }
+        if (kitchenOpen) { if (sTag == null) NameTags(); KitchenGUI(); AskWindow(); return; }
         NameTags();
         GreenTags();
         if (toast != null && Time.time < toastUntil)

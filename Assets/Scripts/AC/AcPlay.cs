@@ -91,6 +91,7 @@ public partial class AcRoom
                     }
                 }
                 break;
+            default: KitchenAct(rid, r, kind, data); break;   // 주방 게임 (kj·ks·ka)
         }
     }
 
