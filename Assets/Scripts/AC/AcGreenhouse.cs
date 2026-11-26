@@ -600,7 +600,7 @@ public partial class AcRoom
         float need = Mathf.Max(h / (portrait ? 0.4f : 0.55f), 1.1f / Mathf.Max(0.3f, cam.aspect));
         focus = s.pos + Vector3.up * (h * (portrait ? 0.1f : 0.3f));
         dist = need / (2f * Mathf.Tan(vfov / 2f)) * decoZoom + 0.4f;
-        pitch = 16f; targetYaw = plantYaw;
+        pitch = 30f; targetYaw = plantYaw;
         return true;
     }
 

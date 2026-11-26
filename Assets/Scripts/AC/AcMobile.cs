@@ -44,6 +44,7 @@ public partial class AcRoom
     }
 
     // ===== 포인터 (마우스/손가락 공통) =====
+    bool gPressed, gDown, gUp; Vector2 gPos;   // 화면 이벤트(IMGUI)로 받은 누르기
     bool ptrDown, ptrPressed, ptrUp; Vector2 ptrPos, ptrStart; float ptrDownAt; bool ptrOnUI, ptrMoved;
     void UpdatePointer()
     {
@@ -57,6 +58,16 @@ public partial class AcRoom
         pressed = Input.GetMouseButton(0); pos = Input.mousePosition;
         bool wDown = Input.GetMouseButtonDown(0), wUp = Input.GetMouseButtonUp(0);
 #endif
+#if ENABLE_INPUT_SYSTEM
+        if (p != null && p.press.wasReleasedThisFrame && gPressed) { gPressed = false; gUp = true; }   // 화면 밖에서 뗀 경우
+#endif
+        if (gDown || gPressed || gUp)
+        {   // 화면 이벤트 쪽 기록을 합침
+            wDown |= gDown; wUp |= gUp;
+            pressed = (pressed || gPressed) && !(gUp && !gPressed);
+            pos = gPos;
+            gDown = false; gUp = false;
+        }
         ptrDown = wDown || (pressed && !ptrPressed); ptrUp = wUp || (!pressed && ptrPressed); ptrPressed = pressed; ptrPos = pos;
         if (ptrDown) { ptrStart = pos; ptrDownAt = Time.unscaledTime; ptrOnUI = OverUI(pos); ptrMoved = false; }
         if (pressed && (pos - ptrStart).magnitude > 18f) ptrMoved = true;

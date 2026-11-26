@@ -1070,6 +1070,11 @@ public partial class AcRoom : MonoBehaviour
         var ev = Event.current; var et = ev.type; bool down = et == EventType.MouseDown || et == EventType.TouchDown;
         var m0 = GUI.matrix; GUI.matrix = Matrix4x4.identity; Vector2 raw = Event.current.mousePosition; GUI.matrix = m0;   // 화면 픽셀(위가 0)
         Vector2 mpos = raw / UiK;
+        // 화면 이벤트로도 누르기·끌기·떼기를 기록 (입력 장치 쪽에서 못 받는 경우: 휴대폰 화면 흉내 등)
+        var sp = new Vector2(raw.x, Screen.height - raw.y);
+        if (down) { gPressed = true; gDown = true; gPos = sp; }
+        else if (et == EventType.MouseDrag || et == EventType.TouchMove) { if (gPressed) gPos = sp; }
+        else if (et == EventType.MouseUp || et == EventType.TouchUp) { if (gPressed) { gUp = true; gPos = sp; } gPressed = false; }
         OnGUIInner();
         // 장식 끌어 놓기 (IMGUI 이벤트로: 아주 빠른 끌기도 처리)
         if (decorating && !treeOverview && !pinching)

@@ -366,22 +366,54 @@ public partial class AcRoom
     {
         if (!kitchenOpen) return false;
         bool portrait = Screen.height > Screen.width;
-        float pitch = portrait ? 62f : 56f;
-        float vfov = cam.fieldOfView * Mathf.Deg2Rad;
-        float hfov = 2f * Mathf.Atan(Mathf.Tan(vfov / 2f) * cam.aspect);
-        float halfW = Kc.W * Kc.Tile * 0.5f + 0.3f, depth = Kc.H * Kc.Tile + 0.8f;
-        // 위(주문표)·아래(조작 버튼) 가림을 피해 화면 가운데 약 70%에 주방이 들어오게
-        float useV = portrait ? 0.66f : 0.78f;
-        float distW = halfW / Mathf.Tan(hfov / 2f);
-        float distD = depth * Mathf.Sin(pitch * Mathf.Deg2Rad) / (2f * Mathf.Tan(vfov / 2f) * useV) + depth * 0.5f * Mathf.Cos(pitch * Mathf.Deg2Rad);
-        float dist = Mathf.Max(distW, distD) + 1.0f;
-        var focus = KO + new Vector3(0, 0.6f, portrait ? -0.9f : -0.4f);
+        float pitch = portrait ? 60f : 55f;
+        // 주방이 들어갈 화면 띠 (아래는 조작 버튼, 위는 주문표): 화면 아래에서부터의 비율
+        float lo = portrait ? (km == KMode.Lobby ? 0.41f : 0.17f) : (km == KMode.Lobby ? 0.3f : 0.12f);
+        float hi = portrait ? (km == KMode.Lobby ? 0.97f : 0.8f) : (km == KMode.Lobby ? 0.97f : 0.84f);
+        if (Mathf.Abs(kCamAspect - cam.aspect) > 0.001f || kCamMode != km || kCamDist <= 0) { kCamAspect = cam.aspect; kCamMode = km; FitKitchenCamera(pitch, lo, hi); }
         var rot = Quaternion.Euler(pitch, 0, 0);
-        var want = focus - rot * Vector3.forward * dist;
+        var want = KO + new Vector3(0, 0.5f, kCamFz) - rot * Vector3.forward * kCamDist;
         cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1 - Mathf.Exp(-dt * 8f));
         cam.transform.rotation = rot;
         cam.nearClipPlane = 0.3f;
         return true;
+    }
+    float kCamAspect, kCamDist, kCamFz; KMode kCamMode = (KMode)(-1);
+
+    // 주방 네 귀퉁이가 화면 띠 안에 꼭 들어오는 가장 가까운 거리와 위치를 찾음
+    void FitKitchenCamera(float pitch, float lo, float hi)
+    {
+        var rot = Quaternion.Euler(pitch, 0, 0);
+        float hx = Kc.W * Kc.Tile * 0.5f + 0.2f, hz = Kc.H * Kc.Tile * 0.5f + 0.2f;
+        var corners = new List<Vector3>();
+        foreach (float x in new[] { -hx, hx }) foreach (float z in new[] { -hz, hz }) foreach (float y in new[] { 0f, 1.1f }) corners.Add(KO + new Vector3(x, y, z));
+        var oldPos = cam.transform.position; var oldRot = cam.transform.rotation;
+        cam.transform.rotation = rot;
+        void Measure(float dist, float fz, out float minX, out float maxX, out float minY, out float maxY)
+        {
+            cam.transform.position = KO + new Vector3(0, 0.5f, fz) - rot * Vector3.forward * dist;
+            minX = minY = 9; maxX = maxY = -9;
+            foreach (var c in corners) { var v = cam.WorldToViewportPoint(c); minX = Mathf.Min(minX, v.x); maxX = Mathf.Max(maxX, v.x); minY = Mathf.Min(minY, v.y); maxY = Mathf.Max(maxY, v.y); }
+        }
+        float fz = 0, d0 = 4f, d1 = 80f;
+        for (int it = 0; it < 3; it++)
+        {
+            d0 = 4f; d1 = 80f;
+            for (int k = 0; k < 18; k++)
+            {
+                float m = (d0 + d1) / 2;
+                Measure(m, fz, out float a, out float b, out float c, out float d);
+                bool fit = a >= 0.02f && b <= 0.98f && (d - c) <= (hi - lo);
+                if (fit) d1 = m; else d0 = m;
+            }
+            // 위아래 가운데 맞추기: 앞뒤로 조금 옮겨 보고 기울기로 계산
+            Measure(d1, fz, out _, out _, out float y0a, out float y0b);
+            Measure(d1, fz + 1f, out _, out _, out float y1a, out float y1b);
+            float c0 = (y0a + y0b) / 2, c1 = (y1a + y1b) / 2, want = (lo + hi) / 2;
+            if (Mathf.Abs(c1 - c0) > 1e-4f) fz += (want - c0) / (c1 - c0);
+        }
+        kCamDist = d1 * 1.02f; kCamFz = fz;
+        cam.transform.position = oldPos; cam.transform.rotation = oldRot;
     }
 
     // ===== 무대 만들기 =====
@@ -531,7 +563,7 @@ public partial class AcRoom
                     b.Box(p + new Vector3(0, CounterH + 0.2f, -T * 0.39f), new Vector3(T * 0.78f, 0.04f, 0.02f), new Color(0.6f, 0.42f, 0.26f));
                     extra = MakeKItem(Kc.Dispense(c));
                     extra.transform.position = p + new Vector3(0, CounterH + 0.23f, 0);
-                    extra.transform.localScale *= 0.85f;
+                    extra.transform.localScale *= 0.95f;
                 }
                 break;
         }
@@ -653,7 +685,7 @@ public partial class AcRoom
     static Mesh BuildKItemMesh(string it)
     {
         var b = new AcPB();
-        const float K = 1.5f;   // 화면에서 잘 보이게 실제보다 크게
+        const float K = 1.75f;   // 화면에서 잘 보이게 실제보다 크게
         if (Kc.IsContainer(it))
         {
             string ct = Kc.ContType(it); var parts = Kc.Parts(it);
@@ -1021,8 +1053,9 @@ public partial class AcRoom
     void KitchenLobbyGUI()
     {
         bool narrow = SW < 640;
-        float w = Mathf.Min(SW - 20, 500), h = narrow ? 268 : 240;
-        var r = new Rect(SW / 2 - w / 2, 10, w, h);
+        float bsz = narrow ? 92 : 84;
+        float w = Mathf.Min(SW - bsz - 46, 500), h = 300;
+        var r = new Rect(narrow ? 10 : SW / 2 - w / 2, SH - h - 10, w, h);   // 아래쪽 (오른쪽은 잡기 버튼 자리)
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 28), "<b>산타의 크리스마스 주방</b>", sLabel);
         var s = Kc.Stages[kStage];
@@ -1030,11 +1063,11 @@ public partial class AcRoom
         float cy = r.y + 44;
         if (GUI.Button(new Rect(r.x + 16, cy, 34, 34), "<", sBtn)) { kStage = Mathf.Max(0, kStage - 1); NewPractice(kStage); me.transform.position = KSpawn(0); }
         if (GUI.Button(new Rect(r.xMax - 50, cy, 34, 34), ">", sBtn)) { kStage = Mathf.Min(Kc.Stages.Length - 1, kStage + 1); NewPractice(kStage); me.transform.position = KSpawn(0); }
-        GUI.Label(new Rect(r.x + 56, cy + 2, w - 112, 30), "<size=18><b>" + (kStage + 1) + ". " + s.name + "</b></size>" + (locked ? "  <size=12>(잠김)</size>" : ""), new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+        GUI.Label(new Rect(r.x + 56, cy + 2, w - 112, 30), "<size=15><b>" + (kStage + 1) + ". " + s.name + "</b></size>" + (locked ? " <size=11>(잠김)</size>" : ""), new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow });
         cy += 38;
         int best = KBestStars(kStage);
-        GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=13>" + s.desc + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        cy += 24;
+        GUI.Label(new Rect(r.x + 10, cy, w - 20, 36), "<size=12>" + s.desc + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true });
+        cy += 36;
         // 메뉴 그림 + 내 최고 별
         float iw = 44, total = s.menus.Length * (iw + 6);
         for (int k = 0; k < s.menus.Length; k++)
@@ -1052,10 +1085,10 @@ public partial class AcRoom
         cy += 24;
         string rec = KBestRecord(kStage);
         if (rec != "") GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=12>" + rec + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        float bw = 110, by = r.yMax + 8;
+        float bw = Mathf.Min(110, (w - 44) / 2), by = r.yMax - 50;
         if (GUI.Button(R(new Rect(r.center.x - bw - 6, by, bw, 40)), "나가기", sBtn)) { CloseKitchen(); return; }
         GUI.enabled = !locked;
-        if (GUI.Button(R(new Rect(r.center.x + 6, by, bw, 40)), locked ? "앞 판을 깨요" : "<b>시작!</b>", sBtnBig)) KitchenStart();
+        if (GUI.Button(R(new Rect(r.center.x + 6, by, bw, 40)), locked ? "<size=12>앞 판을 깨요</size>" : "<b>시작!</b>", sBtnBig)) KitchenStart();
         GUI.enabled = true;
     }
 

@@ -324,9 +324,10 @@ public partial class AcRoom
         else if (style == 1) { for (int k = 0; k < 8; k++) Loop(k * 45, 0.045f, 40 + (k % 2) * 15); for (int k = 0; k < 5; k++) Loop(k * 72 + 20, 0.03f, 70); }
         else if (style == 2) { Loop(0, 0.085f, 20); Loop(180, 0.085f, 20); }
         if (style != 3 || true) bowB.Ellipsoid(new Vector3(0, 0.015f, 0), new Vector3(0.025f, 0.02f, 0.022f), dark, 6, 10);
-        float tailL = style == 2 ? 0.2f : style == 3 ? 0.06f : 0.11f;
-        bowB.Leaf(new Vector3(0, 0.01f, 0), new Vector3(0.6f, -0.1f, 0.8f), Vector3.right, tailL, 0.04f, ribC, dark, 0.05f, 2, 6, style == 2 ? 0.8f : 0.3f);
-        bowB.Leaf(new Vector3(0, 0.01f, 0), new Vector3(-0.6f, -0.1f, 0.8f), Vector3.right, tailL, 0.04f, ribC, dark, 0.05f, 2, 6, style == 2 ? 0.8f : 0.3f);
+        // 꼬리: 상자 윗면 위에 눕혀서 (큰 리본만 앞으로 늘어짐)
+        float tailL = style == 2 ? 0.16f : style == 3 ? 0.05f : 0.07f;
+        bowB.Leaf(new Vector3(0, 0.006f, 0), new Vector3(0.5f, 0f, -0.85f), new Vector3(0.85f, 0f, 0.5f), tailL, 0.035f, ribC, dark, 0.02f, 2, 6, style == 2 ? 0.5f : 0.02f);
+        bowB.Leaf(new Vector3(0, 0.006f, 0), new Vector3(-0.5f, 0f, -0.85f), new Vector3(0.85f, 0f, -0.5f), tailL, 0.035f, ribC, dark, 0.02f, 2, 6, style == 2 ? 0.5f : 0.02f);
         gb.bow = ProcObj("bow", bowB.M("bow"), gb.root);
         gb.bow.transform.localPosition = new Vector3(0, H + ro + 0.004f, 0);
         gb.bow.transform.localScale = Vector3.one * sf;

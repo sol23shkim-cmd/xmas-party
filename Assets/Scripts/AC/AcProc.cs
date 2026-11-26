@@ -144,11 +144,11 @@ public class AcPB
         {
             switch (shape)
             {
-                case 1: return Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.8f)), 0.9f) * (1 - 0.25f * s);
+                case 1: return Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.8f))), 0.9f) * (1 - 0.25f * s);
                 case 2: return s < 0.85f ? 0.55f + 0.45f * Mathf.Sin(Mathf.PI * s * 0.6f) : (1 - s) / 0.15f * 0.9f;
-                case 3: return Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.6f)) * (s > 0.85f ? 0.8f + 0.2f * Mathf.Cos((s - 0.85f) * 20f) : 1f);
-                case 4: return Mathf.Sin(Mathf.PI * s) * (0.82f + 0.18f * Mathf.Abs(Mathf.Sin(s * Mathf.PI * 3.5f)));
-                default: return Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.75f));
+                case 3: return Mathf.Max(0f, Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.6f))) * (s > 0.85f ? 0.8f + 0.2f * Mathf.Cos((s - 0.85f) * 20f) : 1f);
+                case 4: return Mathf.Max(0f, Mathf.Sin(Mathf.PI * s)) * (0.82f + 0.18f * Mathf.Abs(Mathf.Sin(s * Mathf.PI * 3.5f)));
+                default: return Mathf.Max(0f, Mathf.Sin(Mathf.PI * Mathf.Pow(s, 0.75f)));
             }
         }
         foreach (float sg in new[] { 1f, -1f })
