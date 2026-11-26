@@ -15,10 +15,12 @@ public partial class AcRoom
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")] static extern int AcWeb_IsMobile();
     [DllImport("__Internal")] static extern string AcWeb_Prompt(string msg, string def);
+    [DllImport("__Internal")] static extern void AcWeb_Reload();
     static bool Web => true;
 #else
     static int AcWeb_IsMobile() => 0;
     static string AcWeb_Prompt(string msg, string def) => null;
+    static void AcWeb_Reload() { Application.Quit(); }
     static bool Web => false;
 #endif
 

@@ -163,9 +163,9 @@ public partial class AcRoom
 
     void PlayPiano(int note, float vol)
     {
-        string s = note < 54 ? "piano_c3" : note < 66 ? "piano_c4" : "piano_c5";
-        int baseN = note < 54 ? 48 : note < 66 ? 60 : 72;
-        Sfx(s, vol, Mathf.Pow(2f, (note - baseN) / 12f));
+        // 건반마다 따로 만든 소리(piano_n48~n84) → 늘이거나 줄이지 않아 음정이 정확 (11-26)
+        int n = Mathf.Clamp(note, 48, 84);
+        Sfx("piano_n" + n, vol, Mathf.Pow(2f, (note - n) / 12f));
     }
 
     void PressKey(int note)

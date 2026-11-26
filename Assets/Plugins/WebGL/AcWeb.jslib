@@ -26,6 +26,10 @@ mergeInto(LibraryManager.library, {
     stringToUTF8(r, p, n);
     return p;
   },
+  AcWeb_Reload: function () {   // 게임 나가기: 스트림 닫고 처음 화면으로 (떠날 때 내 자리는 pagehide에서 지움)
+    try { if (window._acStream) window._acStream.close(); } catch (e) {}
+    setTimeout(function () { location.reload(); }, 200);
+  },
   AcWeb_IsMobile: function () {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ? 1 : 0;
   },

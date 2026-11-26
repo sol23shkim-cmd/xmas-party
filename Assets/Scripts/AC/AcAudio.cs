@@ -89,5 +89,32 @@ public partial class AcRoom
         {
             musicOn = !musicOn; PlayerPrefs.SetInt("ac_music", musicOn ? 1 : 0); PlayerPrefs.Save();
         }
+        // 게임 나가기 (음악 버튼 왼쪽) → 한 번 더 물어보고 처음 화면으로
+        var q = new Rect(r.x - 78, r.y, 70, r.height);
+        R(q);
+        if (GUI.Button(q, "나가기", sBtn)) quitAsk = true;
+    }
+    bool quitAsk;
+
+    void QuitWindow()
+    {
+        if (!quitAsk) return;
+        float w = Mathf.Min(SW - 40, 340), h = 150;
+        var r = new Rect(SW / 2 - w / 2, SH / 2 - h / 2 - 30, w, h);
+        GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0, 0, 0, 0.3f)));
+        R(new Rect(0, 0, SW, SH));
+        GUI.Box(r, "", sBox);
+        GUI.Label(new Rect(r.x, r.y + 18, w, 30), "<b>파티에서 나갈까요?</b>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+        GUI.Label(new Rect(r.x, r.y + 50, w, 24), "<size=13>처음 화면으로 돌아가요. 트리·눈사람·편지는 그대로 남아요</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true });
+        float bw = 120, by = r.yMax - 52;
+        if (GUI.Button(new Rect(r.center.x - bw - 6, by, bw, 38), "계속 놀기", sBtn)) quitAsk = false;
+        if (GUI.Button(new Rect(r.center.x + 6, by, bw, 38), "<b>나가기</b>", sBtnBig)) { quitAsk = false; QuitGame(); }
+    }
+
+    void QuitGame()
+    {
+        Toast("안녕히 가세요! 메리 크리스마스");
+        PlayerPrefs.Save();
+        AcWeb_Reload();
     }
 }

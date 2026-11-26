@@ -1173,6 +1173,7 @@ public partial class AcRoom : MonoBehaviour
         if (showCustom) CustomWindow();
         MapWindow();
         AskWindow();
+        QuitWindow();
         if (net != null && net.Status != "") GUI.Label(new Rect(SW - 330, IsMobile ? 60 : 50, 320, 24), net.Status, sSmall);
     }
 
