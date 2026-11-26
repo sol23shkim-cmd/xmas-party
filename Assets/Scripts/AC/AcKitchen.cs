@@ -56,6 +56,8 @@ public partial class AcRoom
         me.transform.position = kSavedPos; yaw = kSavedYaw;
         if (kRoot) kRoot.gameObject.SetActive(false);
         ClearHeldVisuals();
+        if (me) me.carryBoth = false;
+        foreach (var kv in remotes) if (kv.Value.c) kv.Value.c.carryBoth = false;
         RenderSettings.fog = true;
         UpdateCamera(0.016f, true);
     }
@@ -291,12 +293,7 @@ public partial class AcRoom
         if (IsMobile && Time.unscaledTime - kTouchAt > 1.5f)
         {
             var u0 = new Vector2(ptrStart.x / UiK, (Screen.height - ptrStart.y) / UiK);
-            if (ptrPressed && !ptrOnUI && u0.x < SW * 0.62f && u0.y > SH * 0.25f)
-            {
-                kStickOn = true; kStickBase = ptrStart;
-                var d = (ptrPos - ptrStart) / (44f * UiK);
-                kStick = Vector2.ClampMagnitude(d, 1f); if (kStick.magnitude < 0.15f) kStick = Vector2.zero;
-            }
+            if (ptrPressed && !ptrOnUI && KJoyZone(u0)) { kStickOn = true; kStick = KJoyVec(new Vector2(ptrPos.x / UiK, (Screen.height - ptrPos.y) / UiK)); }
             else if (!ptrPressed) { kStickOn = false; kStick = Vector2.zero; }
         }
         Vector2 mv = MoveAxis();
@@ -369,8 +366,8 @@ public partial class AcRoom
         bool portrait = Screen.height > Screen.width;
         float pitch = portrait ? 60f : 55f;
         // 주방이 들어갈 화면 띠 (아래는 조작 버튼, 위는 주문표): 화면 아래에서부터의 비율
-        float lo = portrait ? (km == KMode.Lobby ? 0.41f : 0.17f) : (km == KMode.Lobby ? 0.3f : 0.12f);
-        float hi = portrait ? (km == KMode.Lobby ? 0.97f : 0.8f) : (km == KMode.Lobby ? 0.97f : 0.84f);
+        float lo = portrait ? (km == KMode.Lobby ? 0.41f : 0.21f) : (km == KMode.Lobby ? 0.3f : 0.14f);   // 아래: 조작 막대·버튼 위로
+        float hi = portrait ? (km == KMode.Lobby ? 0.97f : 0.79f) : (km == KMode.Lobby ? 0.97f : 0.82f);  // 위: 주문표·시간·점수 아래로
         if (Mathf.Abs(kCamAspect - cam.aspect) > 0.001f || kCamMode != km || kCamDist <= 0) { kCamAspect = cam.aspect; kCamMode = km; FitKitchenCamera(pitch, lo, hi); }
         var rot = Quaternion.Euler(pitch, 0, 0);
         var want = KO + new Vector3(0, 0.5f, kCamFz) - rot * Vector3.forward * kCamDist;
@@ -769,6 +766,9 @@ public partial class AcRoom
             }
         }
         foreach (var k in kHandObjs.Keys.Where(kk => !handSeen.Contains(kk)).ToList()) { if (kHandObjs[k].go) Destroy(kHandObjs[k].go); kHandObjs.Remove(k); }
+        // 든 사람은 두 팔을 앞으로 (오버쿡처럼 받쳐 든 모양)
+        if (me) me.carryBoth = handSeen.Contains(myId);
+        foreach (var kv in remotes) if (kv.Value.c) kv.Value.c.carryBoth = handSeen.Contains(kv.Key);
         // 바라보는 칸
         if (kRing)
         {
@@ -854,7 +854,14 @@ public partial class AcRoom
         }
         // 내는 곳 / 쓰레기통 이름 (대기실·처음 20초)
         if (km == KMode.Lobby || ks.t < 20f)
-            for (int i = 0; i < Kc.W * Kc.H; i++) { char c = Kc.At(s, i); if (c == 'V' || c == 'R') KSmallTag(KPos(i) + Vector3.up * (c == 'V' ? 2.2f : 1.2f), c == 'V' ? "내는 곳" : "쓰레기통"); }
+            for (int i = 0; i < Kc.W * Kc.H; i++)
+            {
+                char c = Kc.At(s, i);
+                if (c == 'V' || c == 'R') KSmallTag(KPos(i) + Vector3.up * (c == 'V' ? 2.2f : 1.2f), c == 'V' ? "내는 곳" : "쓰레기통");
+                else if (c == 'X') KSmallTag(KPos(i) + Vector3.up * 1.15f, "도마");
+                else if (c == 'O') KSmallTag(KPos(i) + Vector3.up * 1.6f, "오븐");
+                else if (c == 'H') KSmallTag(KPos(i) + Vector3.up * 1.35f, "냄비");
+            }
         if (toast != null && Time.time < toastUntil)
         {
             float tw = Mathf.Min(460, SW - 20);
@@ -862,16 +869,42 @@ public partial class AcRoom
             GUI.Box(r, "", sBox); GUI.Label(new Rect(r.x + 14, r.y + 9, r.width - 28, 24), "<size=13>" + toast + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
         }
         if (kDebug) { var c0 = KCell(me.transform.position); GUI.Label(new Rect(8, SH - 20, SW, 20), $"<size=11>cell {c0.x},{c0.y} tgt {kTarget} yaw {yaw:0} pos {me.transform.position.x - KO.x:0.00},{me.transform.position.z - KO.z:0.00} hand {ks.hands.FirstOrDefault(q => q.id == myId)?.it}</size>", sSmall); }
+        // 손에 든 것: 머리 위 작은 그림 (휴대폰에서도 무엇을 들었는지 바로 보이게)
+        foreach (var hh in ks.hands)
+        {
+            if (string.IsNullOrEmpty(hh.it) || km == KMode.Result) continue;
+            Transform who = hh.id == myId ? me.transform : (remotes.TryGetValue(hh.id, out var rr) && rr.c ? rr.c.transform : null);
+            if (who) DrawWorldIcon(who.position + Vector3.up * 2.15f, hh.it, hh.id == myId ? 34 : 28);
+        }
         if (km == KMode.Lobby) { KitchenLobbyGUI(); KControls(); return; }
+        if (km == KMode.Result) { KitchenResultGUI(); return; }
         OrdersGUI();
+        var mid = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter };
         if (km == KMode.Count)
         {
             int left = Mathf.Max(1, Mathf.CeilToInt((float)((kT0 - NetNow) / 1000.0)));
-            GUI.Label(new Rect(0, SH / 2 - 60, SW, 100), "<size=72><b>" + left + "</b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
-            GUI.Label(new Rect(0, SH / 2 + 30, SW, 40), "<size=20>" + (ks.stage + 1) + ". " + s.name + "</size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            float f = 1f - Mathf.Repeat((float)((kT0 - NetNow) / 1000.0), 1f);   // 숫자마다 톡 커졌다 작아짐
+            float sz = 120 * (1.15f - 0.15f * Mathf.SmoothStep(0, 1, f * 3f));
+            var cr = new Rect(SW / 2 - sz / 2, SH * 0.42f - sz / 2, sz, sz);
+            AcUiTheme.Circle(cr, new Color(1f, 1f, 1f, 0.92f)); AcUiTheme.CircleRing(cr, AcUiTheme.Accent);
+            GUI.Label(cr, "<size=" + (int)(sz * 0.55f) + "><b><color=#c0392b>" + left + "</color></b></size>", mid);
+            var nr = new Rect(SW / 2 - 150, cr.yMax + 14, 300, 36);
+            AcUiTheme.Fill(nr, new Color(1f, 1f, 1f, 0.9f), 2);
+            GUI.Label(nr, "<size=17><b>" + (ks.stage + 1) + ". " + s.name + "</b></size>", mid);
         }
-        if (km == KMode.Play) KControls();
-        if (km == KMode.Result) KitchenResultGUI();
+        if (km == KMode.Play)
+        {
+            if (ks.t < 0.9f)
+            {   // 시작! 신호
+                float a = ks.t / 0.9f;
+                var gr = new Rect(SW / 2 - 140, SH * 0.42f - 40, 280, 80);
+                var k0 = GUI.color; GUI.color = new Color(1, 1, 1, 1 - a * a);
+                AcUiTheme.Fill(gr, AcUiTheme.Accent, 4);
+                GUI.Label(gr, "<size=44><b><color=#ffffff>시작!</color></b></size>", mid);
+                GUI.color = k0;
+            }
+            KControls();
+        }
         if (kFailFlash > 0) GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.9f, 0.1f, 0.1f, 0.18f * kFailFlash)));
     }
 
@@ -891,82 +924,135 @@ public partial class AcRoom
         AcUiTheme.Fill(r, new Color(1f, 1f, 1f, 0.85f), 2);
         GUI.Label(r, "<size=11>" + t + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
     }
-    void DrawWorldIcon(Vector3 p, string it)
+    void DrawWorldIcon(Vector3 p, string it, float size = 36)
     {
         var sp = cam.WorldToScreenPoint(p); if (sp.z < 0) return;
         float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK;
-        var r = new Rect(x - 18, y - 18, 36, 36);
-        AcUiTheme.Fill(r, it == "coal" ? new Color(0.3f, 0.3f, 0.3f, 0.9f) : new Color(1f, 1f, 1f, 0.92f), 3);
-        var tex = KIcon(it); if (tex) GUI.DrawTexture(new Rect(r.x + 2, r.y + 2, 32, 32), tex, ScaleMode.ScaleToFit);
+        var r = new Rect(x - size / 2, y - size / 2, size, size);
+        AcUiTheme.Circle(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), it == "coal" ? new Color(0.3f, 0.3f, 0.3f, 0.92f) : new Color(1f, 1f, 1f, 0.95f));
+        AcUiTheme.CircleRing(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), new Color(0.85f, 0.75f, 0.6f));
+        var tex = KIcon(it); if (tex) GUI.DrawTexture(new Rect(r.x + 3, r.y + 3, size - 6, size - 6), tex, ScaleMode.ScaleToFit);
     }
 
     void OrdersGUI()
     {
         var s = KS;
-        float cw = Mathf.Min(78, (SW - 20 - 4 * 5) / 5f), chh = cw + 30;
-        float x = 10;
+        // 주문표: 위쪽 줄. 맨 위 굵은 시간 막대 + 요리 그림 + 이름 + 필요한 재료
+        int n = Mathf.Max(1, ks.orders.Count);
+        float cw = Mathf.Min(92, (SW - 20 - 5 * 6) / 5f), chh = cw + 36;
+        float x = 10, top = 8;
+        var center = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
         foreach (var o in ks.orders.OrderBy(q => q.id))
         {
-            var r = new Rect(x, 8, cw, chh);
             float left = Mathf.Clamp01(1f - (ks.t - o.t0) / o.life);
             bool hurry = left < 0.25f;
-            AcUiTheme.Fill(r, hurry && Mathf.Repeat(Time.time * 3f, 1f) < 0.5f ? new Color(1f, 0.85f, 0.85f) : new Color(1f, 0.99f, 0.95f), 3);
-            AcUiTheme.Ring(r, hurry ? new Color(0.9f, 0.25f, 0.25f) : new Color(0.85f, 0.75f, 0.6f), 2);
-            var tex = KIcon(RecipeItem(o.r)); if (tex) GUI.DrawTexture(new Rect(r.x + 4, r.y + 3, cw - 8, cw - 14), tex, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(r.x, r.y + cw - 13, cw, 16), "<size=10>" + Kc.RecipeKo[o.r] + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow });
-            // 필요한 재료 작은 그림
-            var steps = RecipeSteps[o.r]; float iw = (cw - 8) / steps.Length;
-            for (int k = 0; k < steps.Length; k++) { var t2 = KIcon(steps[k]); if (t2) GUI.DrawTexture(new Rect(r.x + 4 + k * iw, r.y + cw + 2, iw - 1, 16), t2, ScaleMode.ScaleToFit); }
-            var bar = new Rect(r.x + 4, r.yMax - 8, cw - 8, 5);
-            AcUiTheme.Fill(bar, new Color(0.85f, 0.85f, 0.85f), 0);
-            AcUiTheme.Fill(new Rect(bar.x, bar.y, bar.width * left, bar.height), Color.Lerp(new Color(0.9f, 0.25f, 0.2f), new Color(0.35f, 0.75f, 0.35f), left), 0);
-            x += cw + 5;
+            float shake = hurry ? Mathf.Sin(Time.time * 30f) * 1.5f : 0;
+            float born = Mathf.Clamp01((ks.t - o.t0) / 0.3f);                 // 새 주문은 위에서 톡 내려옴
+            var r = new Rect(x + shake, top - (1 - born) * 30, cw, chh);
+            AcUiTheme.Fill(new Rect(r.x + 1, r.y + 3, r.width, r.height), new Color(0.3f, 0.2f, 0.25f, 0.18f), 3);   // 그림자
+            AcUiTheme.Fill(r, new Color(1f, 0.99f, 0.96f, 0.97f), 3);
+            var tb = new Rect(r.x + 5, r.y + 5, cw - 10, 8);
+            AcUiTheme.Fill(tb, new Color(0.88f, 0.86f, 0.84f), 0);
+            var tcol = left > 0.5f ? new Color(0.35f, 0.75f, 0.4f) : left > 0.25f ? new Color(1f, 0.72f, 0.2f) : new Color(0.92f, 0.25f, 0.22f);
+            AcUiTheme.Fill(new Rect(tb.x, tb.y, Mathf.Max(6, tb.width * left), tb.height), tcol, 0);
+            if (hurry) AcUiTheme.Ring(r, new Color(0.92f, 0.25f, 0.22f, 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)), 2);
+            var tex = KIcon(RecipeItem(o.r)); if (tex) GUI.DrawTexture(new Rect(r.x + 8, r.y + 15, cw - 16, cw - 26), tex, ScaleMode.ScaleToFit);
+            GUI.Label(new Rect(r.x, r.y + cw - 12, cw, 18), "<size=12><b>" + Kc.RecipeKo[o.r] + "</b></size>", center);
+            var steps = RecipeSteps[o.r]; float iw = Mathf.Min(24, (cw - 10) / steps.Length);
+            float sx = r.x + cw / 2 - iw * steps.Length / 2;
+            for (int k = 0; k < steps.Length; k++)
+            {
+                var ir = new Rect(sx + k * iw + 1, r.y + cw + 8, iw - 2, iw - 2);
+                AcUiTheme.Fill(ir, new Color(0.93f, 0.9f, 0.86f), 0);
+                var t2 = KIcon(steps[k]); if (t2) GUI.DrawTexture(new Rect(ir.x + 1, ir.y + 1, ir.width - 2, ir.height - 2), t2, ScaleMode.ScaleToFit);
+            }
+            x += cw + 6;
         }
-        // 시간·점수
+        // 시간 (왼쪽) · 점수와 별 진행 막대 (오른쪽)
+        float hy = top + chh + 8;
         float remain = Mathf.Max(0, s.time - ks.t);
-        var tr = new Rect(10, 8 + chh + 6, 92, 28);
-        AcUiTheme.Fill(tr, new Color(1f, 1f, 1f, 0.88f), 3);
-        GUI.Label(tr, $"<size=15><b>{(int)remain / 60}:{(int)remain % 60:00}</b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter, normal = { textColor = remain < 20 ? new Color(0.85f, 0.2f, 0.2f) : sLabel.normal.textColor } });
-        var sr = new Rect(SW - 10 - 110, 8 + chh + 6, 110, 28);
-        AcUiTheme.Fill(sr, new Color(1f, 1f, 1f, 0.88f), 3);
-        int stars = Kc.Stars(s, ks.nPlayers, ks.score);
-        GUI.Label(sr, $"<size=15><b>{ks.score}점</b></size> <size=12>별 {stars}</size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+        var tr = new Rect(10, hy, 96, 36);
+        bool low = remain < 20;
+        AcUiTheme.Fill(tr, low && Mathf.Repeat(Time.time * 2f, 1f) < 0.5f ? new Color(1f, 0.88f, 0.88f, 0.95f) : new Color(1f, 1f, 1f, 0.94f), 3);
+        AcUiTheme.Circle(new Rect(tr.x + 8, tr.y + 8, 20, 20), low ? AcUiTheme.Accent : new Color(0.4f, 0.45f, 0.6f));
+        float ang = (1 - remain / Mathf.Max(1f, s.time)) * Mathf.PI * 2;
+        GUI.Label(new Rect(tr.x + 30, tr.y, tr.width - 34, tr.height), $"<size=18><b>{(int)remain / 60}:{(int)remain % 60:00}</b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter, normal = { textColor = low ? new Color(0.85f, 0.2f, 0.2f) : sLabel.normal.textColor } });
+        int ni = Mathf.Clamp(ks.nPlayers, 1, 4) - 1;
+        float t3 = Mathf.Max(1, s.thr[ni, 2]);
+        float sw2 = Mathf.Min(220, SW - 10 - tr.xMax - 14);
+        var sr = new Rect(SW - 10 - sw2, hy, sw2, 36);
+        AcUiTheme.Fill(sr, new Color(1f, 1f, 1f, 0.94f), 3);
+        GUI.Label(new Rect(sr.x + 8, sr.y, 70, sr.height), $"<size=18><b>{ks.score}</b></size><size=11>점</size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleLeft });
+        var pb = new Rect(sr.x + 74, sr.y + 15, sr.width - 88, 8);
+        AcUiTheme.Fill(pb, new Color(0.9f, 0.88f, 0.86f), 0);
+        AcUiTheme.Fill(new Rect(pb.x, pb.y, Mathf.Max(6, pb.width * Mathf.Clamp01(ks.score / t3)), pb.height), new Color(1f, 0.75f, 0.2f), 0);
+        for (int k = 0; k < 3; k++)
+        {
+            float fx = pb.x + pb.width * Mathf.Clamp01(s.thr[ni, k] / t3);
+            bool got = ks.score >= s.thr[ni, k];
+            AcUiTheme.Star(new Rect(fx - 10, pb.center.y - 10, 20, 20), got ? new Color(1f, 0.78f, 0.15f) : new Color(0.78f, 0.76f, 0.74f));
+        }
         for (int i = kPops.Count - 1; i >= 0; i--)
         {
             float a = Time.unscaledTime - kPops[i].at; if (a > 1.2f) { kPops.RemoveAt(i); continue; }
-            GUI.Label(new Rect(sr.x, sr.yMax + 4 - a * 30, sr.width, 30), "<size=20><b><color=#2e7d32>" + kPops[i].text + "</color></b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(sr.x, sr.yMax + 4 - a * 30, 80, 30), "<size=22><b><color=#2e7d32>" + kPops[i].text + "</color></b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
         }
     }
 
-    // 조작: 왼쪽 아래 끌기 = 이동, 오른쪽 아래 버튼 = 잡기/놓기, 도마 앞이면 버튼 위 문지르기 판
+    // 조작: 왼쪽 아래 고정 조작 막대 = 이동 (늘 같은 자리에 보임), 오른쪽 아래 동그란 버튼 = 잡기/놓기, 도마 앞이면 버튼 위 문지르기 판
+    float KJoyR => SW < 640 ? 62 : 56;
+    float kLobbyTop;   // 대기실 판 위쪽 (대기실에서는 조작 막대를 판 바로 위에)
+    Vector2 KJoyC => km == KMode.Lobby ? new Vector2(18 + KJoyR + 6, kLobbyTop - KJoyR - 14) : new Vector2(18 + KJoyR + 6, SH - 24 - KJoyR - 6);
+    bool KJoyZone(Vector2 ui) => ui.x < SW * 0.55f && (km == KMode.Lobby ? ui.y < kLobbyTop && ui.y > kLobbyTop - KJoyR * 2 - 70 : ui.y > SH * 0.5f) && !kBtnRect.Contains(ui) && !kPadRect.Contains(ui);
+    Vector2 KJoyVec(Vector2 ui)
+    {
+        var d = (ui - KJoyC) / KJoyR; d.y = -d.y;
+        d = Vector2.ClampMagnitude(d, 1f);
+        if (d.magnitude < 0.14f) return Vector2.zero;
+        return d * Mathf.InverseLerp(0.14f, 1f, d.magnitude) / Mathf.Max(0.001f, d.magnitude);
+    }
+
     void KControls()
     {
         bool narrow = SW < 640;
-        float bs = narrow ? 92 : 84;
-        kBtnRect = new Rect(SW - bs - 18, SH - bs - 22, bs, bs);
+        float bs = narrow ? 104 : 92;
+        kBtnRect = new Rect(SW - bs - 20, SH - bs - 26, bs, bs);
         bool chopHere = kTarget >= 0 && Kc.At(KS, kTarget) == 'X' && Kc.Chopped(Kc.ItemAt(ks, kTarget)) != null;
-        kPadRect = chopHere ? new Rect(SW - 18 - (narrow ? 170 : 200), kBtnRect.y - (narrow ? 118 : 110), narrow ? 170 : 200, narrow ? 104 : 96) : new Rect(-999, -999, 0, 0);
+        float pw = narrow ? 190 : 210, ph = narrow ? 108 : 100;
+        kPadRect = chopHere ? new Rect(SW - 16 - pw, kBtnRect.y - ph - 14, pw, ph) : new Rect(-999, -999, 0, 0);
         string label = KActionLabel();
-        // 버튼
-        AcUiTheme.DrawGlow(kBtnRect, label != "" ? 0.6f + 0.4f * Mathf.Sin(Time.time * 5f) : 0.15f);
+        var mid = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter };
+        // 동그란 행동 버튼: 할 수 있는 일이 있으면 빨갛게 빛남, 없으면 흐린 흰색
+        bool can = label != "";
+        bool pressed = kBtnSeen >= 0 || (kBtnMouse && Time.unscaledTime - kBtnMouseAt < 0.15f);
+        var br = pressed ? new Rect(kBtnRect.x + 4, kBtnRect.y + 4, kBtnRect.width - 8, kBtnRect.height - 8) : kBtnRect;
+        if (can) AcUiTheme.DrawGlow(br, 0.6f + 0.4f * Mathf.Sin(Time.time * 5f));
+        AcUiTheme.Circle(new Rect(br.x + 2, br.y + 5, br.width, br.height), new Color(0.3f, 0.15f, 0.2f, 0.25f));
+        AcUiTheme.Circle(br, can ? AcUiTheme.Accent : new Color(1f, 1f, 1f, 0.75f));
+        AcUiTheme.CircleRing(br, can ? AcUiTheme.Gold : new Color(0.8f, 0.78f, 0.88f));
+        var hand = ks.hands.FirstOrDefault(hh => hh.id == myId);
+        GUI.Label(new Rect(br.x, br.y + (can ? 0 : 0), br.width, br.height), "<size=" + (narrow ? 20 : 18) + "><b>" + (can ? "<color=#ffffff>" + label + "</color>" : "<color=#8a84a0>" + (hand != null && hand.it != "" ? "놓을 곳\n찾기" : "잡기") + "</color>") + "</b></size>", mid);
         R(kBtnRect);
-        if (GUI.Button(kBtnRect, "<size=" + (narrow ? 17 : 15) + "><b>" + (label == "" ? "잡기\n놓기" : label) + "</b></size>", sBtnBig) && Time.unscaledTime - kTouchAt > 1.5f) { if (kTarget >= 0) KDo('g', kTarget); }
+        if (GUI.Button(kBtnRect, "", GUIStyle.none) && Time.unscaledTime - kTouchAt > 1.5f) { kBtnMouse = true; kBtnMouseAt = Time.unscaledTime; if (kTarget >= 0) KDo('g', kTarget); }
         if (chopHere)
         {
             bool spread = Kc.IsSpread(Kc.ItemAt(ks, kTarget));
             var t = Kc.TileAt(ks, kTarget, false);
-            AcUiTheme.Fill(kPadRect, new Color(1f, 0.97f, 0.88f, 0.92f), 3);
+            AcUiTheme.Fill(new Rect(kPadRect.x + 1, kPadRect.y + 4, kPadRect.width, kPadRect.height), new Color(0.3f, 0.2f, 0.2f, 0.2f), 3);
+            AcUiTheme.Fill(kPadRect, new Color(1f, 0.97f, 0.88f, 0.96f), 3);
             AcUiTheme.Ring(kPadRect, AcUiTheme.Gold, 3);
-            GUI.Label(new Rect(kPadRect.x, kPadRect.y + 8, kPadRect.width, 30), "<size=17><b>" + (spread ? "쓱쓱 문질러 바르기" : "쓱쓱 문질러 썰기") + "</b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(kPadRect.x, kPadRect.y + 6, kPadRect.width, 30), "<size=17><b>" + (spread ? "쓱쓱 문질러 바르기" : "쓱쓱 문질러 썰기") + "</b></size>", mid);
             int done = t != null ? Mathf.RoundToInt(t.p) : 0;
             for (int k = 0; k < Kc.Strokes; k++)
             {
-                var d = new Rect(kPadRect.center.x - Kc.Strokes * 15 + k * 30 + 4, kPadRect.y + 44, 22, 22);
-                AcUiTheme.Fill(d, k < done ? new Color(1f, 0.7f, 0.2f) : new Color(0.85f, 0.82f, 0.78f), 10);
+                var d = new Rect(kPadRect.center.x - Kc.Strokes * 17 + k * 34 + 5, kPadRect.y + 40, 24, 24);
+                AcUiTheme.Circle(d, k < done ? new Color(1f, 0.7f, 0.2f) : new Color(0.86f, 0.83f, 0.79f));
             }
-            GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 28, kPadRect.width, 24), "<size=12>" + (IsMobile ? "여기를 좌우로 문질러요" : "여기를 끌거나 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+            // 좌우로 움직이는 손 표시
+            float hx = kPadRect.center.x + Mathf.Sin(Time.time * 6f) * (kPadRect.width * 0.3f);
+            AcUiTheme.Circle(new Rect(hx - 7, kPadRect.yMax - 26, 14, 14), new Color(0.75f, 0.55f, 0.35f, 0.6f));
+            GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 24, kPadRect.width, 22), "<size=12>" + (IsMobile ? "좌우로 문질러요" : "끌거나 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
             R(kPadRect);
-            // 마우스로 끌기 (PC)
             var e = Event.current;
             if (Time.unscaledTime - kTouchAt > 1.5f)
             {
@@ -975,21 +1061,26 @@ public partial class AcRoom
                 if (e.type == EventType.MouseUp) kPadMouse = false;
             }
         }
-        // 손가락 조작 표시
-        if (IsMobile && kStickOn)
+        // 고정 조작 막대 (휴대폰): 받침은 늘 같은 자리, 손잡이만 움직임
+        if (IsMobile)
         {
-            var c = kStickBase / UiK; c.y = SH - c.y;
-            AcUiTheme.Fill(new Rect(c.x - 56, c.y - 56, 112, 112), new Color(1f, 1f, 1f, 0.35f), 56);
-            var k = c + new Vector2(kStick.x, -kStick.y) * 44f;
-            AcUiTheme.Fill(new Rect(k.x - 26, k.y - 26, 52, 52), new Color(1f, 1f, 1f, 0.85f), 26);
+            var c = KJoyC; float R0 = KJoyR;
+            var baseR = new Rect(c.x - R0, c.y - R0, R0 * 2, R0 * 2);
+            AcUiTheme.Circle(baseR, new Color(1f, 1f, 1f, kStickOn ? 0.45f : 0.3f));
+            AcUiTheme.CircleRing(baseR, new Color(1f, 1f, 1f, 0.85f));
+            // 네 방향 작은 점
+            for (int k = 0; k < 4; k++) { var dv = new Vector2(Mathf.Cos(k * Mathf.PI / 2), Mathf.Sin(k * Mathf.PI / 2)) * (R0 - 11); AcUiTheme.Circle(new Rect(c.x + dv.x - 4, c.y + dv.y - 4, 8, 8), new Color(1f, 1f, 1f, 0.9f)); }
+            var kp = c + new Vector2(kStick.x, -kStick.y) * R0 * 0.62f;
+            float kr = R0 * 0.46f;
+            AcUiTheme.Circle(new Rect(kp.x - kr + 1, kp.y - kr + 4, kr * 2, kr * 2), new Color(0.2f, 0.15f, 0.25f, 0.22f));
+            AcUiTheme.Circle(new Rect(kp.x - kr, kp.y - kr, kr * 2, kr * 2), new Color(1f, 1f, 1f, 0.96f));
+            AcUiTheme.CircleRing(new Rect(kp.x - kr, kp.y - kr, kr * 2, kr * 2), new Color(0.75f, 0.72f, 0.86f));
         }
-        else if (IsMobile && km != KMode.Lobby)
-            GUI.Label(new Rect(16, SH - 60, SW * 0.5f, 40), "<size=12>왼쪽을 누른 채 끌어서 이동</size>", new GUIStyle(sSmall) { normal = { textColor = new Color(0.35f, 0.3f, 0.3f) } });
         else if (km != KMode.Lobby)
-            GUI.Label(new Rect(16, SH - 34, SW * 0.6f, 24), "<size=12>WASD/방향키 이동 · 스페이스 잡기/놓기 · E 문지르기</size>", sSmall);
+            GUI.Label(new Rect(16, SH - 34, SW * 0.6f, 24), "<size=12>WASD/방향키 이동,  스페이스 잡기/놓기,  E 문지르기</size>", sSmall);
         KTouch();
     }
-    bool kPadMouse;
+    bool kPadMouse, kBtnMouse; float kBtnMouseAt;
 
     string KActionLabel()
     {
@@ -1025,17 +1116,12 @@ public partial class AcRoom
             if (began)
             {
                 kTouchAt = Time.unscaledTime;
-                if (kBtnRect.Contains(ui)) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
+                var bc = kBtnRect.center; float br = kBtnRect.width * 0.62f;   // 동그란 버튼 + 둘레 조금 너그럽게
+                if ((ui - bc).magnitude < br) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
                 if (kPadRect.Contains(ui)) { kPadTouch = id; kPadLast = ui; kChopAccum = 0; continue; }
-                if (ui.x < SW * 0.62f && ui.y > SH * 0.25f && kStickTouch < 0) { kStickTouch = id; kStickBase = pos; }
+                if (KJoyZone(ui) && kStickTouch < 0) kStickTouch = id;
             }
-            if (id == kStickTouch)
-            {
-                stickAlive = true;
-                var d = (pos - kStickBase) / (44f * UiK);
-                kStick = Vector2.ClampMagnitude(d, 1f); if (kStick.magnitude < 0.15f) kStick = Vector2.zero;
-                if (d.magnitude > 1.4f) kStickBase = pos - d.normalized * 1.4f * 44f * UiK;   // 손가락을 따라 받침도 옮김
-            }
+            if (id == kStickTouch) { stickAlive = true; kStick = KJoyVec(ui); }
             if (id == kPadTouch)
             {
                 padAlive = true;
@@ -1055,9 +1141,10 @@ public partial class AcRoom
     void KitchenLobbyGUI()
     {
         bool narrow = SW < 640;
-        float bsz = narrow ? 92 : 84;
+        float bsz = narrow ? 104 : 92;
         float w = Mathf.Min(SW - bsz - 46, 500), h = 300;
         var r = new Rect(narrow ? 10 : SW / 2 - w / 2, SH - h - 10, w, h);   // 아래쪽 (오른쪽은 잡기 버튼 자리)
+        kLobbyTop = r.y;
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 28), "<b>산타의 크리스마스 주방</b>", sLabel);
         var s = Kc.Stages[kStage];
@@ -1079,7 +1166,7 @@ public partial class AcRoom
             var tex = KIcon(RecipeItem(s.menus[k])); if (tex) GUI.DrawTexture(ir, tex, ScaleMode.ScaleToFit);
         }
         cy += iw + 4;
-        GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=13>" + string.Join(" · ", s.menus.Select(m => Kc.RecipeKo[m])) + (best > 0 ? $"   내 최고: 별 {best}개" : "") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+        GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=13>" + string.Join(", ", s.menus.Select(m => Kc.RecipeKo[m])) + (best > 0 ? $"   내 최고: 별 {best}개" : "") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
         cy += 24;
         var with = new List<string> { uiName.Trim() };
         foreach (var kv in kLobby) if (Time.unscaledTime - kv.Value.at < 3.5f && remotes.ContainsKey(kv.Key)) with.Add(kv.Value.name);
@@ -1105,38 +1192,57 @@ public partial class AcRoom
             int sc = (int)AcJson.D(d, "score");
             if (sc > bestScore) { bestScore = sc; who = AcJson.S(d, "names"); n = (int)AcJson.D(d, "n"); }
         }
-        return bestScore < 0 ? "" : $"최고 기록 {bestScore}점 · {who} ({n}명)";
+        return bestScore < 0 ? "" : $"최고 기록 {bestScore}점, {who} ({n}명)";
     }
 
     void KitchenResultGUI()
     {
         var s = KS;
-        float w = Mathf.Min(SW - 24, 420), h = 300;
-        var r = new Rect(SW / 2 - w / 2, SH / 2 - h / 2, w, h);
-        GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0, 0, 0, 0.25f)));
-        GUI.Box(R(r), "", sBox);
-        var center = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(r.x, r.y + 12, w, 30), kLostHost ? "<b>게임이 멈췄어요</b>" : "<size=22><b>" + (ks.stage + 1) + ". " + s.name + "</b></size>", center);
+        float w = Mathf.Min(SW - 24, 400), h = 360;
+        var r = new Rect(SW / 2 - w / 2, SH / 2 - h / 2 - 10, w, h);
+        GUI.DrawTexture(new Rect(0, 0, SW, SH), AcPalette.Tex(new Color(0.1f, 0.05f, 0.1f, 0.45f)));
+        R(new Rect(0, 0, SW, SH));
+        GUI.Box(r, "", sBox);
+        var center = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+        var small = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+        // 제목 띠
+        var hb = new Rect(r.x + 16, r.y + 14, w - 32, 38);
+        AcUiTheme.Fill(hb, kLostHost ? new Color(0.6f, 0.6f, 0.65f) : AcUiTheme.Accent, 3);
+        GUI.Label(hb, kLostHost ? "<size=17><b><color=#ffffff>게임이 멈췄어요</color></b></size>" : "<size=17><b><color=#ffffff>" + (ks.stage + 1) + ". " + s.name + "</color></b></size>", center);
+        // 별 3개 (가운데가 조금 크고 높게)
         float a = Time.unscaledTime - kResultAt;
         for (int k = 0; k < 3; k++)
         {
-            bool on = k < kResultStars && a > 0.3f + k * 0.35f;
-            var sr = new Rect(r.center.x - 90 + k * 64, r.y + 50, 52, 52);
-            float pop = on ? Mathf.Clamp01((a - 0.3f - k * 0.35f) / 0.25f) : 1f;
-            var sr2 = new Rect(sr.center.x - 26 * (0.6f + 0.4f * pop), sr.center.y - 26 * (0.6f + 0.4f * pop), 52 * (0.6f + 0.4f * pop), 52 * (0.6f + 0.4f * pop));
-            AcUiTheme.Fill(sr2, on ? new Color(1f, 0.8f, 0.2f) : new Color(0.85f, 0.82f, 0.78f), 26);
-            GUI.Label(sr2, "<size=26><b>" + (k + 1) + "</b></size>", center);
+            bool on = k < kResultStars && a > dtStarSnd(k);
+            float big = k == 1 ? 66 : 54;
+            float cx = r.center.x + (k - 1) * 74, cy = r.y + 100 - (k == 1 ? 10 : 0);
+            float pop = on ? Mathf.Clamp01((a - dtStarSnd(k)) / 0.25f) : 1f;
+            float sc = on ? (pop < 1 ? 0.5f + 0.7f * pop : 1f + 0.03f * Mathf.Sin(Time.time * 3f + k)) : 1f;
+            float sz = big * sc;
+            AcUiTheme.Star(new Rect(cx - sz / 2 + 2, cy - sz / 2 + 4, sz, sz), new Color(0.3f, 0.2f, 0.2f, 0.18f));
+            AcUiTheme.Star(new Rect(cx - sz / 2, cy - sz / 2, sz, sz), on ? new Color(1f, 0.78f, 0.15f) : new Color(0.84f, 0.82f, 0.8f));
             if (on && a - dtStarSnd(k) < Time.unscaledDeltaTime && a >= dtStarSnd(k)) Sfx("star", 0.5f, 1f + k * 0.15f);
         }
-        GUI.Label(new Rect(r.x, r.y + 112, w, 40), $"<size=30><b>{ks.score}점</b></size>", center);
+        float y = r.y + 146;
+        GUI.Label(new Rect(r.x, y, w, 46), $"<size=36><b>{ks.score}</b></size><size=16> 점</size>", center); y += 48;
+        // 기록 칸 3개
+        string[] lab = { "낸 요리", "놓친 주문", "함께한 사람" }; string[] val = { ks.served + "개", ks.failed + "개", ks.nPlayers + "명" };
+        float cw = (w - 32 - 16) / 3f;
+        for (int k = 0; k < 3; k++)
+        {
+            var cr = new Rect(r.x + 16 + k * (cw + 8), y, cw, 46);
+            AcUiTheme.Fill(cr, new Color(0.97f, 0.95f, 0.92f), 2);
+            GUI.Label(new Rect(cr.x, cr.y + 3, cw, 18), "<size=11><color=#8a84a0>" + lab[k] + "</color></size>", small);
+            GUI.Label(new Rect(cr.x, cr.y + 20, cw, 24), "<size=16><b>" + val[k] + "</b></size>", small);
+        }
+        y += 54;
         int n = Mathf.Clamp(ks.nPlayers, 1, 4) - 1;
-        GUI.Label(new Rect(r.x, r.y + 152, w, 24), $"<size=13>낸 요리 {ks.served}개 · 놓친 주문 {ks.failed}개 · {ks.nPlayers}명</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        GUI.Label(new Rect(r.x, r.y + 176, w, 24), $"<size=12>별 기준: {s.thr[n, 0]} / {s.thr[n, 1]} / {s.thr[n, 2]}점</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        if (kResultStars > 0 && ks.stage + 1 < Kc.Stages.Length) GUI.Label(new Rect(r.x, r.y + 200, w, 24), "<size=13><color=#2e7d32>다음 스테이지가 열렸어요!</color></size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        else if (kResultStars == 0 && !kLostHost) GUI.Label(new Rect(r.x, r.y + 200, w, 24), "<size=13>별 1개를 받으면 다음 스테이지가 열려요</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
-        float bw = 120, by = r.yMax - 52;
-        if (GUI.Button(R(new Rect(r.center.x - bw - 6, by, bw, 40)), "나가기", sBtn)) { CloseKitchen(); return; }
-        if (GUI.Button(R(new Rect(r.center.x + 6, by, bw, 40)), "<b>대기실로</b>", sBtnBig))
+        GUI.Label(new Rect(r.x + 16, y, w - 32, 20), $"<size=12><color=#8a84a0>별 기준   ★ {s.thr[n, 0]}점    ★★ {s.thr[n, 1]}점    ★★★ {s.thr[n, 2]}점</color></size>", small); y += 22;
+        if (kResultStars > 0 && ks.stage + 1 < Kc.Stages.Length) GUI.Label(new Rect(r.x + 16, y, w - 32, 22), "<size=13><b><color=#2e7d32>다음 스테이지가 열렸어요!</color></b></size>", small);
+        else if (kResultStars == 0 && !kLostHost) GUI.Label(new Rect(r.x + 16, y, w - 32, 22), "<size=13>별 1개를 받으면 다음 스테이지가 열려요</size>", small);
+        float bw = Mathf.Min(140, (w - 44) / 2), by = r.yMax - 56;
+        if (GUI.Button(R(new Rect(r.center.x - bw - 6, by, bw, 42)), "나가기", sBtn)) { CloseKitchen(); return; }
+        if (GUI.Button(R(new Rect(r.center.x + 6, by, bw, 42)), "<b>" + (kResultStars > 0 && ks.stage + 1 < Kc.Stages.Length ? "다음 판으로" : "다시 하기") + "</b>", sBtnBig))
         {
             km = KMode.Lobby; kLostHost = false;
             if (kResultStars > 0 && ks.stage + 1 <= KUnlocked) kStage = ks.stage + 1; else kStage = Mathf.Min(ks.stage, KUnlocked);

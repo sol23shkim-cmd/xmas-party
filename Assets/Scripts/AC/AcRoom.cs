@@ -600,6 +600,8 @@ public partial class AcRoom : MonoBehaviour
         if (decorating && !chatting && !askOpen && !treeOverview) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
         if (building) BuildingUpdate();
         GreenUpdate(dt);
+        if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building);
+        UpdateCloseupQuality();
         GiftUpdate(dt);
         KitchenUpdate(dt);
         FxUpdate(dt);
@@ -1141,7 +1143,7 @@ public partial class AcRoom : MonoBehaviour
         if (lettersOpen) { LettersWindow(); AskWindow(); return; }
         if (playingGame) { CookieGameGUI(); return; }
         if (treeOverview) { OverviewGUI(); return; }
-        if (snowFocusId != null) { SnowFocusGUI(); return; }
+        if (snowFocusId != null) { SnowFocusGUI(); AskWindow(); return; }
         if (pianoOpen) { PianoGUI(); return; }
         if (quizOpen) { QuizGUI(); return; }
         if (GreenBusy) { GreenGUI(); return; }

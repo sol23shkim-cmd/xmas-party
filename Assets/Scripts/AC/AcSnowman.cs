@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-[Serializable] public class SnowDeco { public string m; public int t; public float x, y, z; public string c = ""; public float s = 1f; }
+[Serializable] public class SnowDeco { public string m; public int t; public float x, y, z; public string c = ""; public float s = 1f; public float a; }
 [Serializable] public class SnowData
 {
     public int tiers = 3;
@@ -148,7 +148,7 @@ public partial class AcRoom
         if (!string.IsNullOrEmpty(dd.c) && it != null && it.groups != null && it.groups.Length > 0) tints = new Dictionary<string, Color> { { it.groups[0], Hex(dd.c) } };
         var g = AcmLoader.Spawn(dd.m, root, tints);
         g.transform.localPosition = p - n * 0.01f;
-        g.transform.localRotation = Quaternion.LookRotation(n, up.normalized);
+        g.transform.localRotation = Quaternion.LookRotation(n, up.normalized) * Quaternion.Euler(0, 0, dd.a);   // a: 붙인 면에서 돌린 각도
         g.transform.localScale = Vector3.one * DecoBase(r) * dd.s;
         return g;
     }
@@ -355,7 +355,7 @@ public partial class AcRoom
             var n = new Vector3(dir.x / dRadii[tier].x, dir.y / dRadii[tier].y, dir.z / dRadii[tier].z).normalized;
             var up = Vector3.up - n * Vector3.Dot(Vector3.up, n); if (up.sqrMagnitude < 1e-4f) up = Vector3.forward;
             snowGhost.transform.localPosition = dCenters[tier] + Vector3.Scale(dir, dRadii[tier]) - n * 0.01f;
-            snowGhost.transform.localRotation = Quaternion.LookRotation(n, up.normalized);
+            snowGhost.transform.localRotation = Quaternion.LookRotation(n, up.normalized) * Quaternion.Euler(0, 0, snowAngle);
             snowGhost.transform.localScale = Vector3.one * DecoBase(draft.R(tier)) * tmp.s;
         }
         else if (snowGhost) snowGhost.SetActive(false);
@@ -379,7 +379,7 @@ public partial class AcRoom
     }
 
     bool IsMobileTouchIdle() => IsMobile && !ptrPressed && !ptrUp;
-    bool snowPicked = true, snowPressOn; float snowYaw;
+    bool snowPicked = true, snowPressOn; float snowYaw, snowAngle;
 
     // 그림을 끌어다 눈사람 위에 놓기
     void SnowDropAt(Vector2 screen)
@@ -392,7 +392,7 @@ public partial class AcRoom
     SnowDeco NewDeco(int tier, Vector3 dir)
     {
         string m = CurDeco;
-        return new SnowDeco { m = m, t = tier, x = dir.x, y = dir.y, z = dir.z, s = DecoSizes[Mathf.Clamp(snowSizeSel, 0, 2)],
+        return new SnowDeco { m = m, t = tier, x = dir.x, y = dir.y, z = dir.z, s = DecoSizes[Mathf.Clamp(snowSizeSel, 0, 2)], a = snowAngle,
                               c = DecoTintable(m) ? HexOf(AcPalette.Vivid[Wrap(snowColSel, AcPalette.Vivid.Length)]) : "" };
     }
 
@@ -528,6 +528,19 @@ public partial class AcRoom
                 if (i == snowSizeSel) AcUiTheme.Ring(r, AcUiTheme.Accent, 3);
                 if (GUI.Button(r, DecoSizeKo[i], sBtn)) snowSizeSel = i;
             }
+            cy += 34;
+            // 각도: 장갑·팔·리본 등을 돌려 붙이기. 방금 붙인 장식도 같이 돌아감
+            GUI.Label(new Rect(lx, cy + 3, 40, 22), "각도", sSmall);
+            void Turn(float d)
+            {
+                snowAngle = Mathf.Repeat(snowAngle + d + 180f, 360f) - 180f;
+                if (draft.d.Count > 0) { draft.d[draft.d.Count - 1].a = snowAngle; RebuildDraft(); }
+                if (snowGhost) snowGhostKey = "";
+            }
+            if (GUI.Button(new Rect(lx + 40, cy, 44, 28), "<", sBtn)) Turn(-30f);
+            GUI.Label(new Rect(lx + 88, cy + 3, 56, 22), "<size=13>" + (Mathf.Abs(snowAngle) < 1 ? "똑바로" : Mathf.RoundToInt(snowAngle) + "도") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.UpperCenter });
+            if (GUI.Button(new Rect(lx + 146, cy, 44, 28), ">", sBtn)) Turn(30f);
+            if (GUI.Button(new Rect(lx + 196, cy, 64, 28), "처음대로", sBtn)) Turn(-snowAngle);
             if (draft.d.Count > 0 && GUI.Button(new Rect(SW - 20 - 110, cy, 100, 28), "하나 되돌리기", sBtn)) { draft.d.RemoveAt(draft.d.Count - 1); RebuildDraft(); }
         }
         else
@@ -629,24 +642,69 @@ public partial class AcRoom
         var a = MoveAxis(); snowFocusYaw -= a.x * 70f * Time.unscaledDeltaTime;
     }
 
+    // 감상평: snowc/<눈사람id>~<시각>~<쓴 사람> = {name, text, t}
+    List<(string name, string text, double t, string key)> SnowComments(string id)
+    {
+        var res = new List<(string, string, double, string)>();
+        var node = net != null ? net.Get("snowc") : null;
+        if (node == null) return res;
+        foreach (var kv in node)
+        {
+            if (!kv.Key.StartsWith(id + "~", StringComparison.Ordinal) || !(kv.Value is Dictionary<string, object> d)) continue;
+            res.Add((AcJson.S(d, "name"), AcJson.S(d, "text"), AcJson.D(d, "t"), kv.Key));
+        }
+        res.Sort((a, b) => a.Item3.CompareTo(b.Item3));
+        return res;
+    }
+
+    void WriteSnowComment(string id, string ownerName)
+    {
+        Ask(ownerName != "" ? ownerName + " 님 눈사람 감상평 (40자)" : "눈사람 감상평 (40자)", "", false, txt =>
+        {
+            txt = txt.Trim(); if (txt == "") return; if (txt.Length > 40) txt = txt.Substring(0, 40);
+            double t = Math.Floor(NowMs);
+            net?.Put("snowc/" + id + "~" + t.ToString("0") + "~" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"text\":" + AcJson.Esc(txt) + ",\"t\":" + t.ToString("0") + "}");
+            Sfx("candy_collect", 0.4f, 1.2f); Toast("감상평을 남겼어요!");
+        });
+    }
+
     void SnowFocusGUI()
     {
-        string who = "";
+        string who = "", ownerKey = "";
         var node = net != null ? net.Get("snow") : null;
-        if (node != null && node.TryGetValue(snowFocusId, out var v) && v is Dictionary<string, object> d) who = AcJson.S(d, "name");
-        float w = Mathf.Min(SW - 20, 460), h = 96;
+        if (node != null && node.TryGetValue(snowFocusId, out var v) && v is Dictionary<string, object> d) { who = AcJson.S(d, "name"); ownerKey = NameKey(who); }
+        bool mine = who != "" && ownerKey == myKey;
+        var cms = SnowComments(snowFocusId);
+        int show = Mathf.Min(3, cms.Count);
+        float w = Mathf.Min(SW - 20, 460), h = 96 + (show > 0 ? show * 22 + 26 : 0);
         var r = new Rect(SW / 2 - w / 2, SH - h - 12, w, h);
         GUI.Box(R(r), "", sBox);
-        GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 26), (who != "" ? who + " 님의 눈사람" : "눈사람"), sLabel);
+        GUI.Label(new Rect(r.x + 16, r.y + 10, w - 32, 26), (who != "" ? (mine ? "내 눈사람" : who + " 님의 눈사람") : "눈사람"), sLabel);
         GUI.Label(new Rect(r.x + 16, r.y + 36, w - 32, 22), snowDelAsk ? "<size=13>정말 없앨까요? 모두의 마당에서 사라져요</size>" : (IsMobile ? "<size=13>끌어서 돌려 보기, 두 손가락 확대</size>" : "<size=13>끌어서 돌려 보기, 휠 확대</size>"), sSmall);
-        float bw = 96, by = r.y + 58;
+        float yy = r.y + 60;
+        if (show > 0)
+        {
+            GUI.Label(new Rect(r.x + 16, yy, w - 32, 22), $"<size=12><color=#8a6d5a>감상평 {cms.Count}개" + (cms.Count > show ? " (최근 3개)" : "") + "</color></size>", sSmall);
+            yy += 22;
+            for (int i = cms.Count - show; i < cms.Count; i++)
+            {
+                GUI.Label(new Rect(r.x + 16, yy, w - 32, 22), "<size=13><b>" + cms[i].name + "</b>  " + cms[i].text + "</size>", sSmall);
+                yy += 22;
+            }
+            yy += 4;
+        }
+        float by = r.yMax - 40;
         if (!snowDelAsk)
         {
-            if (GUI.Button(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 30), "없애기", sBtn)) snowDelAsk = true;
+            float cw = 120;
+            if (!mine && GUI.Button(new Rect(r.x + 16, by, cw, 30), "<b>감상평 남기기</b>", sBtn)) WriteSnowComment(snowFocusId, who);
+            float bw = 96;
+            if ((mine || who == "") && GUI.Button(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 30), "없애기", sBtn)) snowDelAsk = true;   // 남의 눈사람은 감상평만
             if (GUI.Button(new Rect(r.xMax - 16 - bw, by, bw, 30), "<b>닫기</b>", sBtn)) snowFocusId = null;
         }
         else
         {
+            float bw = 96;
             if (GUI.Button(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 30), "<b>없애기</b>", sBtn))
             {
                 net?.Delete("snow/" + snowFocusId);

@@ -308,6 +308,13 @@ public partial class AcRoom
             }
             var w = o.c + o.rot * l; p.x = w.x; p.z = w.z;
         }
+        if (slots != null)   // 온실: 심은 화분만 막힘 (빈 화분은 지나감)
+            foreach (var sl in slots)
+            {
+                if (!sl.planted) continue;
+                var d = new Vector2(p.x - sl.pos.x, p.z - sl.pos.z); float rr = 0.32f + r;
+                if (d.sqrMagnitude < rr * rr && d.sqrMagnitude > 1e-8f) { d = d.normalized * rr; p.x = sl.pos.x + d.x; p.z = sl.pos.z + d.y; }
+            }
         foreach (var c in snowCircles)   // 마당의 눈사람
         {
             var d = new Vector2(p.x - c.x, p.z - c.y); float rr = c.z + r;

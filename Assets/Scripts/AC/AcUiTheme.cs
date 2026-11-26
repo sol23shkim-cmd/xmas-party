@@ -90,6 +90,24 @@ public static class AcUiTheme
             onNormal = { background = btnDown, textColor = ink }, onHover = { background = btnDown, textColor = ink }, onActive = { background = btnDown, textColor = ink },
         };
     }
+    // 살짝 색이 든 칩 버튼 (버튼 무리 구분용: 말·몸짓 = 연분홍, 꾸미기 = 연민트 등)
+    public static GUIStyle TintButton(GUIStyle baseBtn, int size, Color tint)
+    {
+        Build();
+        var ink = Ink.linear;
+        Color top = Color.Lerp(Color.white, tint, 0.35f), bot = Color.Lerp(new Color(0.93f, 0.92f, 0.97f), tint, 0.55f), bd = Color.Lerp(new Color(0.8f, 0.78f, 0.9f), tint * 0.8f, 0.6f);
+        top.a = bot.a = 0.97f; bd.a = 0.95f;
+        var n = Round(40, 12, top, bot, bd, 1f, 2f, 0.5f);
+        var h = Round(40, 12, Color.Lerp(top, Color.white, 0.4f), bot, bd, 1.2f, 2f, 0.6f);
+        var d = Round(40, 12, bot * 0.95f, bot, bd, 1.2f, 0f, 0f);
+        return new GUIStyle(baseBtn)
+        {
+            fontSize = size, richText = true, alignment = TextAnchor.MiddleCenter,
+            border = new RectOffset(13, 13, 13, 15), padding = new RectOffset(8, 8, 4, 6),
+            normal = { background = n, textColor = ink }, hover = { background = h, textColor = ink },
+            active = { background = d, textColor = ink }, focused = { background = n, textColor = ink },
+        };
+    }
     public static GUIStyle BigButton(GUIStyle baseBtn, int size)
     {
         Build();
@@ -125,6 +143,47 @@ public static class AcUiTheme
         var k = GUI.color; GUI.color = c.linear;
         fillSt.Draw(new Rect(r.x - pad, r.y - pad, r.width + pad * 2, r.height + pad * 2), false, false, false, false);
         GUI.color = k;
+    }
+
+    // 동그라미 (채움 / 테두리) — 조작 막대 받침, 별 자리 등
+    static Texture2D circleTex, circleRingTex, starTex;
+    public static void Circle(Rect r, Color c)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        if (!circleTex) circleTex = Round(96, 48, Color.white, Color.white, Color.clear, 0);
+        var k = GUI.color; GUI.color = c.linear; GUI.DrawTexture(r, circleTex); GUI.color = k;
+    }
+    public static void CircleRing(Rect r, Color c)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        if (!circleRingTex) circleRingTex = Round(96, 48, Color.clear, Color.clear, Color.white, 4f);
+        var k = GUI.color; GUI.color = c.linear; GUI.DrawTexture(r, circleRingTex); GUI.color = k;
+    }
+    // 둥근 별 (흰색, GUI.color로 물들임)
+    public static Texture2D StarTex()
+    {
+        if (starTex) return starTex;
+        int n = 128; starTex = new Texture2D(n, n, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float fx = (x + 0.5f) / n * 2 - 1, fy = (y + 0.5f) / n * 2 - 1 + 0.06f;
+                float a = Mathf.Atan2(fx, fy), rr = Mathf.Sqrt(fx * fx + fy * fy);
+                float seg = Mathf.PI * 2 / 5, m = Mathf.Repeat(a + seg / 2, seg) - seg / 2;           // 꼭짓점 기준 각도
+                float edge = Mathf.Lerp(0.92f, 0.42f, Mathf.Pow(Mathf.Abs(m) / (seg / 2), 0.85f));  // 꼭짓점 0.92 ~ 오목 0.42
+                float d = (edge - rr) * n * 0.5f;
+                float al = Mathf.Clamp01(d + 0.5f);
+                float shade = Mathf.Lerp(1f, 0.82f, Mathf.Clamp01(-fy * 0.5f + 0.3f));
+                px[y * n + x] = new Color(shade, shade, shade, al);
+            }
+        starTex.SetPixels(px); starTex.Apply();
+        return starTex;
+    }
+    public static void Star(Rect r, Color c)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        var k = GUI.color; GUI.color = c.linear; GUI.DrawTexture(r, StarTex()); GUI.color = k;
     }
 
     // 큰 버튼 둘레 빛 (네모난 깜빡이 테두리 대신)

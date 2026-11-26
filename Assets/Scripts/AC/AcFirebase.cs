@@ -157,6 +157,7 @@ public class AcFirebase : MonoBehaviour
         if (p[0] == "gifts" && p.Length == 2) return "orn/x~gift~" + p[1];      // 선물 (11-26)
         if (p[0] == "ck" && p.Length == 2) return "orn/x~ck~" + p[1];          // 주방 게임 판·상태
         if (p[0] == "cks" && p.Length == 2) return "orn/x~cks~" + p[1];        // 주방 게임 기록
+        if (p[0] == "snowc" && p.Length == 2) return "orn/x~snowc~" + p[1];    // 눈사람 감상평 (11-26)
         return path;
     }
 
@@ -166,7 +167,7 @@ public class AcFirebase : MonoBehaviour
         string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~"
                       : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : p[0] == "quiz" ? "x~quiz~" : p[0] == "sbf" ? "x~sbf~" : p[0] == "qzs" ? "x~qzs~" : p[0] == "candy" ? "x~candy~"
                       : p[0] == "plants" ? "x~plant~" : p[0] == "pw" ? "x~pw~" : p[0] == "gifts" ? "x~gift~"
-                      : p[0] == "ck" ? "x~ck~" : p[0] == "cks" ? "x~cks~" : null;
+                      : p[0] == "ck" ? "x~ck~" : p[0] == "cks" ? "x~cks~" : p[0] == "snowc" ? "x~snowc~" : null;
         if (prefix != null)
         {
             var orn = Node("orn");

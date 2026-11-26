@@ -48,6 +48,41 @@ public class AcCharacter : MonoBehaviour
     string emote = ""; float emoteT = -10;
     public void PlayEmote(string kind) { emote = kind; emoteT = Time.time; }
 
+    // 내 캐릭터 숨기기 (가까이 보는 화면에서 카메라가 몸 안으로 들어가 속이 비쳐 보이는 것 방지)
+    bool hidden;
+    public void SetHidden(bool h)
+    {
+        if (h == hidden) return; hidden = h;
+        foreach (var r in GetComponentsInChildren<Renderer>(true)) r.enabled = !h;
+    }
+
+    // ===== 왼손에 든 물건 (포장한 선물) =====
+    GameObject leftHold; float leftHoldSize;
+    public bool HoldingLeft => leftHold != null;
+    public bool carryBoth;   // 두 팔을 앞으로 뻗어 들기 (주방 게임에서 그릇·재료)
+    // obj를 왼손에 쥠. size = 캐릭터 키 기준 크기(1 = 원래 크기). null이면 내려놓기
+    public void HoldLeft(GameObject obj, float size)
+    {
+        if (leftHold && leftHold != obj) Destroy(leftHold);
+        leftHold = obj; leftHoldSize = size;
+        if (!obj || !armL) return;
+        float minY = -0.3f;
+        foreach (var mf in armL.GetComponentsInChildren<MeshFilter>())
+        {
+            if (!mf.sharedMesh || mf.gameObject == obj) continue; var b = mf.sharedMesh.bounds;
+            for (int i = 0; i < 8; i++)
+            {
+                var p = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) * 2 - 1, (i & 2) - 1, ((i & 4) >> 1) - 1));
+                minY = Mathf.Min(minY, armL.InverseTransformPoint(mf.transform.TransformPoint(p)).y);
+            }
+        }
+        obj.transform.SetParent(armL, false);
+        float ws = transform.lossyScale.x / Mathf.Max(0.01f, armL.lossyScale.x);
+        obj.transform.localPosition = new Vector3(0.02f * ws, minY - 0.02f * ws, 0.1f * ws);
+        obj.transform.localRotation = Quaternion.Euler(50f, 0, 0);   // 팔을 앞으로 든 만큼 되돌려 상자가 똑바로
+        obj.transform.localScale = Vector3.one * size * ws;
+    }
+
     // ===== 베개 (침실 베개 싸움) =====
     public bool holdPillow; public Color pillowColor = new Color(0.98f, 0.86f, 0.9f);
     GameObject pillow; static Mesh pillowMesh; const float PillowK = 0.85f;   // 베개 크기 (캐릭터 키의 약 절반)
@@ -148,7 +183,7 @@ public class AcCharacter : MonoBehaviour
 
     public void Rebuild(AcLook l)
     {
-        look = l;
+        look = l; hidden = false;
         if (body) Destroy(body.gameObject);
         attached.Clear();
         var tints = new Dictionary<string, Color>
@@ -287,6 +322,8 @@ public class AcCharacter : MonoBehaviour
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
         float et = Time.time - emoteT, jump = 0;
+        if (carryBoth) { if (armL) armL.localRotation = Quaternion.Euler(-68f + sw * 0.1f, 0, -14f); if (armR) armR.localRotation = Quaternion.Euler(-68f - sw * 0.1f, 0, 14f); }
+        if (leftHold && armL) armL.localRotation = Quaternion.Euler(-50f + sw * 0.12f + Mathf.Sin(Time.time * 2.2f) * 2f, 0, -10f);   // 선물을 앞으로 들고 있는 왼팔
         if (holdPillow && !(et < 1.0f && (emote == "swing" || emote == "bonk"))) if (armR) armR.localRotation = Quaternion.Euler(-72f + sw * 0.15f + Mathf.Sin(Time.time * 2.4f) * 3f, 0, 16f);   // 베개를 앞으로 들고 있는 팔
         if (et < 1.8f)
         {

@@ -1,6 +1,6 @@
 // AcGreenhouse.cs - 겨울 온실 화분 키우기 (11-26)
 // 빈 화분 12개. 식물 5가지(포인세티아·아기 전나무·아마릴리스·크리스마스 선인장·호랑가시나무) 중 골라 심고 화분 색도 고름.
-// 물은 4시간마다 한 번씩: 그 4시간 동안 주인이 물을 주면 +4단계, 다른 사람이 주면 한 사람당 +1단계. 최대 128단계.
+// 물은 4시간마다 한 번씩: 그 4시간 동안 주인이 물을 주면 +4단계, 다른 사람이 주면 한 사람당 +1단계. 최대 100단계.
 // 다 자라면 '다 자랐어요!' + 반짝임, 주인은 눈사람처럼 장식을 붙여 꾸밀 수 있음.
 // 저장: orn/x~plant~p<번호> = {slot, owner, name, kind, pot, ct, d(장식 json)}
 //       orn/x~pw~p<번호>~<심은 시각>~<4시간 칸 번호>~<물 준 사람> = {name, t}
@@ -22,7 +22,7 @@ public partial class AcRoom
         "키가 쑥쑥, 커다란 빨간 나팔꽃이 피어요",
         "마디마디 늘어지다 끝에 분홍 꽃이 펴요",
         "뾰족한 잎 사이로 빨간 열매가 열려요" };
-    const int PlantMax = 128;
+    const int PlantMax = 100;
     const double WaterWinMs = 4 * 3600 * 1000.0;
     const float PotTop = 0.29f;
     // 온실 안 화분 자리 (방 가운데 기준, 미터). 가운데 돌길과 옆방 문 앞은 비워 둠
@@ -66,7 +66,6 @@ public partial class AcRoom
             s.root = r;
             ProcObj("saucer", saucer, r);
             s.pot = ProcObj("pot", PotMesh(PotDefault), r);
-            obstacles.Add(new Obb { c = s.pos, h = new Vector2(0.3f, 0.3f), rot = Quaternion.identity, inv = Quaternion.identity });
             slots[i] = s;
         }
     }
@@ -707,8 +706,8 @@ public partial class AcRoom
             float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK;
             string t;
             if (!s.planted) t = "<size=12>빈 화분</size>";
-            else if (s.stage >= PlantMax) t = $"<size=12>{s.name} · <color=#c0392b>다 자랐어요!</color></size>";
-            else t = $"<size=12>{s.name} · {Mathf.Max(0, s.stage)}/{PlantMax}{(s.iWatered ? "" : " · <color=#1f6fb8>물!</color>")}</size>";
+            else if (s.stage >= PlantMax) t = $"<size=12>{s.name}  <color=#c0392b>다 자랐어요!</color></size>";
+            else t = $"<size=12>{s.name}  {Mathf.Max(0, s.stage)}/{PlantMax}{(s.iWatered ? "" : "  <color=#1f6fb8>물!</color>")}</size>";
             var size = sTag.CalcSize(new GUIContent(t));
             GUI.Label(new Rect(x - size.x / 2 - 6, y - 10, size.x + 12, 20), t, sTag);
         }
@@ -751,7 +750,7 @@ public partial class AcRoom
         var s = slots[plantPicker];
         if (!s.planted) s.pot.GetComponent<MeshFilter>().sharedMesh = PotMesh(PotCols[Wrap(pickPot, PotCols.Length)]);
         cy += 36;
-        GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=12>4시간마다 물 주기: 내가 주면 +4, 친구가 주면 +1 (128이면 다 자라요)</size>", sSmall);
+        GUI.Label(new Rect(r.x + 16, cy, w - 32, 22), "<size=12>물 주기: 내가 주면 +4, 친구가 주면 +1 (100이면 다 자라요)</size>", sSmall);
         float bw = 96, by = r.yMax - 42;
         if (GUI.Button(R(new Rect(r.xMax - 16 - bw * 2 - 8, by, bw, 32)), "취소", sBtn)) ClosePicker(false);
         if (GUI.Button(R(new Rect(r.xMax - 16 - bw, by, bw, 32)), "<b>심기!</b>", sBtn)) ClosePicker(true);
@@ -772,7 +771,7 @@ public partial class AcRoom
         if (k > 0) AcUiTheme.Fill(new Rect(bar.x, bar.y, Mathf.Max(14, bar.width * k), bar.height), grown ? new Color(1f, 0.75f, 0.2f) : new Color(0.4f, 0.75f, 0.4f), 0);
         GUI.Label(new Rect(bar.xMax + 8, bar.y - 4, 70, 22), $"<size=13>{Mathf.Max(0, s.stage)}/{PlantMax}</size>", sSmall);
         string who = s.waterNames.Count > 0 ? string.Join(", ", s.waterNames.Take(4)) + (s.waterNames.Count > 4 ? $" 외 {s.waterNames.Count - 4}명" : "") : "아직 없어요";
-        GUI.Label(new Rect(r.x + 16, r.y + 62, w - 32, 22), "<size=12>이번 4시간 물 준 사람: " + who + "</size>", sSmall);
+        GUI.Label(new Rect(r.x + 16, r.y + 62, w - 32, 22), "<size=12>최근 물 준 사람: " + who + "</size>", sSmall);
         GUI.Label(new Rect(r.x + 16, r.y + 82, w - 32, 22), "<size=12>" + (s.iWatered ? "다음 물 주기: " + NextWaterText() : grown ? "물을 주면 반짝반짝 기뻐해요" : (mine ? "지금 물을 주면 +4" : "지금 물을 주면 +1")) + "</size>", sSmall);
         float by = r.yMax - 42, bw = narrowBtn(w, 4);
         float x = r.x + 16;

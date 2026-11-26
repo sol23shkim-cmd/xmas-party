@@ -14,6 +14,9 @@ public class AcPB
     public readonly List<int> t = new List<int>();
     public Matrix4x4 xf = Matrix4x4.identity;
     public bool inward;   // 안쪽에서 보는 모양 (배경 둥근 벽)
+    public static float DefaultDetail = 1f;   // 가까이서 크게 보는 물체(선물 내용물)는 잘게 나눠 매끈하게
+    public float detail = DefaultDetail;
+    int D(int n) => detail <= 1f ? n : Mathf.Max(n, Mathf.RoundToInt(n * detail));
 
     static Color32 C32(Color col) => new Color32((byte)(Mathf.Clamp01(col.r) * 255), (byte)(Mathf.Clamp01(col.g) * 255), (byte)(Mathf.Clamp01(col.b) * 255), 0);
 
@@ -67,6 +70,7 @@ public class AcPB
     public void Ellipsoid(Vector3 center, Vector3 rad, Color col, int lat = 10, int lon = 14, Quaternion? rot = null, System.Func<Vector3, Color> colf = null, float aoBottom = 0.7f)
     {
         var q = rot ?? Quaternion.identity;
+        lat = D(lat); lon = D(lon);
         int start = v.Count;
         for (int i = 0; i <= lat; i++)
         {
@@ -95,6 +99,7 @@ public class AcPB
     public void Tube(IList<Vector3> pts, IList<float> rads, Color col, int seg = 8, IList<Color> cols = null, bool capStart = true, bool capEnd = true)
     {
         int nP = pts.Count; if (nP < 2) return;
+        seg = D(seg);
         var up = Vector3.up;
         var dir0 = (pts[1] - pts[0]).normalized;
         if (Mathf.Abs(Vector3.Dot(dir0, up)) > 0.95f) up = Vector3.right;
@@ -214,7 +219,7 @@ public class AcPB
 
     public void Torus(Vector3 center, Vector3 axis, float R, float r, Color col, int s1 = 24, int s2 = 8)
     {
-        axis.Normalize();
+        axis.Normalize(); s1 = D(s1); s2 = D(s2);
         var a1 = Vector3.Cross(axis, Mathf.Abs(axis.y) > 0.9f ? Vector3.right : Vector3.up).normalized; var a2 = Vector3.Cross(axis, a1);
         int start = v.Count;
         for (int i = 0; i <= s1; i++)

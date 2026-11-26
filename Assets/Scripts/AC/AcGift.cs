@@ -1,7 +1,7 @@
 // AcGift.cs - 선물 포장실: 선물 만들기 → 들고 다니다 친구 옆에서 전달 → 받은 사람이 풀어보기 (11-26)
 // 만들기: 내용물(36가지, 움직이는 것들 + 내 캐릭터 미니어처) / 상자 크기 / 포장지 색·무늬·무늬 색 / 리본 색·무늬·모양 / 카드 한마디
 // 풀어보기: 따로 떨어진 '선물 무대'에서 크게. 리본을 3번 끌어 풀고, 포장지를 문질러 찢고, '상자 열기!' → 내용물이 짠!
-// 저장: 들고 있는 선물 = PlayerPrefs gift_held (최대 3개)
+// 저장: 들고 있는 선물 = PlayerPrefs gift_held (마지막으로 포장한 1개, 왼손)
 //       보낸 선물 = orn/x~gift~<id> = {id, from, fromName, to, toName, ct, opened, d(GiftData json)}
 using System;
 using System.Collections.Generic;
@@ -49,12 +49,14 @@ public partial class AcRoom
         new GiftItem("p_minitree", "미니 트리", 1, 0.48f, "glow"),
         new GiftItem("poinsettia", "포인세티아", 1, 0.36f, "sway"),
         new GiftItem("p_starwand", "별 요술봉", 1, 0.5f, "spin"),
-        new GiftItem("p_jack", "깜짝 용수철 상자", 2, 0.55f, "boing"),
-        new GiftItem("p_popflower", "깜짝 꽃", 2, 0.5f, "boing"),
-        new GiftItem("gift_box", "선물 속 선물", 2, 0.3f, "hop"),
-        new GiftItem("bell_pair", "딸랑 종", 2, 0.36f, "swing"),
-        new GiftItem("toy_train", "칙칙폭폭 기차", 2, 0.26f, "drive"),
-        new GiftItem("nutcracker", "호두까기 병정", 2, 0.5f, "hop"),
+        new GiftItem("p_jack", "펀치 상자", 2, 0.55f, "boing"),
+        new GiftItem("p_snakecan", "뱀 나오는 땅콩 캔", 2, 0.5f, "boing"),
+        new GiftItem("p_chicken", "꽥꽥 고무 닭", 2, 0.42f, "squawk"),
+        new GiftItem("p_whoopee", "뿡뿡 방귀 쿠션", 2, 0.16f, "puff"),
+        new GiftItem("p_teeth", "딱딱 태엽 이빨", 2, 0.18f, "chatter"),
+        new GiftItem("p_spider", "대롱대롱 거미", 2, 0.5f, "dangle"),
+        new GiftItem("p_popflower", "물총 꽃", 2, 0.5f, "squirt"),
+        new GiftItem("p_glasses", "콧수염 변장 안경", 2, 0.16f, "wiggle"),
         new GiftItem("p_cupcake", "컵케이크", 3, 0.28f, "bob"),
         new GiftItem("p_donut", "딸기 도넛", 3, 0.14f, "spin"),
         new GiftItem("cocoa_mug", "코코아", 3, 0.22f, "bob"),
@@ -82,7 +84,7 @@ public partial class AcRoom
     // ===== 들고 있는 선물 =====
     GiftHeldList held;
     GiftHeldList Held { get { if (held == null) { try { held = JsonUtility.FromJson<GiftHeldList>(PlayerPrefs.GetString("gift_held", "")); } catch { } if (held == null) held = new GiftHeldList(); } return held; } }
-    GiftData HeldGift => Held.g.Count > 0 ? Held.g[0] : null;
+    GiftData HeldGift => Held.g.Count > 0 ? Held.g[Held.g.Count - 1] : null;
     void SaveHeld() { PlayerPrefs.SetString("gift_held", JsonUtility.ToJson(Held)); PlayerPrefs.Save(); }
 
     // ===== 무늬 그림 =====
@@ -369,12 +371,17 @@ public partial class AcRoom
         else if (id.StartsWith("p_", StringComparison.Ordinal)) g = ProcItem(id);
         else g = AcmLoader.Exists(id) ? AcCatalog.Spawn(id, null, id == "gift_box" ? new Dictionary<string, Color> { { "box", new Color(0.3f, 0.6f, 0.95f) }, { "ribbon", new Color(1f, 0.85f, 0.3f) } } : null) : ProcItem("p_cupcake");
         var holder = FitHolder(g, def.h, "item_" + id);
-        foreach (var r in holder.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = ShadowCastingMode.On;
+        foreach (var r in holder.GetComponentsInChildren<MeshRenderer>()) { r.shadowCastingMode = ShadowCastingMode.On; r.receiveShadows = false; }   // 작은 물체 위 그림자 얼룩(계단 무늬) 없애기
         return holder;
     }
 
     // 코드로 만든 내용물 (움직이는 부분은 이름 붙인 자식)
     GameObject ProcItem(string id)
+    {
+        float keepDetail = AcPB.DefaultDetail; AcPB.DefaultDetail = 1.8f;   // 가까이서 크게 보므로 잘게 나눠 매끈하게
+        try { return ProcItemInner(id); } finally { AcPB.DefaultDetail = keepDetail; }
+    }
+    GameObject ProcItemInner(string id)
     {
         var root = new GameObject(id);
         AcPB b = new AcPB();
@@ -392,22 +399,34 @@ public partial class AcRoom
             for (int i = 0; i <= 8; i++) { float a = Mathf.PI * (0.15f + 0.7f * i / 8f); pts.Add(c + new Vector3(Mathf.Cos(a) * 0.18f * s, -0.12f * s - Mathf.Sin(a) * 0.12f * s, 0.01f * s)); rs.Add(0.025f * s); }
             pb.Tube(pts, rs, black, 5);
         }
+        void GEye(AcPB pb, Vector3 c, float r, float look = 0.35f)
+        {   // 왕눈이 (흰 공 + 아래로 쏠린 까만 눈동자)
+            pb.Sphere(c, r, white, 6, 8);
+            pb.Sphere(c + new Vector3(0, -r * look, r * 0.62f), r * 0.5f, black, 5, 7);
+            pb.Sphere(c + new Vector3(r * 0.2f, r * 0.15f, r * 0.9f), r * 0.14f, white, 3, 4);
+        }
+        Color red2 = new Color(0.92f, 0.2f, 0.25f), yellow2 = new Color(1f, 0.85f, 0.3f);
         switch (id)
         {
             case "p_penguin":
-                b.Ellipsoid(new Vector3(0, 0.17f, 0), new Vector3(0.13f, 0.17f, 0.12f), black, 10, 14);
-                b.Ellipsoid(new Vector3(0, 0.15f, 0.05f), new Vector3(0.1f, 0.13f, 0.08f), white, 8, 12);
-                b.Ellipsoid(new Vector3(0, 0.3f, 0.01f), new Vector3(0.1f, 0.09f, 0.09f), black, 8, 12);
-                b.Ellipsoid(new Vector3(0, 0.29f, 0.05f), new Vector3(0.075f, 0.06f, 0.05f), white, 6, 10);
-                Face2(b, new Vector3(0, 0.3f, 0.1f), 0.09f, 0.33f);
-                b.Cylinder(new Vector3(0, 0.285f, 0.095f), new Vector3(0, 0.28f, 0.13f), 0.016f, 0.002f, orange, 6);
-                b.Ellipsoid(new Vector3(-0.05f, 0.01f, 0.05f), new Vector3(0.035f, 0.012f, 0.05f), orange, 4, 8);
-                b.Ellipsoid(new Vector3(0.05f, 0.01f, 0.05f), new Vector3(0.035f, 0.012f, 0.05f), orange, 4, 8);
-                b.Ellipsoid(new Vector3(-0.13f, 0.17f, 0), new Vector3(0.025f, 0.09f, 0.05f), black, 5, 8, Quaternion.Euler(0, 0, -15));
-                b.Ellipsoid(new Vector3(0.13f, 0.17f, 0), new Vector3(0.025f, 0.09f, 0.05f), black, 5, 8, Quaternion.Euler(0, 0, 15));
-                b.Torus(new Vector3(0, 0.235f, 0.005f), Vector3.up, 0.095f, 0.022f, new Color(0.9f, 0.2f, 0.25f), 16, 6);
-                Part("body", b, Vector3.zero);
-                break;
+                {
+                    // 몸·머리를 각각 한 덩어리로 만들고 배·얼굴의 흰 부분은 정점 색으로 칠함 (겹친 껍질끼리 깜빡이던 문제)
+                    Color Belly(Vector3 u, float fz, float fy0, float fy1) { float k = Mathf.SmoothStep(0, 1, (u.z - fz) / 0.18f) * Mathf.SmoothStep(0, 1, (u.y - fy0) / 0.2f) * Mathf.SmoothStep(0, 1, (fy1 - u.y) / 0.2f); return Color.Lerp(black, white, k); }
+                    b.Ellipsoid(new Vector3(0, 0.165f, 0), new Vector3(0.13f, 0.165f, 0.12f), black, 16, 22, null, u => Belly(u, 0.15f, -0.95f, 0.75f), 0.8f);
+                    b.Ellipsoid(new Vector3(0, 0.3f, 0.005f), new Vector3(0.1f, 0.09f, 0.092f), black, 14, 20, null, u => { float k = Mathf.SmoothStep(0, 1, (u.z - 0.25f) / 0.25f) * Mathf.SmoothStep(0, 1, (0.55f - u.y) / 0.25f); return Color.Lerp(black, white, k); }, 0.85f);
+                    Face2(b, new Vector3(0, 0.3f, 0.094f), 0.085f, 0.36f);
+                    b.Cylinder(new Vector3(0, 0.287f, 0.09f), new Vector3(0, 0.28f, 0.13f), 0.017f, 0.002f, orange, 8);
+                    b.Ellipsoid(new Vector3(-0.05f, 0.012f, 0.05f), new Vector3(0.036f, 0.013f, 0.052f), orange, 5, 8);
+                    b.Ellipsoid(new Vector3(0.05f, 0.012f, 0.05f), new Vector3(0.036f, 0.013f, 0.052f), orange, 5, 8);
+                    b.Ellipsoid(new Vector3(-0.128f, 0.17f, 0), new Vector3(0.026f, 0.09f, 0.05f), black, 6, 8, Quaternion.Euler(0, 0, -15));
+                    b.Ellipsoid(new Vector3(0.128f, 0.17f, 0), new Vector3(0.026f, 0.09f, 0.05f), black, 6, 8, Quaternion.Euler(0, 0, 15));
+                    // 목도리: 몸에서 살짝 띄운 도넛 + 늘어진 끝
+                    var red = new Color(0.9f, 0.2f, 0.25f);
+                    b.Torus(new Vector3(0, 0.232f, 0.004f), Vector3.up, 0.103f, 0.02f, red, 18, 7);
+                    b.Ellipsoid(new Vector3(0.06f, 0.19f, 0.105f), new Vector3(0.022f, 0.04f, 0.012f), red, 5, 7, Quaternion.Euler(0, 0, -12));
+                    Part("body", b, Vector3.zero);
+                    break;
+                }
             case "p_chick":
                 {
                     var yel = new Color(1f, 0.85f, 0.3f);
@@ -524,47 +543,178 @@ public partial class AcRoom
                 }
             case "p_jack":
             case "p_popflower":
+            case "p_snakecan":
                 {
-                    bool jack = id == "p_jack";
+                    float baseY = BoingBase(id);
                     var bx = new AcPB();
-                    if (jack)
-                    {
-                        bx.Box(new Vector3(0, 0.07f, 0), new Vector3(0.16f, 0.14f, 0.16f), new Color(0.35f, 0.6f, 0.95f));
-                        bx.Box(new Vector3(0, 0.07f, 0), new Vector3(0.165f, 0.03f, 0.165f), new Color(1f, 0.85f, 0.3f));
-                        bx.Star(new Vector3(0, 0.07f, 0.083f), Vector3.forward, Vector3.up, 0.035f, 0.015f, 0.004f, new Color(1f, 0.85f, 0.3f));
-                        var lidB = new AcPB(); lidB.Box(new Vector3(0.08f, 0.005f, 0), new Vector3(0.16f, 0.01f, 0.16f), new Color(0.95f, 0.3f, 0.4f));
-                        var lidGo = ProcObj("jlid", lidB.M("jlid"), root.transform); lidGo.transform.localPosition = new Vector3(-0.08f, 0.14f, 0); lidGo.transform.localRotation = Quaternion.Euler(0, 0, 110);
+                    if (id == "p_jack")
+                    {   // 줄무늬 상자 + 열린 뚜껑
+                        for (int k = 0; k < 4; k++) bx.Box(new Vector3(0, 0.0175f + k * 0.035f, 0), new Vector3(0.16f, 0.035f, 0.16f), k % 2 == 0 ? new Color(0.35f, 0.6f, 0.95f) : new Color(0.98f, 0.96f, 0.92f));
+                        bx.Star(new Vector3(0, 0.07f, 0.082f), Vector3.forward, Vector3.up, 0.04f, 0.017f, 0.006f, yellow2);
+                        bx.Cylinder(new Vector3(0.082f, 0.07f, 0), new Vector3(0.11f, 0.07f, 0), 0.006f, 0.006f, yellow2, 8);   // 태엽 손잡이
+                        bx.Box(new Vector3(0.115f, 0.085f, 0), new Vector3(0.008f, 0.04f, 0.012f), yellow2);
+                        var lidB = new AcPB(); lidB.Box(new Vector3(0.08f, 0.006f, 0), new Vector3(0.165f, 0.012f, 0.165f), red2);
+                        var lidGo = ProcObj("jlid", lidB.M("jlid"), root.transform); lidGo.transform.localPosition = new Vector3(-0.08f, 0.14f, 0); lidGo.transform.localRotation = Quaternion.Euler(0, 0, 115);
+                    }
+                    else if (id == "p_snakecan")
+                    {   // 땅콩 캔 (상표 띠) + 옆으로 날아간 뚜껑
+                        bx.Cylinder(Vector3.zero, new Vector3(0, 0.15f, 0), 0.07f, 0.07f, new Color(0.85f, 0.86f, 0.9f), 20);
+                        bx.Cylinder(new Vector3(0, 0.03f, 0), new Vector3(0, 0.12f, 0), 0.0715f, 0.0715f, new Color(0.95f, 0.75f, 0.2f), 20, false);
+                        for (int k = 0; k < 5; k++) { float aa = -0.5f + k * 0.25f; bx.Ellipsoid(new Vector3(Mathf.Sin(aa) * 0.072f, 0.075f + (k % 2) * 0.012f, Mathf.Cos(aa) * 0.072f), new Vector3(0.012f, 0.008f, 0.004f), new Color(0.6f, 0.38f, 0.2f), 4, 6, Quaternion.Euler(0, aa * 57f, 25)); }
+                        bx.Disk(new Vector3(0, 0.149f, 0), Vector3.up, 0.065f, new Color(0.2f, 0.18f, 0.2f), 18, false);
+                        var lidB = new AcPB(); lidB.Cylinder(Vector3.zero, new Vector3(0, 0.012f, 0), 0.073f, 0.073f, new Color(0.9f, 0.9f, 0.95f), 20);
+                        var lidGo = ProcObj("jlid", lidB.M("jlid"), root.transform); lidGo.transform.localPosition = new Vector3(0.12f, 0.02f, 0.05f); lidGo.transform.localRotation = Quaternion.Euler(10, 0, 70);
                     }
                     else
-                    {
-                        bx.Cylinder(Vector3.zero, new Vector3(0, 0.12f, 0), 0.07f, 0.09f, new Color(0.9f, 0.5f, 0.3f), 14);
-                        bx.Disk(new Vector3(0, 0.118f, 0), Vector3.up, 0.085f, new Color(0.35f, 0.25f, 0.18f), 14, false);
+                    {   // 물총 꽃: 화분
+                        bx.Cylinder(Vector3.zero, new Vector3(0, 0.12f, 0), 0.07f, 0.09f, new Color(0.9f, 0.5f, 0.3f), 16);
+                        bx.Torus(new Vector3(0, 0.12f, 0), Vector3.up, 0.09f, 0.012f, new Color(0.95f, 0.58f, 0.36f), 18, 6);
+                        bx.Disk(new Vector3(0, 0.118f, 0), Vector3.up, 0.085f, new Color(0.35f, 0.25f, 0.18f), 16, false);
                     }
                     Part("base", bx, Vector3.zero);
-                    // 용수철 (높이 0.2, 아래가 원점)
-                    var sp = new AcPB(); var pts = new List<Vector3>(); var rs = new List<float>();
-                    for (int i = 0; i <= 80; i++) { float a = i / 80f * Mathf.PI * 2 * 6; pts.Add(new Vector3(Mathf.Cos(a) * 0.035f, i / 80f * 0.2f, Mathf.Sin(a) * 0.035f)); rs.Add(0.006f); }
-                    sp.Tube(pts, rs, jack ? new Color(0.85f, 0.85f, 0.9f) : new Color(0.35f, 0.65f, 0.35f), 5);
-                    var spGo = ProcObj("spring", sp.M("spring"), root.transform); spGo.transform.localPosition = new Vector3(0, jack ? 0.12f : 0.11f, 0);
+                    // 늘어나는 부분 (높이 0.2, 아래가 원점): 상자 = 용수철, 캔 = 줄무늬 뱀 몸통, 꽃 = 꽃대
+                    var sp = new AcPB(); var pts = new List<Vector3>(); var rs = new List<float>(); var cs2 = new List<Color>();
+                    if (id == "p_jack")
+                        for (int i = 0; i <= 80; i++) { float aa = i / 80f * Mathf.PI * 2 * 6; pts.Add(new Vector3(Mathf.Cos(aa) * 0.035f, i / 80f * 0.2f, Mathf.Sin(aa) * 0.035f)); rs.Add(0.006f); cs2.Add(new Color(0.85f, 0.85f, 0.9f)); }
+                    else if (id == "p_snakecan")
+                        for (int i = 0; i <= 60; i++) { float u = i / 60f, aa = u * Mathf.PI * 2 * 2.5f; pts.Add(new Vector3(Mathf.Cos(aa) * 0.022f * (1 - u * 0.5f), u * 0.2f, Mathf.Sin(aa) * 0.022f * (1 - u * 0.5f))); rs.Add(0.03f - u * 0.006f); cs2.Add((i / 4) % 2 == 0 ? new Color(0.35f, 0.75f, 0.35f) : yellow2); }
+                    else
+                        for (int i = 0; i <= 20; i++) { float u = i / 20f; pts.Add(new Vector3(Mathf.Sin(u * 3f) * 0.01f, u * 0.2f, 0)); rs.Add(0.008f); cs2.Add(new Color(0.35f, 0.65f, 0.35f)); }
+                    sp.Tube(pts, rs, Color.white, id == "p_snakecan" ? 10 : 5, cs2);
+                    if (id == "p_popflower") sp.Leaf(new Vector3(0, 0.08f, 0), new Vector3(1, 0.5f, 0.2f), Vector3.forward, 0.07f, 0.035f, new Color(0.35f, 0.65f, 0.35f), new Color(0.5f, 0.75f, 0.4f), 0.15f);
+                    var spGo = ProcObj("spring", sp.M("spring"), root.transform); spGo.transform.localPosition = new Vector3(0, baseY, 0);
                     var hd = new AcPB();
-                    if (jack)
-                    {
-                        hd.Sphere(new Vector3(0, 0.07f, 0), 0.075f, new Color(1f, 0.88f, 0.78f), 10, 14);
-                        Face2(hd, new Vector3(0, 0.07f, 0.072f), 0.06f, 0.42f);
-                        hd.Sphere(new Vector3(0, 0.065f, 0.08f), 0.016f, new Color(0.95f, 0.2f, 0.25f), 5, 6);
-                        hd.Cylinder(new Vector3(0, 0.13f, 0), new Vector3(0.02f, 0.23f, 0), 0.06f, 0.003f, new Color(0.95f, 0.3f, 0.4f), 12);
-                        hd.Sphere(new Vector3(0.02f, 0.235f, 0), 0.018f, new Color(1f, 0.85f, 0.3f), 5, 6);
-                        hd.Torus(new Vector3(0, 0.005f, 0), Vector3.up, 0.04f, 0.018f, Color.white, 14, 6);   // 목 주름
+                    if (id == "p_jack")
+                    {   // 빨간 권투 장갑 (앞으로 주먹)
+                        hd.Ellipsoid(new Vector3(0, 0.06f, 0.02f), new Vector3(0.068f, 0.06f, 0.075f), red2, 12, 16, null, null, 0.8f);
+                        hd.Ellipsoid(new Vector3(0.055f, 0.045f, 0.035f), new Vector3(0.025f, 0.032f, 0.03f), red2 * 0.95f, 8, 10, Quaternion.Euler(0, 0, -25));   // 엄지
+                        hd.Cylinder(new Vector3(0, -0.005f, 0), new Vector3(0, 0.02f, 0), 0.045f, 0.05f, Color.white, 16);   // 손목
+                        hd.Torus(new Vector3(0, 0.02f, 0), Vector3.up, 0.048f, 0.008f, Color.white, 16, 5);
+                        hd.Ellipsoid(new Vector3(-0.025f, 0.09f, 0.07f), new Vector3(0.012f, 0.008f, 0.004f), Color.white * 0.98f, 4, 6);   // 반짝
+                        GEye(hd, new Vector3(-0.022f, 0.075f, 0.085f), 0.016f); GEye(hd, new Vector3(0.022f, 0.075f, 0.085f), 0.016f);
+                        hd.Tube(new[] { new Vector3(-0.02f, 0.045f, 0.093f), new Vector3(0, 0.038f, 0.096f), new Vector3(0.02f, 0.045f, 0.093f) }, new[] { 0.004f, 0.004f, 0.004f }, black, 5);
+                    }
+                    else if (id == "p_snakecan")
+                    {   // 뱀 머리: 왕눈이 + 갈라진 혀
+                        var g = new Color(0.35f, 0.75f, 0.35f);
+                        hd.Ellipsoid(new Vector3(0, 0.035f, 0.015f), new Vector3(0.04f, 0.032f, 0.05f), g, 10, 14);
+                        GEye(hd, new Vector3(-0.02f, 0.065f, 0.03f), 0.016f, 0.1f); GEye(hd, new Vector3(0.02f, 0.065f, 0.03f), 0.016f, 0.1f);
+                        hd.Tube(new[] { new Vector3(0, 0.025f, 0.06f), new Vector3(0, 0.02f, 0.085f) }, new[] { 0.004f, 0.004f }, red2, 5);
+                        hd.Tube(new[] { new Vector3(0, 0.02f, 0.085f), new Vector3(-0.01f, 0.018f, 0.1f) }, new[] { 0.003f, 0.002f }, red2, 4);
+                        hd.Tube(new[] { new Vector3(0, 0.02f, 0.085f), new Vector3(0.01f, 0.018f, 0.1f) }, new[] { 0.003f, 0.002f }, red2, 4);
+                        hd.Ellipsoid(new Vector3(-0.025f, 0.02f, 0.045f), new Vector3(0.008f, 0.005f, 0.003f), new Color(1f, 0.6f, 0.65f), 3, 5);
+                        hd.Ellipsoid(new Vector3(0.025f, 0.02f, 0.045f), new Vector3(0.008f, 0.005f, 0.003f), new Color(1f, 0.6f, 0.65f), 3, 5);
                     }
                     else
-                    {
+                    {   // 물총 꽃: 가운데에 작은 물총 구멍
                         Color petal = new Color(1f, 0.55f, 0.7f);
-                        for (int p = 0; p < 8; p++) { float pa = p * Mathf.PI / 4; var pd = new Vector3(Mathf.Cos(pa), Mathf.Sin(pa), 0.15f); hd.Leaf(new Vector3(0, 0.07f, 0), pd, Vector3.forward, 0.08f, 0.055f, petal, Color.Lerp(petal, Color.white, 0.4f), 0.05f, 3, 4); }
-                        hd.Ellipsoid(new Vector3(0, 0.07f, 0.01f), new Vector3(0.05f, 0.05f, 0.025f), new Color(1f, 0.85f, 0.3f), 8, 12);
+                        for (int pp = 0; pp < 8; pp++) { float pa = pp * Mathf.PI / 4; var pd = new Vector3(Mathf.Cos(pa), Mathf.Sin(pa), 0.15f); hd.Leaf(new Vector3(0, 0.07f, 0), pd, Vector3.forward, 0.08f, 0.055f, petal, Color.Lerp(petal, Color.white, 0.4f), 0.05f, 3, 6); }
+                        hd.Ellipsoid(new Vector3(0, 0.07f, 0.01f), new Vector3(0.05f, 0.05f, 0.025f), yellow2, 10, 14);
                         Face2(hd, new Vector3(0, 0.07f, 0.034f), 0.045f, 0.4f);
-                        hd.Leaf(new Vector3(0, -0.04f, 0), new Vector3(1, 0.4f, 0), Vector3.forward, 0.07f, 0.035f, new Color(0.35f, 0.65f, 0.35f), new Color(0.5f, 0.75f, 0.4f), 0.15f);
+                        hd.Cylinder(new Vector3(0, 0.055f, 0.032f), new Vector3(0, 0.055f, 0.042f), 0.007f, 0.005f, new Color(0.3f, 0.6f, 0.95f), 8);
                     }
-                    var hdGo = ProcObj("head", hd.M("head"), root.transform); hdGo.transform.localPosition = new Vector3(0, (jack ? 0.12f : 0.11f) + 0.2f, 0);
+                    var hdGo = ProcObj("head", hd.M("head"), root.transform); hdGo.transform.localPosition = new Vector3(0, baseY + 0.2f, 0);
+                    break;
+                }
+            case "p_chicken":
+                {   // 꽥꽥 고무 닭: 노란 몸 + 긴 목(머리째 늘어남) + 쩍 벌린 부리
+                    var yl = new Color(1f, 0.84f, 0.25f);
+                    b.Ellipsoid(new Vector3(0, 0.1f, -0.02f), new Vector3(0.085f, 0.075f, 0.12f), yl, 12, 16, null, null, 0.8f);
+                    b.Leaf(new Vector3(0, 0.12f, -0.12f), new Vector3(0, 0.6f, -1), Vector3.right, 0.06f, 0.06f, yl, yl * 1.05f, 0.2f, 0, 5);   // 꼬리
+                    b.Ellipsoid(new Vector3(-0.08f, 0.1f, -0.02f), new Vector3(0.015f, 0.04f, 0.07f), yl * 0.95f, 6, 8);
+                    b.Ellipsoid(new Vector3(0.08f, 0.1f, -0.02f), new Vector3(0.015f, 0.04f, 0.07f), yl * 0.95f, 6, 8);
+                    foreach (float sx in new[] { -0.035f, 0.035f })
+                    {   // 축 늘어진 다리
+                        b.Tube(new[] { new Vector3(sx, 0.04f, 0), new Vector3(sx, 0.015f, 0.01f), new Vector3(sx, 0.006f, 0.03f) }, new[] { 0.007f, 0.006f, 0.006f }, orange, 6);
+                        for (int k = -1; k <= 1; k++) b.Ellipsoid(new Vector3(sx + k * 0.01f, 0.004f, 0.045f), new Vector3(0.006f, 0.004f, 0.016f), orange, 3, 5, Quaternion.Euler(0, k * 25f, 0));
+                    }
+                    Part("body", b, Vector3.zero);
+                    var nk = new AcPB();
+                    nk.Tube(new[] { new Vector3(0, 0, 0), new Vector3(0, 0.08f, 0.015f), new Vector3(0, 0.16f, 0.03f) }, new[] { 0.028f, 0.022f, 0.022f }, yl, 10);
+                    nk.Sphere(new Vector3(0, 0.18f, 0.035f), 0.045f, yl, 10, 14);
+                    for (int k = 0; k < 3; k++) nk.Sphere(new Vector3(0, 0.225f + k * 0.006f, 0.01f + k * 0.018f), 0.016f, red2, 5, 7);   // 볏
+                    nk.Cylinder(new Vector3(0, 0.185f, 0.07f), new Vector3(0, 0.19f, 0.12f), 0.02f, 0.003f, orange, 8);     // 윗부리
+                    nk.Cylinder(new Vector3(0, 0.168f, 0.07f), new Vector3(0, 0.145f, 0.11f), 0.016f, 0.003f, orange, 8);   // 아랫부리 (벌림)
+                    nk.Ellipsoid(new Vector3(0, 0.168f, 0.075f), new Vector3(0.012f, 0.01f, 0.008f), red2 * 0.8f, 4, 6);   // 입 속
+                    GEye(nk, new Vector3(-0.024f, 0.2f, 0.065f), 0.017f, 0.5f); GEye(nk, new Vector3(0.024f, 0.2f, 0.065f), 0.017f, 0.5f);
+                    var nkGo = ProcObj("head", nk.M("head"), root.transform); nkGo.transform.localPosition = new Vector3(0, 0.15f, 0.07f);
+                    break;
+                }
+            case "p_whoopee":
+                {   // 뿡뿡 방귀 쿠션: 납작한 분홍 고무 + 주둥이
+                    var pk = new Color(1f, 0.55f, 0.65f);
+                    var cu = new AcPB();
+                    cu.Ellipsoid(new Vector3(0, 0.05f, 0), new Vector3(0.14f, 0.05f, 0.12f), pk, 12, 18, null, u => Color.Lerp(pk, Color.white, Mathf.Max(0, u.y - 0.6f) * 0.8f), 0.75f);
+                    cu.Torus(new Vector3(0, 0.05f, 0), Vector3.up, 0.13f, 0.006f, pk * 0.9f, 28, 5);
+                    cu.Ellipsoid(new Vector3(-0.04f, 0.095f, 0.03f), new Vector3(0.03f, 0.006f, 0.015f), Color.white, 4, 6);   // 반짝
+                    GEye(cu, new Vector3(-0.035f, 0.09f, 0.07f), 0.016f); GEye(cu, new Vector3(0.035f, 0.09f, 0.07f), 0.016f);
+                    cu.Tube(new[] { new Vector3(-0.02f, 0.07f, 0.105f), new Vector3(0, 0.064f, 0.11f), new Vector3(0.02f, 0.07f, 0.105f) }, new[] { 0.004f, 0.004f, 0.004f }, black, 5);
+                    var cuGo = ProcObj("cush", cu.M("cush"), root.transform);
+                    var nz = new AcPB();
+                    nz.Tube(new[] { new Vector3(0, 0.03f, -0.11f), new Vector3(0, 0.025f, -0.15f), new Vector3(0, 0.03f, -0.18f) }, new[] { 0.025f, 0.02f, 0.024f }, pk * 0.95f, 12);
+                    nz.Torus(new Vector3(0, 0.03f, -0.18f), Vector3.forward, 0.022f, 0.005f, pk * 0.9f, 12, 5);
+                    Part("nozzle", nz, Vector3.zero);
+                    break;
+                }
+            case "p_teeth":
+                {   // 딱딱 태엽 이빨: 아래턱(발 달림) + 위턱(움직임) + 태엽
+                    var gum = new Color(1f, 0.45f, 0.55f);
+                    b.Ellipsoid(new Vector3(0, 0.03f, 0), new Vector3(0.08f, 0.03f, 0.065f), gum, 10, 16);
+                    for (int k = 0; k < 7; k++) { float aa = (k - 3) * 0.32f; b.Box(new Vector3(Mathf.Sin(aa) * 0.06f, 0.062f, Mathf.Cos(aa) * 0.048f), new Vector3(0.018f, 0.022f, 0.012f), Color.white, Quaternion.Euler(0, aa * 57f, 0)); }
+                    foreach (float sx in new[] { -0.04f, 0.04f }) b.Ellipsoid(new Vector3(sx, 0.006f, 0.02f), new Vector3(0.022f, 0.008f, 0.032f), orange, 5, 8);   // 발
+                    Part("lower", b, Vector3.zero);
+                    var up2 = new AcPB();
+                    up2.Ellipsoid(new Vector3(0, 0.03f, 0.04f), new Vector3(0.082f, 0.03f, 0.066f), gum, 10, 16);
+                    for (int k = 0; k < 7; k++) { float aa = (k - 3) * 0.32f; up2.Box(new Vector3(Mathf.Sin(aa) * 0.06f, -0.002f, 0.04f + Mathf.Cos(aa) * 0.048f), new Vector3(0.018f, 0.022f, 0.012f), Color.white, Quaternion.Euler(0, aa * 57f, 0)); }
+                    GEye(up2, new Vector3(-0.03f, 0.065f, 0.06f), 0.017f); GEye(up2, new Vector3(0.03f, 0.065f, 0.06f), 0.017f);
+                    var jaw = ProcObj("jaw", up2.M("jaw"), root.transform); jaw.transform.localPosition = new Vector3(0, 0.065f, -0.04f);   // 뒤쪽 경첩
+                    var ky = new AcPB();
+                    ky.Cylinder(Vector3.zero, new Vector3(0, 0, -0.03f), 0.005f, 0.005f, yellow2, 8);
+                    ky.Torus(new Vector3(0.015f, 0, -0.035f), Vector3.forward, 0.012f, 0.004f, yellow2, 12, 5);
+                    ky.Torus(new Vector3(-0.015f, 0, -0.035f), Vector3.forward, 0.012f, 0.004f, yellow2, 12, 5);
+                    var key = ProcObj("key", ky.M("key"), root.transform, 0.15f); key.transform.localPosition = new Vector3(0, 0.035f, -0.065f);
+                    break;
+                }
+            case "p_spider":
+                {   // 대롱대롱 거미: 지팡이 사탕 걸이 + 실 + 털복숭이 거미
+                    var stand = new AcPB();
+                    stand.Cylinder(Vector3.zero, new Vector3(0, 0.012f, 0), 0.07f, 0.07f, new Color(0.55f, 0.36f, 0.25f), 18);
+                    var cp = new List<Vector3>(); var cr = new List<float>(); var cc = new List<Color>();
+                    for (int i = 0; i <= 30; i++) { float u = i / 30f; Vector3 pnt = u < 0.7f ? new Vector3(-0.05f, 0.012f + u / 0.7f * 0.42f, 0) : new Vector3(-0.05f + 0.05f * (1 - Mathf.Cos((u - 0.7f) / 0.3f * Mathf.PI)), 0.432f + 0.05f * Mathf.Sin((u - 0.7f) / 0.3f * Mathf.PI), 0); cp.Add(pnt); cr.Add(0.01f); cc.Add((i / 2) % 2 == 0 ? red2 : Color.white); }
+                    stand.Tube(cp, cr, Color.white, 8, cc);
+                    Part("stand", stand, Vector3.zero);
+                    var th = new AcPB(); th.Cylinder(Vector3.zero, new Vector3(0, -0.2f, 0), 0.0015f, 0.0015f, new Color(0.95f, 0.95f, 1f), 4, false);
+                    var thGo = ProcObj("thread", th.M("thread"), root.transform); thGo.transform.localPosition = new Vector3(0.05f, 0.43f, 0);
+                    var spd = new AcPB(); var fur = new Color(0.18f, 0.16f, 0.22f);
+                    spd.Ellipsoid(new Vector3(0, -0.05f, 0), new Vector3(0.05f, 0.045f, 0.05f), fur, 12, 16);
+                    spd.Ellipsoid(new Vector3(0, -0.01f, 0.01f), new Vector3(0.006f, 0.012f, 0.006f), fur, 4, 5);
+                    GEye(spd, new Vector3(-0.02f, -0.04f, 0.042f), 0.017f); GEye(spd, new Vector3(0.02f, -0.04f, 0.042f), 0.017f);
+                    spd.Tube(new[] { new Vector3(-0.015f, -0.068f, 0.045f), new Vector3(0, -0.075f, 0.047f), new Vector3(0.015f, -0.068f, 0.045f) }, new[] { 0.003f, 0.003f, 0.003f }, new Color(1f, 0.5f, 0.6f), 5);
+                    spd.Ellipsoid(new Vector3(0, -0.02f, 0.03f), new Vector3(0.025f, 0.006f, 0.006f), red2, 4, 6);   // 작은 리본
+                    for (int k = 0; k < 8; k++)
+                    {
+                        float sx = k < 4 ? -1 : 1, a2 = (k % 4 - 1.5f) * 0.45f;
+                        var p0 = new Vector3(sx * 0.04f, -0.05f, Mathf.Sin(a2) * 0.03f);
+                        var p1 = p0 + new Vector3(sx * 0.04f, 0.03f, Mathf.Sin(a2) * 0.03f);
+                        var p2 = p1 + new Vector3(sx * 0.03f, -0.06f, Mathf.Sin(a2) * 0.02f);
+                        spd.Tube(new[] { p0, p1, p2 }, new[] { 0.006f, 0.005f, 0.004f }, fur, 5);
+                    }
+                    var spGo2 = ProcObj("spider", spd.M("spider"), root.transform); spGo2.transform.localPosition = new Vector3(0.05f, 0.23f, 0);
+                    break;
+                }
+            case "p_glasses":
+                {   // 콧수염 변장 안경: 까만 테 + 큰 코 + 덥수룩 콧수염 + 눈썹
+                    var fr = new Color(0.12f, 0.12f, 0.15f), skin = new Color(1f, 0.75f, 0.65f);
+                    foreach (float sx in new[] { -0.045f, 0.045f }) { b.Torus(new Vector3(sx, 0.1f, 0), Vector3.forward, 0.035f, 0.007f, fr, 20, 6); b.Disk(new Vector3(sx, 0.1f, -0.002f), Vector3.forward, 0.032f, new Color(0.85f, 0.95f, 1f), 18); }
+                    b.Tube(new[] { new Vector3(-0.012f, 0.105f, 0), new Vector3(0, 0.11f, 0), new Vector3(0.012f, 0.105f, 0) }, new[] { 0.005f, 0.005f, 0.005f }, fr, 5);
+                    foreach (float sx in new[] { -1f, 1f }) b.Tube(new[] { new Vector3(sx * 0.08f, 0.1f, 0), new Vector3(sx * 0.085f, 0.1f, -0.08f), new Vector3(sx * 0.08f, 0.085f, -0.1f) }, new[] { 0.004f, 0.004f, 0.004f }, fr, 5);
+                    b.Ellipsoid(new Vector3(0, 0.075f, 0.025f), new Vector3(0.022f, 0.03f, 0.028f), skin, 10, 12);
+                    b.Sphere(new Vector3(0, 0.055f, 0.04f), 0.022f, skin, 10, 12);
+                    foreach (float sx in new[] { -0.045f, 0.045f }) b.Ellipsoid(new Vector3(sx, 0.148f, 0.004f), new Vector3(0.03f, 0.008f, 0.008f), fr, 6, 8, Quaternion.Euler(0, 0, sx > 0 ? -10 : 10));
+                    Part("frame", b, Vector3.zero);
+                    var ms = new AcPB();
+                    foreach (float sx in new[] { -1f, 1f }) ms.Tube(new[] { new Vector3(0, 0, 0), new Vector3(sx * 0.025f, -0.006f, 0.005f), new Vector3(sx * 0.05f, 0.002f, 0), new Vector3(sx * 0.062f, 0.015f, -0.005f) }, new[] { 0.012f, 0.012f, 0.008f, 0.003f }, new Color(0.3f, 0.2f, 0.15f), 8);
+                    var msGo = ProcObj("stache", ms.M("stache"), root.transform); msGo.transform.localPosition = new Vector3(0, 0.03f, 0.045f);
                     break;
                 }
             case "p_cupcake":
@@ -609,6 +759,8 @@ public partial class AcRoom
         return root;
     }
 
+    static float BoingBase(string id) => id == "p_jack" ? 0.12f : id == "p_snakecan" ? 0.13f : 0.11f;   // 늘어나는 부분이 시작하는 높이
+
     // 내용물 움직이기 (holder: 맞춘 크기 물체, 원점 바닥 가운데)
     void AnimItem(GameObject holder, GiftItem def, float t, Vector3 basePos, float baseYaw)
     {
@@ -640,14 +792,98 @@ public partial class AcRoom
                 }
             case "boing":
                 {
-                    float p = Mathf.Repeat(t, 2.6f);
-                    float k = 1 + 0.45f * Mathf.Sin(p * 11f) * Mathf.Exp(-p * 2.2f);
+                    // 쏙 들어갔다가(0~0.5초) 튀어나와 띠요옹
+                    float p = Mathf.Repeat(t, 3f);
+                    float k = p < 0.5f ? Mathf.Lerp(1f, 0.15f, Mathf.SmoothStep(0, 1, p / 0.5f)) : 1 + 0.5f * Mathf.Sin((p - 0.5f) * 12f) * Mathf.Exp(-(p - 0.5f) * 2.4f);
+                    float bb = BoingBase(def.id);
                     foreach (Transform c in holder.GetComponentsInChildren<Transform>())
                     {
-                        if (c.name == "spring") c.localScale = new Vector3(1, k, 1);
-                        if (c.name == "head") { c.localPosition = new Vector3(0, (def.id == "p_jack" ? 0.12f : 0.11f) + 0.2f * k, 0); c.localRotation = Quaternion.Euler(0, 0, 10f * Mathf.Sin(p * 9f) * Mathf.Exp(-p * 2f)); }
+                        if (c.name == "spring") c.localScale = new Vector3(1, Mathf.Max(0.05f, k), 1);
+                        if (c.name == "head")
+                        {
+                            float wob = p > 0.5f ? Mathf.Sin((p - 0.5f) * 9f) * Mathf.Exp(-(p - 0.5f) * 2f) : 0;
+                            c.localPosition = new Vector3(0, bb + 0.2f * k, def.id == "p_jack" ? 0.04f * Mathf.Max(0, k - 1) * 3f : 0);
+                            c.localRotation = def.id == "p_jack" ? Quaternion.Euler(-25f * wob, 0, 8f * wob) : Quaternion.Euler(0, 15f * wob, 14f * wob);
+                        }
                     }
-                    if (p < Time.deltaTime * 1.2f && giftMode != GiftMode.None) Sfx("boing", 0.4f);
+                    if (p >= 0.5f && p - Time.deltaTime < 0.5f && giftMode != GiftMode.None) Sfx(def.id == "p_jack" ? "punch" : def.id == "p_snakecan" ? "pop" : "boing", 0.45f);
+                    break;
+                }
+            case "squirt":
+                {   // 물총 꽃: 고개를 까딱하다가 찍! 물 뿜기
+                    float p = Mathf.Repeat(t, 2.4f);
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                        if (c.name == "head")
+                        {
+                            float nod = p < 1.2f ? Mathf.Sin(p * 6f) * 8f : -18f * Mathf.Exp(-(p - 1.2f) * 4f);
+                            c.localRotation = Quaternion.Euler(nod, 0, 6f * Mathf.Sin(t * 2f));
+                            if (p >= 1.2f && p - Time.deltaTime < 1.2f && giftMode != GiftMode.None)
+                            {
+                                Sfx("squirt", 0.45f);
+                                var fwd = c.forward; var at = c.TransformPoint(new Vector3(0, 0.055f, 0.045f));
+                                for (int i = 0; i < 14; i++) FxOne("drop", at, (fwd * 1.6f + Vector3.up * 0.7f + UnityEngine.Random.insideUnitSphere * 0.25f) * UnityEngine.Random.Range(0.7f, 1.1f), 0.018f, new Color(0.55f, 0.8f, 1f), 0.7f, 5f);
+                            }
+                        }
+                    break;
+                }
+            case "squawk":
+                {   // 고무 닭: 목을 쭉 늘이며 꽥!
+                    float p = Mathf.Repeat(t, 2.2f);
+                    float st = p < 0.15f ? p / 0.15f : p < 0.6f ? 1 + 0.06f * Mathf.Sin(p * 60f) : Mathf.Max(0, 1 - (p - 0.6f) / 0.3f);
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                    {
+                        if (c.name == "head") { c.localScale = new Vector3(1 - 0.12f * st, 1 + 0.55f * st, 1 - 0.12f * st); c.localRotation = Quaternion.Euler(-20f * st, 0, 0); }
+                        if (c.name == "body") c.localScale = new Vector3(1 + 0.12f * st, 1 - 0.18f * st, 1 + 0.06f * st);
+                    }
+                    if (p < Time.deltaTime * 1.2f && giftMode != GiftMode.None) Sfx("squeak", 0.45f, UnityEngine.Random.Range(0.95f, 1.1f));
+                    y = 0.02f * st;
+                    break;
+                }
+            case "puff":
+                {   // 방귀 쿠션: 부풀었다가 뿡! 하고 납작 + 폴짝
+                    float p = Mathf.Repeat(t, 2.8f);
+                    float inf = p < 1.6f ? Mathf.SmoothStep(0.55f, 1.15f, p / 1.6f) : p < 2.0f ? Mathf.Lerp(1.15f, 0.35f, (p - 1.6f) / 0.4f) : Mathf.Lerp(0.35f, 0.55f, (p - 2.0f) / 0.8f);
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                        if (c.name == "cush") c.localScale = new Vector3(1 + (1 - inf) * 0.15f, inf, 1 + (1 - inf) * 0.15f);
+                    if (p >= 1.6f && p < 2.0f) { y = 0.05f * Mathf.Sin((p - 1.6f) / 0.4f * Mathf.PI); rz = 8f * Mathf.Sin(p * 50f); }
+                    if (p >= 1.6f && p - Time.deltaTime < 1.6f && giftMode != GiftMode.None)
+                    {
+                        Sfx("pfft", 0.5f);
+                        var back = tr.TransformPoint(new Vector3(0, 0.03f, -0.2f));
+                        FxBurst("ring", back, 6, 0.6f, 0.03f, new[] { new Color(0.85f, 0.95f, 0.8f), Color.white }, 0.9f, -0.3f, null, -tr.forward);
+                    }
+                    break;
+                }
+            case "chatter":
+                {   // 태엽 이빨: 딱딱거리며 동그랗게 총총
+                    float a = t * 1.1f;
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                    {
+                        if (c.name == "jaw") c.localRotation = Quaternion.Euler(-Mathf.Abs(Mathf.Sin(t * 14f)) * 32f, 0, 0);
+                        if (c.name == "key") c.localRotation = Quaternion.Euler(0, 0, -t * 360f);
+                    }
+                    if (Mathf.Repeat(t, 1.6f) < Time.deltaTime * 1.2f && giftMode != GiftMode.None) Sfx("chatter", 0.4f);
+                    var off = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.12f;
+                    tr.localPosition = basePos + off + Vector3.up * Mathf.Abs(Mathf.Sin(t * 14f)) * 0.012f;
+                    tr.localRotation = Quaternion.Euler(0, -a * Mathf.Rad2Deg, 6f * Mathf.Sin(t * 14f));
+                    tr.localScale = Vector3.one;
+                    return;
+                }
+            case "dangle":
+                {   // 거미: 실을 타고 내려왔다 올라갔다 + 다리 꼼지락
+                    float d = 0.5f + 0.5f * Mathf.Sin(t * 1.6f);
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                    {
+                        if (c.name == "thread") c.localScale = new Vector3(1, 0.3f + 1.0f * d, 1);
+                        if (c.name == "spider") { c.localPosition = new Vector3(0.05f, 0.43f - 0.2f * (0.3f + 1.0f * d) + 0.0f, 0); c.localRotation = Quaternion.Euler(0, 30f * Mathf.Sin(t * 0.9f), 10f * Mathf.Sin(t * 5f)); c.localScale = new Vector3(1 + 0.05f * Mathf.Sin(t * 10f), 1 - 0.05f * Mathf.Sin(t * 10f), 1); }
+                    }
+                    break;
+                }
+            case "wiggle":
+                {   // 변장 안경: 콧수염 씰룩, 안경 들썩
+                    foreach (Transform c in holder.GetComponentsInChildren<Transform>())
+                        if (c.name == "stache") c.localRotation = Quaternion.Euler(0, 0, 12f * Mathf.Sin(t * 9f) * (0.5f + 0.5f * Mathf.Sin(t * 1.3f)));
+                    y = 0.02f * Mathf.Abs(Mathf.Sin(t * 3f)); yaw += 25f * Mathf.Sin(t * 0.8f);
                     break;
                 }
             case "dance":
@@ -740,7 +976,6 @@ public partial class AcRoom
 
     void OpenWrap()
     {
-        if (Held.g.Count >= 3) { Toast("선물은 3개까지 들 수 있어요. 먼저 친구에게 전달해 주세요"); return; }
         var last = PlayerPrefs.GetString("gift_last", "");
         wrapDraft = null;
         if (last != "") try { wrapDraft = JsonUtility.FromJson<GiftData>(last); } catch { }
@@ -785,13 +1020,14 @@ public partial class AcRoom
     {
         var g = JsonUtility.FromJson<GiftData>(JsonUtility.ToJson(wrapDraft));
         g.look = me.look.Encode(); g.from = uiName.Trim();
-        Held.g.Add(g); SaveHeld();
+        bool replaced = Held.g.Count > 0;
+        Held.g.Clear(); Held.g.Add(g); SaveHeld();   // 마지막으로 포장한 하나만 들고 다님
         var keep = JsonUtility.FromJson<GiftData>(JsonUtility.ToJson(wrapDraft)); keep.msg = ""; PlayerPrefs.SetString("gift_last", JsonUtility.ToJson(keep));
         LeaveStudio();
         Emote("cheer");
         Sfx("ta_da", 0.5f);
         FxBurst("star", me.transform.position + Vector3.up * 1.2f, 16, 2f, 0.06f, FxGold, 1.1f, 1.5f);
-        Toast("포장 완료! 친구 가까이 가면 '전달하기'가 생겨요");
+        Toast(replaced ? "새 선물로 바꿔 들었어요! 친구 가까이 가면 '전달하기'가 생겨요" : "포장 완료! 친구 가까이 가면 '전달하기'가 생겨요");
     }
 
     void WrapGUI()
@@ -838,7 +1074,7 @@ public partial class AcRoom
                     var it = GiftItemById(d.item);
                     GUI.Label(new Rect(lx, cy, SW - 60, 26), "<b>" + it.ko + "</b>" + (it.id == "mini_me" ? "  <size=12>(지금 내 모습 그대로)</size>" : ""), sLabel);
                     cy += 28;
-                    GUI.Label(new Rect(lx, cy, SW - 60, 22), "<size=12>끌어서 돌려 보기 · 받는 사람이 상자를 열면 짠! 하고 나와요</size>", sSmall);
+                    GUI.Label(new Rect(lx, cy, SW - 60, 22), "<size=12>끌어서 돌려 보기.  받는 사람이 상자를 열면 짠! 하고 나와요</size>", sSmall);
                     break;
                 }
             case 1:
@@ -908,13 +1144,12 @@ public partial class AcRoom
     {
         var g = HeldGift;
         string key = g == null || GiftBusy || playingGame || candyOpen ? "" : g.paper + g.ribbon + Held.g.Count;
-        if (key == carryKey) return;
+        if (key == carryKey && (key == "" || carryObj)) return;   // 캐릭터를 다시 만들면 손에 든 것도 사라짐 → 다시 쥠
         carryKey = key;
-        if (carryObj) Destroy(carryObj);
+        if (carryObj) { if (me) me.HoldLeft(null, 0); Destroy(carryObj); }
         if (key == "" || me == null) return;
         carryObj = AcCatalog.Spawn("gift_box", me.transform, new Dictionary<string, Color> { { "box", Hex(g.paper) }, { "ribbon", Hex(g.ribbon) } });
-        carryObj.transform.localPosition = new Vector3(0, 0.62f, 0.34f);
-        carryObj.transform.localScale = Vector3.one * 0.42f;
+        me.HoldLeft(carryObj, 0.34f);   // 왼손에 쥠
     }
 
     void GiveGift(Remote r)
@@ -925,7 +1160,7 @@ public partial class AcRoom
                       ",\"to\":" + AcJson.Esc(NameKey(r.net.name)) + ",\"toName\":" + AcJson.Esc(r.net.name) + ",\"ct\":" + Math.Floor(NowMs).ToString("0") +
                       ",\"opened\":false,\"d\":" + AcJson.Esc(JsonUtility.ToJson(g)) + "}";
         net.Put("gifts/" + id, json);
-        Held.g.RemoveAt(0); SaveHeld();
+        Held.g.Clear(); SaveHeld();
         Emote("gift", r.net.id); FaceTo(r.c.transform.position);
         Sfx("candy_collect", 0.5f, 1.1f);
         FxBurst("heart", r.c.transform.position + Vector3.up * 1.4f, 10, 1.5f, 0.07f, new[] { new Color(1f, 0.4f, 0.55f), new Color(1f, 0.65f, 0.75f) }, 1.2f, -0.5f);
@@ -1235,7 +1470,7 @@ public partial class AcRoom
             {
                 var r = new Rect(12, y, IsMobile ? 170 : 160, 30);
                 GUI.Box(R(r), "", sBox);
-                GUI.Label(new Rect(r.x + 10, r.y + 5, r.width - 16, 22), $"<size=12>선물 {Held.g.Count}개 들고 있어요</size>", sSmall);
+                GUI.Label(new Rect(r.x + 10, r.y + 5, r.width - 16, 22), "<size=12>선물을 들고 있어요</size>", sSmall);
             }
         }
     }

@@ -35,6 +35,21 @@ public partial class AcRoom
         Application.targetFrameRate = 30;
     }
 
+    // 가까이서 크게 보는 화면(선물 포장·풀기, 화분 보기, 눈사람 만들기/보기)에서는 잠깐 선명하게:
+    // 원래 해상도 + 계단 현상 줄이기(MSAA) + 짧은 그림자 거리(그림자가 촘촘해짐)
+    bool closeQ, closeBaseSet; float baseRenderScale = 1f, baseShadowDist = 45f; int baseMsaa = 1;
+    void UpdateCloseupQuality()
+    {
+        bool want = giftMode != GiftMode.None || plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null;
+        if (want == closeQ) return;
+        var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        if (urp == null) return;
+        if (!closeBaseSet || !closeQ) { baseRenderScale = urp.renderScale; baseShadowDist = urp.shadowDistance; baseMsaa = urp.msaaSampleCount; closeBaseSet = true; }
+        closeQ = want;
+        if (want) { urp.renderScale = 1f; urp.shadowDistance = 9f; urp.msaaSampleCount = 4; }
+        else { urp.renderScale = baseRenderScale; urp.shadowDistance = baseShadowDist; urp.msaaSampleCount = baseMsaa; }
+    }
+
     // ===== 화면 UI 영역 (그 위를 누르면 이동하지 않음) =====
     readonly List<Rect> uiRects = new List<Rect>();
     Rect R(Rect r) { uiRects.Add(r); return r; }
@@ -245,16 +260,19 @@ public partial class AcRoom
         }
     }
 
+    GUIStyle sBtnTalk, sBtnDeco;
     // ===== 화면 버튼 (말하기/인사/하트/만세/꾸미기) =====
     void ActionButtons()
     {
-        float gap = 6, bw = Mathf.Min(IsMobile ? 70 : 62, (SW - 30) / 5f - gap), bh = IsMobile ? 46 : 36;
+        float gap = 6, sep = 8, bw = Mathf.Min(IsMobile ? 70 : 62, (SW - 30 - sep) / 5f - gap), bh = IsMobile ? 46 : 36;
         string[] labels = { "말하기", "인사", "하트", "만세", "꾸미기" };
-        float x = SW - (bw + gap) * labels.Length - 10, y = SH - bh - 12;
-        R(new Rect(x - 4, y - 4, (bw + gap) * labels.Length + 2, bh + 8));   // 뒤 판 없이 버튼만 (터치 영역은 그대로 등록)
+        float x = SW - (bw + gap) * labels.Length - sep - 10, y = SH - bh - 12;
+        R(new Rect(x - 4, y - 4, (bw + gap) * labels.Length + sep + 2, bh + 8));   // 뒤 판 없이 버튼만 (터치 영역은 그대로 등록)
+        if (sBtnTalk == null) { sBtnTalk = AcUiTheme.TintButton(sBtn, sBtn.fontSize, new Color(1f, 0.82f, 0.86f)); sBtnDeco = AcUiTheme.TintButton(sBtn, sBtn.fontSize, new Color(0.72f, 0.9f, 0.84f)); }
         for (int i = 0; i < labels.Length; i++)
         {
-            if (GUI.Button(new Rect(x + i * (bw + gap), y, bw, bh), labels[i], sBtn))
+            // 말·몸짓(앞 4개)은 연분홍, 꾸미기는 연민트에 조금 떨어뜨려 둠
+            if (GUI.Button(new Rect(x + i * (bw + gap) + (i == 4 ? sep : 0), y, bw, bh), labels[i], i == 4 ? sBtnDeco : sBtnTalk))
             {
                 switch (i)
                 {
