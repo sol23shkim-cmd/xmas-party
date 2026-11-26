@@ -635,10 +635,13 @@ public partial class AcRoom : MonoBehaviour
     readonly Dictionary<string, float> recentLeft = new Dictionary<string, float>();   // 이름 → 나간 시각 (금방 다시 들어오면 알림 안 띄움)
 
     // 다른 참가자
+    float remotesSince = -1;
     void UpdateRemotes(float dt)
     {
         if (net == null) return;
         var peers = net.Peers();
+        if (remotesSince < 0 && net.ServerNow > 0) remotesSince = Time.time;
+        bool quiet = remotesSince < 0 || Time.time - remotesSince < 4f;   // 처음 들어왔을 때 이미 있던 사람은 알리지 않음
         var alive = new HashSet<string>();
         foreach (var n in peers)
         {
@@ -651,7 +654,7 @@ public partial class AcRoom : MonoBehaviour
                 r.c.transform.position = r.target; r.c.name = "Peer " + n.name;
                 remotes[n.id] = r;
                 // 들어옴 알림: 잠깐 끊겼다 다시 들어온 경우(5분 안)는 조용히. 대화 기록에는 넣지 않음
-                if (!(recentLeft.TryGetValue(n.name ?? "", out var lt) && Time.time - lt < 300f)) Toast(n.name + " 님이 들어왔어요");
+                if (!quiet && !(recentLeft.TryGetValue(n.name ?? "", out var lt) && Time.time - lt < 300f)) Toast(n.name + " 님이 들어왔어요");
                 if (npcs.Count > 0) foreach (var c in npcs) c.gameObject.SetActive(false);
             }
             if (r.look != n.look) { r.look = n.look; r.c.Rebuild(AcLook.Decode(n.look)); }

@@ -201,12 +201,14 @@ public class AcFirebase : MonoBehaviour
 
     // ===== 다른 참가자 =====
     readonly Dictionary<string, (long seq, float at)> seen = new Dictionary<string, (long, float)>();
+    readonly HashSet<string> swept = new HashSet<string>();
     public List<AcNet> Peers()
     {
         var list = new List<AcNet>();
         var ps = Node("players");
         if (ps == null) return list;
         double now = ServerNow;
+        if (now <= 0) return list;   // 서버 시각을 아직 모르면 오래된 기록과 구분 못 함 → 잠깐 기다림
         foreach (var kv in ps)
         {
             if (kv.Key == myId) { continue; }
@@ -219,7 +221,12 @@ public class AcFirebase : MonoBehaviour
                 decorating = AcJson.B(d, "decorating"), skate = AcJson.B(d, "skate"), act = AcJson.S(d, "act"), seq = (long)AcJson.D(d, "seq"), t = AcJson.D(d, "t"),
             };
             // 오래 안 바뀐 기록(꺼진 사람)은 빼기
-            if (now > 0 && n.t > 0 && now - n.t > 30000) continue;   // 휴대폰이 잠깐 화면을 끄거나 다른 앱에 가도 바로 나간 걸로 보지 않게 (11-25: 10초 → 30초)
+            if (n.t <= 0 || now - n.t > 30000)
+            {   // 창을 그냥 닫아서 남은 기록: 10분 넘게 멈춰 있으면 지워 둠 (다시 오면 새로 씀)
+                if (!Offline && (n.t <= 0 || now - n.t > 600000) && swept.Add(n.id))
+                    StartCoroutine(Send("DELETE", Base + "/players/" + UnityWebRequest.EscapeURL(n.id) + ".json", null));
+                continue;
+            }   // 휴대폰이 잠깐 화면을 끄거나 다른 앱에 가도 바로 나간 걸로 보지 않게 (11-25: 10초 → 30초)
             if (!seen.TryGetValue(n.id, out var s) || s.seq != n.seq) seen[n.id] = (n.seq, Time.unscaledTime);
             else if (Time.unscaledTime - s.at > 25f) continue;
             list.Add(n);
