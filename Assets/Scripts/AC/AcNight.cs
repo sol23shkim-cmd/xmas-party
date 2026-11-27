@@ -2,6 +2,8 @@
 // 평소엔 안팎 모두 낮. 트리 전경에서 '야경' 버튼을 누르면 하늘·빛이 밤으로 바뀌고,
 // 트리에 꼬마전구 줄이 감기며 색깔별로 반짝반짝 (창문·벽난로처럼 스스로 빛나는 것도 밤에 더 돋보임)
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using UnityEngine.Rendering;
 using UnityEngine;
 
 public partial class AcRoom
@@ -98,6 +100,53 @@ public partial class AcRoom
             bulbGroups.Add((go.GetComponent<Renderer>(), i * 1.37f, 1.6f + (i % 4) * 0.55f));
         }
         nightBulbs.SetActive(false);
+    }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] static extern void AcWeb_SaveImage(string b64, string name);
+#endif
+    // 트리 전경 사진 저장: 버튼·글씨 없이 지금 보이는 화면 그대로 (낮·야경 모두)
+    bool shotPending; float shotFlash;
+    void OverviewPhoto()
+    {
+        if (!shotPending || cam == null) return;
+        shotPending = false;
+        int W = Screen.width, H = Screen.height; float k = Mathf.Min(1f, 2048f / Mathf.Max(W, H)); W = Mathf.Max(64, (int)(W * k)); H = Mathf.Max(64, (int)(H * k));
+        RenderTexture rt = null; Texture2D tex = null;
+        try
+        {
+            rt = RenderTexture.GetTemporary(W, H, 24, RenderTextureFormat.ARGB32);
+            bool done = false;
+            try
+            {
+                var req = new RenderPipeline.StandardRequest();
+                if (RenderPipeline.SupportsRenderRequest(cam, req)) { req.destination = rt; RenderPipeline.SubmitRenderRequest(cam, req); done = true; }
+            }
+            catch { }
+            if (!done) { cam.targetTexture = rt; cam.Render(); cam.targetTexture = null; }
+            var prev = RenderTexture.active; RenderTexture.active = rt;
+            tex = new Texture2D(W, H, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply();
+            RenderTexture.active = prev;
+            var jpg = tex.EncodeToJPG(92);
+            string name = "크리스마스파티_" + (nightView ? "야경_" : "트리_") + System.DateTime.Now.ToString("MMdd_HHmm") + ".jpg";
+#if UNITY_WEBGL && !UNITY_EDITOR
+            AcWeb_SaveImage(System.Convert.ToBase64String(jpg), name);
+#else
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(Application.persistentDataPath, name), jpg);
+#endif
+            shotFlash = 1f; Sfx("candy_win", 0.35f);
+            Toast(IsMobile ? "사진을 만들었어요! 저장하거나 친구에게 보내 보세요" : "사진을 저장했어요 (내려받기 폴더)");
+        }
+        catch (System.Exception e) { Debug.LogWarning("[OverviewPhoto] " + e.Message); Toast("사진을 만들지 못했어요"); }
+        finally { if (rt) RenderTexture.ReleaseTemporary(rt); if (tex) Destroy(tex); }
+    }
+    void PhotoFlashGUI()
+    {
+        if (shotFlash <= 0f) return;
+        shotFlash = Mathf.Max(0f, shotFlash - Time.unscaledDeltaTime * 2.5f);
+        var old = GUI.color; GUI.color = new Color(1, 1, 1, shotFlash * 0.8f);
+        GUI.DrawTexture(new Rect(0, 0, SW, SH), Texture2D.whiteTexture); GUI.color = old;
     }
 
     // 트리 전경 화면의 '야경 / 낮으로' 버튼

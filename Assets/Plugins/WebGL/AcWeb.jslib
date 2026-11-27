@@ -1,5 +1,24 @@
 // AcWeb.jslib — 웹(휴대폰 브라우저)에서만 쓰는 기능: Firebase 실시간 스트림, 글 입력창, 기기 확인
 mergeInto(LibraryManager.library, {
+  // 사진 저장: 휴대폰은 공유 창(사진첩에 저장·카톡 보내기), 안 되면 파일로 내려받기 (11-28)
+  AcWeb_SaveImage: function (b64Ptr, namePtr) {
+    var b64 = UTF8ToString(b64Ptr), name = UTF8ToString(namePtr);
+    try {
+      var bin = atob(b64), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var blob = new Blob([arr], { type: 'image/jpeg' });
+      var download = function () {
+        var url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click();
+        setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 4000);
+      };
+      var file = null; try { file = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
+      var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (mobile && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: '크리스마스 파티' }).catch(function (e) { if (!e || e.name !== 'AbortError') download(); });
+      } else download();
+    } catch (e) { console.warn('[SaveImage]', e); }
+  },
   AcWeb_Loading: function (p) { try { if (window.xpStage) window.xpStage(p); } catch (e) {} },   // 로딩 화면(index.html)에 진행 알림
   AcWeb_Stream: function (urlPtr, goPtr) {
     var url = UTF8ToString(urlPtr), go = UTF8ToString(goPtr);

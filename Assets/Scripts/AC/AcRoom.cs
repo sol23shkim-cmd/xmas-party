@@ -643,6 +643,7 @@ public partial class AcRoom : MonoBehaviour
         if (building) BuildingUpdate();
         GreenUpdate(dt);
         TreeShotUpdate();
+        OverviewPhoto();
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
         QuestUpdate(dt);
         PetsUpdate(dt);
@@ -1475,14 +1476,17 @@ public partial class AcRoom : MonoBehaviour
         decoButtons = 0;
         float bw = IsMobile ? 150 : 130, bh = IsMobile ? 50 : 42;
         if (!IsMobile) CamPad(SW / 2 - 69, SH - bh - 20 - 58, false);   // 휴대폰은 끌어서 돌리면 되니 버튼 없음
-        // 야경 버튼 + 나가기 버튼을 한 줄로 가운데 정렬 (휴대폰에서 왼쪽 끝이 잘리지 않게)
-        float nw = bw * 0.82f, gap = 10f, total = nw + gap + bw;
-        if (total > SW - 24) { float k = (SW - 24) / total; nw *= k; bw *= k; gap *= k; total = SW - 24; }
+        // 야경 · 사진 저장 · 나가기 버튼을 한 줄로 가운데 정렬 (휴대폰에서 끝이 잘리지 않게)
+        float nw = bw * 0.82f, pw = bw * 0.82f, gap = 10f, total = nw + gap + pw + gap + bw;
+        if (total > SW - 24) { float k = (SW - 24) / total; nw *= k; pw *= k; bw *= k; gap *= k; total = SW - 24; }
         float x0 = SW / 2 - total / 2;
         var nr = new Rect(x0, SH - bh - 14, nw, bh); R(nr);
-        var r = new Rect(x0 + nw + gap, SH - bh - 14, bw, bh); R(r);
+        var pr = new Rect(x0 + nw + gap, SH - bh - 14, pw, bh); R(pr);
+        var r = new Rect(pr.xMax + gap, SH - bh - 14, bw, bh); R(r);
         if (GUI.Button(r, "<b>나가기</b>", sBtnBig)) treeOverview = false;
+        if (GUI.Button(pr, "<b>사진 저장</b>", sBtn)) shotPending = true;
         NightToggleGUI(nr);
+        PhotoFlashGUI();
     }
 
     void OverviewInput()
