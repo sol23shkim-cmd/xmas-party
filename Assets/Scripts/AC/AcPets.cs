@@ -502,7 +502,7 @@ public partial class AcRoom
         if (snap || d > 9f) { rig.root.position = target; rig.vel = Vector3.zero; rig.yaw = ownerYaw; pos = target; d = 0; flat = Vector3.zero; }
         // 따라가기: 멀수록 빨리 (최대 8 m/s), 가까우면 멈춤
         Vector3 want = Vector3.zero;
-        if (d > 0.35f) want = flat / d * Mathf.Min(8f, (d - 0.25f) * 2.6f + 0.6f);
+        if (d > 0.35f) want = flat / d * Mathf.Min(16f, (d - 0.25f) * 2.6f + 0.6f);
         rig.vel = Vector3.Lerp(rig.vel, want, 1 - Mathf.Exp(-dt * 7f));
         pos += rig.vel * dt; pos.y = Mathf.Lerp(pos.y, target.y, 1 - Mathf.Exp(-dt * 10f));
         rig.root.position = pos;
@@ -675,7 +675,8 @@ public partial class AcRoom
             bool vis = phase != Phase.Lobby && me.gameObject.activeInHierarchy && !me.Hidden && !kitchenOpen && !GiftBusy && !playingGame;
             if (vis && !myPet.root.gameObject.activeSelf) { SetPetVisible(myPet, true); PetStep(myPet, me.transform, yaw, dt, true); }
             else SetPetVisible(myPet, vis);
-            if (vis) PetStep(myPet, me.transform, yaw, dt, false);
+            bool pull = IsSantaMe && me.skating;   // 산타 썰매: 루돌프가 앞에서 끔
+            if (vis) PetStep(myPet, me.transform, yaw, dt, false, pull ? new Vector2(0, 1.7f) : (Vector2?)null, pull ? yaw : (float?)null);
         }
         // 다른 사람 펫
         foreach (var kv in remotes)
@@ -688,7 +689,8 @@ public partial class AcRoom
             bool vis = r.c.gameObject.activeInHierarchy && !r.c.Hidden && (r.c.transform.position - KO).sqrMagnitude > 1600f;
             if (vis && !rp.root.gameObject.activeSelf) { SetPetVisible(rp, true); PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, true); }
             else SetPetVisible(rp, vis);
-            if (vis) PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, false);
+            bool rpull = r.c.santa && r.c.skating;
+            if (vis) PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, false, rpull ? new Vector2(0, 1.7f) : (Vector2?)null, rpull ? r.c.transform.eulerAngles.y : (float?)null);
         }
         // 나간 사람 펫 정리
         List<string> gone = null;

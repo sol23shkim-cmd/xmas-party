@@ -169,6 +169,7 @@ public partial class AcRoom : MonoBehaviour
         string code = new string(uiPath.Trim().ToLowerInvariant().Where(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_').ToArray());
         if (!solo && code == "") { lobbyMsg = "방 코드를 입력하세요 (같은 코드끼리 만나요)"; return; }
         if (uiName.Trim() == "") { lobbyMsg = "이름을 입력하세요"; return; }
+        if (uiName.Trim() == SantaName && !SantaAllowed) { lobbyMsg = "'산타'는 주인이 정해진 이름이라 쓸 수 없어요"; return; }
         uiPath = code;
         PlayerPrefs.SetString("ac_room", code); PlayerPrefs.SetString("xmas_name", uiName.Trim()); PlayerPrefs.Save();
         online = !solo;
@@ -615,8 +616,9 @@ public partial class AcRoom : MonoBehaviour
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
         QuestUpdate(dt);
         PetsUpdate(dt);
-        if (me) me.beard = uiName.Trim() == "산타";   // 산타만 은발 수염
-        foreach (var rr in remotes.Values) if (rr.c && rr.net != null) rr.c.beard = (rr.net.name ?? "").Trim() == "산타";
+        if (me) me.SetSanta(IsSantaMe);   // 산타: 전용 모습
+        foreach (var rr in remotes.Values) if (rr.c && rr.net != null) rr.c.SetSanta((rr.net.name ?? "").Trim() == SantaName);
+        if (IsSantaMe && phase == Phase.Play && me && Outside && !me.skating && !playingGame && !building) { me.SetSkates(true); skateVel = Vector3.zero; }   // 산타는 밖에 나가면 늘 썰매
         UpdateCloseupQuality();
         GiftUpdate(dt);
         KitchenUpdate(dt);
@@ -735,13 +737,14 @@ public partial class AcRoom : MonoBehaviour
         {
             // 스케이트: 밀면 빨라지고, 손을 떼도 쭉 미끄러짐
             if (walkTarget.HasValue && dir.sqrMagnitude < 0.01f) { var wd = walkTarget.Value - prev; wd.y = 0; if (wd.magnitude > 0.4f) dir = wd.normalized; else walkTarget = null; }
-            if (dir.sqrMagnitude > 0.01f) skateVel += dir * 10f * dt; else skateVel = Vector3.MoveTowards(skateVel, Vector3.zero, 1.6f * dt);
-            if (skateVel.magnitude > 9f) skateVel = skateVel.normalized * 9f;
+            float sk = IsSantaMe ? 1.6f : 1f;   // 산타 썰매: 스케이트보다 1.6배
+            if (dir.sqrMagnitude > 0.01f) skateVel += dir * 10f * sk * dt; else skateVel = Vector3.MoveTowards(skateVel, Vector3.zero, 1.6f * dt);
+            if (skateVel.magnitude > 9f * sk) skateVel = skateVel.normalized * 9f * sk;
             p = prev + skateVel * dt;
             if (dir.sqrMagnitude < 0.01f && skateVel.sqrMagnitude > 0.05f) dir = skateVel.normalized * 0.001f;
         }
-        p = Collide(p, 0.36f);
-        p = ClampRegion(prev, p);
+        bool ghostWalk = IsSantaMe;   // 산타는 벽·가구를 지나 어느 방이든 들어감
+        if (!ghostWalk) { p = Collide(p, 0.36f); p = ClampRegion(prev, p); } else { p.x = Mathf.Clamp(p.x, WorldX0, WorldX1); p.z = Mathf.Clamp(p.z, WorldZ0, WorldZ1); }
         var d2 = new Vector2(p.x - TreePos.x, p.z - TreePos.z);
         if (d2.magnitude < TreeR) { d2 = d2.normalized * TreeR; p.x = TreePos.x + d2.x; p.z = TreePos.z + d2.y; }
         foreach (var r in remotes.Values)
@@ -749,14 +752,14 @@ public partial class AcRoom : MonoBehaviour
             var dd = new Vector2(p.x - r.c.transform.position.x, p.z - r.c.transform.position.z);
             if (dd.magnitude < 0.75f && dd.magnitude > 0.001f) { dd = dd.normalized * 0.75f; p.x = r.c.transform.position.x + dd.x; p.z = r.c.transform.position.z + dd.y; }
         }
-        p = ClampRegion(prev, p);
+        if (!ghostWalk) p = ClampRegion(prev, p);
         var moved = p - prev; moved.y = 0;
         if (me.skating)
         {
             if (dt > 0) skateVel = Vector3.Lerp(skateVel, moved / dt, 0.5f);   // 벽에 부딪히면 속도도 줄어듦
             me.speed = dt > 0 ? moved.magnitude / dt : 0;
             if (moved.sqrMagnitude > 1e-6f) yaw = Mathf.Atan2(moved.x, moved.z) * Mathf.Rad2Deg;
-            if (InHouse(p)) { me.SetSkates(false); skateVel = Vector3.zero; Toast("집 안에서는 스케이트를 벗어요"); }
+            if (InHouse(p)) { me.SetSkates(false); skateVel = Vector3.zero; Toast(IsSantaMe ? "썰매는 문 앞에 세워 두고 들어가요" : "집 안에서는 스케이트를 벗어요"); }
             me.transform.position = p;
             me.transform.rotation = Quaternion.Slerp(me.transform.rotation, Quaternion.Euler(0, yaw, 0), 1 - Mathf.Exp(-dt * 8f));
             return;

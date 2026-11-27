@@ -24,6 +24,18 @@ public partial class AcRoom
         new QuestDef("letter", "친구에게 편지 쓰기", 1),
     };
     const string AllPetsName = "상환";   // 모든 펫을 처음부터
+    // 산타: 이 기기에서 원래 '산타'로 놀던 사람만 쓸 수 있음 (다른 기기는 주소에 ?santakey=rudolph 를 붙여 한 번 열면 됨)
+    public const string SantaName = "산타";
+    bool IsSantaMe => uiName != null && uiName.Trim() == SantaName && SantaAllowed;
+    bool SantaAllowed
+    {
+        get
+        {
+            if (PlayerPrefs.GetInt("santa_ok", 0) == 1) return true;
+            if (Application.absoluteURL.Contains("santakey=rudolph") || PlayerPrefs.GetString("xmas_name", "") == SantaName) { PlayerPrefs.SetInt("santa_ok", 1); PlayerPrefs.Save(); return true; }
+            return false;
+        }
+    }
 
     int questDay = -1, questPoints; readonly List<string> questToday = new List<string>();
     readonly Dictionary<string, int> questProg = new Dictionary<string, int>();
@@ -34,12 +46,12 @@ public partial class AcRoom
 
     static int TodayKst => (int)Math.Floor((AcSync.UnixMs + 9 * 3600000.0) / 86400000.0);
     bool AllPets => myKey == AllPetsName;
-    bool PetUnlocked => AllPets || questPoints >= 7 || petsOwned.Count > 0;
+    bool PetUnlocked => AllPets || IsSantaMe || questPoints >= 7 || petsOwned.Count > 0;
     bool FancyName => questPoints >= 3;
     List<string> MyPets => AllPets ? PetIds.ToList() : petsOwned;
     string CurPet
     {
-        get { var p = PlayerPrefs.GetString("pet_cur", ""); return p == "-" ? "" : (MyPets.Contains(p) ? p : (MyPets.Count > 0 ? MyPets[0] : "")); }
+        get { if (IsSantaMe) return "rudolph"; var p = PlayerPrefs.GetString("pet_cur", ""); return p == "-" ? "" : (MyPets.Contains(p) ? p : (MyPets.Count > 0 ? MyPets[0] : "")); }
         set { PlayerPrefs.SetString("pet_cur", string.IsNullOrEmpty(value) ? "-" : value); PlayerPrefs.Save(); }
     }
 
