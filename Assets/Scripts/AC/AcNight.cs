@@ -99,10 +99,8 @@ public partial class AcRoom
     }
 
     // 트리 전경 화면의 '야경 / 낮으로' 버튼
-    void NightToggleGUI(Rect exitBtn)
+    void NightToggleGUI(Rect r)
     {
-        float w = exitBtn.width * 0.82f;
-        var r = new Rect(exitBtn.x - w - 10, exitBtn.y, w, exitBtn.height);
         if (GUI.Button(r, nightView ? "<b>낮으로</b>" : "<b>야경 보기</b>", sBtn)) nightView = !nightView;
     }
 }
