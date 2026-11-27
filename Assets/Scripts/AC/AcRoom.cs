@@ -263,7 +263,7 @@ public partial class AcRoom : MonoBehaviour
             int c0 = b.V(new Vector3(0, 3.8f, zf), nrm, wall, 1f);
             var idx = new int[pent.Length];
             for (int i = 0; i < pent.Length; i++) idx[i] = b.V(new Vector3(pent[i].x, pent[i].y, zf), nrm, wall, 0.92f);
-            for (int i = 0; i < pent.Length; i++) b.Tri(c0, idx[i], idx[(i + 1) % pent.Length]);
+            for (int i = 0; i < pent.Length; i++) { b.Tri(c0, idx[i], idx[(i + 1) % pent.Length]); b.Tri(c0, idx[(i + 1) % pent.Length], idx[i]); }
             // 나무 판자 느낌의 가로 줄
             for (int k = 0; k < 5; k++) { float y = 3.25f + k * 0.38f; float hw = Mathf.Min(2.45f, (5.36f - y) / 0.79f); if (hw > 0.15f) b.Box(new Vector3(0, y, zf + 0.012f * Mathf.Sign(zf)), new Vector3(hw * 2f, 0.025f, 0.01f), new Color(0.86f, 0.78f, 0.64f)); }
         }
