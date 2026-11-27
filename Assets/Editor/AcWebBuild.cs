@@ -53,6 +53,8 @@ public static class AcWebBuild
             if (File.Exists(overlay))
             {
                 foreach (var f in Directory.GetFiles(extras)) if (!f.EndsWith(".html")) File.Copy(f, Path.Combine(outDir, Path.GetFileName(f)), true);
+                string pwaHead = Path.Combine(extras, "pwa-head.html");   // 앱으로 설치(홈 화면에 추가) 설정
+                if (File.Exists(pwaHead)) html = html.Replace("<head>", "<head>\n" + File.ReadAllText(pwaHead));
                 html = html.Replace("<body>", "<body>\n" + File.ReadAllText(overlay))
                            .Replace("progressBarFull.style.width = 100 * progress + \"%\";", "progressBarFull.style.width = 100 * progress + \"%\"; if (window.xpProgress) xpProgress(progress);")
                            .Replace("}).then((unityInstance) => {", "}).then((unityInstance) => { if (window.xpDone) xpDone();")

@@ -20,6 +20,13 @@
   #xp-label { color: #fffaf0; font-size: 16px; letter-spacing: .08em; margin-bottom: 10px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
   #xp-bar { width: min(62%, 320px); height: 10px; margin: 0 auto; border-radius: 6px; background: rgba(255,255,255,.28); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); overflow: hidden; }
   #xp-fill { width: 0%; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #e04a4a, #f7c948); transition: width .3s ease; }
+  /* 앱으로 받기 버튼 (오른쪽 위) + 안내 */
+  #xp-app { position: absolute; z-index: 3; top: max(14px, env(safe-area-inset-top)); right: 14px; display: none; align-items: center; gap: 6px; padding: 9px 14px 9px 11px; border-radius: 22px;
+            background: rgba(255, 250, 240, .92); color: #7a1f2b; font: 700 14px/1 "GowunLoad", sans-serif; letter-spacing: .02em; border: 0; box-shadow: 0 3px 12px rgba(0,0,0,.28); cursor: pointer; animation: xp-in 1s .6s ease-out both; }
+  #xp-app img { width: 22px; height: 22px; border-radius: 6px; }
+  #xp-guide { position: absolute; z-index: 4; top: calc(max(14px, env(safe-area-inset-top)) + 50px); right: 14px; width: min(78vw, 300px); display: none; padding: 14px 16px; border-radius: 14px;
+              background: rgba(255, 250, 240, .97); color: #3b2a22; font: 400 14px/1.55 "GowunLoad", sans-serif; box-shadow: 0 6px 22px rgba(0,0,0,.35); }
+  #xp-guide b { color: #b3262f; }
   @keyframes xp-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 </style>
 <div id="xp-load">
@@ -27,6 +34,8 @@
   <video muted loop playsinline webkit-playsinline preload="none"></video>
   <canvas id="xp-snow"></canvas>
   <div id="xp-title">크리스마스 파티</div>
+  <button id="xp-app" type="button"><img src="icon-192.png" alt="">앱으로 받기</button>
+  <div id="xp-guide"></div>
   <div id="xp-bottom"><div id="xp-label">불러오는 중</div><div id="xp-bar"><div id="xp-fill"></div></div></div>
 </div>
 <script>
@@ -85,6 +94,22 @@
       if (p >= 2) show(97, "집 짓는 중");
       else show(60 + p * 36, null);
     };
+    // 앱으로 받기: 설치할 수 있는 브라우저는 바로 설치 창, 아니면 '홈 화면에 추가' 방법 안내. 이미 앱으로 열었으면 버튼 숨김
+    var appBtn = document.getElementById("xp-app"), guide = document.getElementById("xp-guide");
+    var standalone = (window.matchMedia && (matchMedia("(display-mode: fullscreen)").matches || matchMedia("(display-mode: standalone)").matches)) || navigator.standalone === true;
+    var ua = navigator.userAgent, isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document), isKakao = /KAKAOTALK/i.test(ua);
+    window.xpInstallShow = function () { if (!standalone && !done) appBtn.style.display = "flex"; };
+    window.xpInstallHide = function () { appBtn.style.display = "none"; guide.style.display = "none"; };
+    if (!standalone) appBtn.style.display = "flex";
+    appBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var ev = window.xpInstallEvt;
+      if (ev) { ev.prompt(); ev.userChoice.then(function (r) { if (r && r.outcome === "accepted") window.xpInstallHide(); }).catch(function () {}); window.xpInstallEvt = null; return; }
+      guide.innerHTML = isKakao ? "카카오톡 안에서는 설치가 안 돼요.<br>오른쪽 아래 <b>⋮ → 다른 브라우저로 열기</b>를 누른 뒤 다시 '앱으로 받기'를 눌러 주세요."
+        : isIOS ? "Safari 아래쪽 <b>공유 버튼(□↑)</b> → <b>홈 화면에 추가</b>를 누르면<br>주소창 없이 앱처럼 열려요."
+        : "브라우저 메뉴(<b>⋮</b> 또는 <b>≡</b>) → <b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누르면<br>주소창 없이 앱처럼 열려요.";
+      guide.style.display = guide.style.display === "block" ? "none" : "block";
+    });
     window.xpFinish = function () {
       if (done) return; done = true;
       fill.style.width = "100%"; label.textContent = "준비 완료";
