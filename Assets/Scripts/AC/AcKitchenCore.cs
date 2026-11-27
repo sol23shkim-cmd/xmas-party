@@ -31,7 +31,7 @@ public static class Kc
 {
     public const int W = 8, H = 9;
     public const float Tile = 1.2f;
-    public const int Strokes = 3;
+    public const int Strokes = 2;   // 도마: 쓱 두 번 밀면 끝
     public const float ConveyorStep = 1.1f;
 
     public class Stage
