@@ -55,7 +55,8 @@ public static class AcWebBuild
                 foreach (var f in Directory.GetFiles(extras)) if (!f.EndsWith(".html")) File.Copy(f, Path.Combine(outDir, Path.GetFileName(f)), true);
                 html = html.Replace("<body>", "<body>\n" + File.ReadAllText(overlay))
                            .Replace("progressBarFull.style.width = 100 * progress + \"%\";", "progressBarFull.style.width = 100 * progress + \"%\"; if (window.xpProgress) xpProgress(progress);")
-                           .Replace("}).then((unityInstance) => {", "}).then((unityInstance) => { if (window.xpDone) xpDone();");
+                           .Replace("}).then((unityInstance) => {", "}).then((unityInstance) => { if (window.xpDone) xpDone();")
+                           .Replace("document.body.appendChild(script);", "if (window.xpReady) xpReady(function () { document.body.appendChild(script); }); else document.body.appendChild(script);");
             }
             File.WriteAllText(idx, html);
         }
