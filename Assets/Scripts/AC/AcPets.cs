@@ -697,7 +697,7 @@ public partial class AcRoom
                 gallerySanta = AcCharacter.Create(me.look, world); gallerySanta.SetSanta(true);
                 gallerySled = AcCharacter.Create(me.look, world); gallerySled.SetSanta(true); gallerySled.SetSkates(true);
             }
-            gallerySanta.transform.SetPositionAndRotation(me.transform.position + new Vector3(1.5f, 0, 0.3f), Quaternion.Euler(0, -15f, 0));
+            gallerySanta.transform.SetPositionAndRotation(me.transform.position + new Vector3(1.1f, 0, 0.7f), Quaternion.Euler(0, -10f, 0));
             gallerySled.transform.SetPositionAndRotation(me.transform.position + new Vector3(-1.8f, 0, 0.1f), Quaternion.Euler(0, 30f, 0));
             for (int i = 0; i < galleryPets.Count; i++)
             {

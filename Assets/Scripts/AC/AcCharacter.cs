@@ -489,11 +489,11 @@ public class AcCharacter : MonoBehaviour
         foreach (var (arm, sg) in new[] { (armL, -1f), (armR, 1f) })
         {
             if (!arm) continue;
-            arm.position = body.TransformPoint(G(sg * 0.31f, 1.0f, -0.01f));
+            arm.position = body.TransformPoint(G(sg * 0.29f, 1.0f, -0.01f));
             float k = body.lossyScale.x / Mathf.Max(1e-4f, arm.lossyScale.x);
-            float L = armLen * k, ar = 0.072f * k;
+            float L = armLen * k, ar = 0.058f * k;
             var ab = new AcPB { detail = 1.4f };
-            ab.Ellipsoid(Vector3.zero, Vector3.one * ar * 1.35f, red, 10, 14, null, coatShade);                                   // 어깨
+            ab.Ellipsoid(Vector3.zero, Vector3.one * ar * 1.15f, red, 10, 14, null, coatShade);                                   // 어깨
             ab.Tube(new[] { new Vector3(0, 0, 0), new Vector3(0, -L * 0.45f, ar * 0.1f), new Vector3(0, -L * 0.8f, ar * 0.15f) }, new[] { ar * 1.2f, ar * 1.05f, ar * 1.1f }, red, 16);
             ab.Torus(new Vector3(0, -L * 0.79f, ar * 0.15f), Vector3.up, ar * 1.05f, ar * 0.38f, fur, 20, 8);
             ab.Ellipsoid(new Vector3(0, -L * 0.93f, ar * 0.2f), new Vector3(ar * 0.85f, ar * 1.05f, ar * 0.7f), leather, 10, 12);   // 장갑
