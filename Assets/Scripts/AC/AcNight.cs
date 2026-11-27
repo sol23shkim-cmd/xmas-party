@@ -6,6 +6,7 @@ using UnityEngine;
 
 public partial class AcRoom
 {
+    const bool NightBulbsOn = false;
     bool nightView;                       // 트리 전경에서 야경 켬 (다음에 전경 볼 때도 기억)
     bool NightOn => nightView && treeOverview && phase == Phase.Play;
     GameObject nightBulbs;
@@ -38,6 +39,7 @@ public partial class AcRoom
     void NightLights(float dt, float k)
     {
         NightGlow(k);
+        if (!NightBulbsOn) return;   // 11-27: 실제로 달지 않은 꼬마전구 줄은 야경에서도 안 보이게 (꾸민 장식·별만 빛남)
         bool show = k > 0.02f;
         if (show && nightBulbs == null) BuildNightBulbs();
         if (nightBulbs == null) return;
