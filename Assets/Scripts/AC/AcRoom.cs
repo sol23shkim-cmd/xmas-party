@@ -1262,8 +1262,8 @@ public partial class AcRoom : MonoBehaviour
             sTagMe = new GUIStyle(sTag) { normal = { background = red, textColor = Color.white } };
             sBubble = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontSize = 15, normal = { background = sBox.normal.background, textColor = new Color(0.3f, 0.22f, 0.16f) }, padding = new RectOffset(10, 10, 6, 6) };
         }
-        Tag(me.transform.position, uiName, true, myChat, myChatT, myEmote, myEmoteT, questPoints);
-        foreach (var r in remotes.Values) if (r.net != null) Tag(r.c.transform.position, r.net.name, false, r.net.chat, r.net.chatT, r.net.emote, r.net.emoteT, r.net.qp);
+        Tag(me.transform.position + (me.santa ? Vector3.up * 0.32f : Vector3.zero), uiName, true, myChat, myChatT, myEmote, myEmoteT, questPoints);
+        foreach (var r in remotes.Values) if (r.net != null) Tag(r.c.transform.position + (r.c.santa ? Vector3.up * 0.32f : Vector3.zero), r.net.name, false, r.net.chat, r.net.chatT, r.net.emote, r.net.emoteT, r.net.qp);
     }
 
     static readonly Dictionary<string, string> EmoteText = new Dictionary<string, string>

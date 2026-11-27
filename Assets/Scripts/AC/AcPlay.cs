@@ -158,7 +158,7 @@ public partial class AcRoom
         musicRoom = !Outside && AreaAt(me.transform.position) == "음악실";
         if (musicRoom) return true;
         var hp = new Vector3(HalfX - SEG * 1.5f + 0.3f, 0, -HalfZ + 0.5f);   // 거실 피아노
-        return !Outside && Flat(me.transform.position, hp) < 2.8f;
+        return !Outside && Flat(me.transform.position, hp) < 2.8f && SameRoom(hp);
     }
 
     void OpenPiano() { pianoOpen = true; pianoSong = -1; pianoStep = 0; walkTarget = null; decorating = false; treeOverview = false; }

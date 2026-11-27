@@ -367,150 +367,153 @@ public class AcCharacter : MonoBehaviour
 
     void BuildSanta()
     {
-        // 사람 모델의 뼈대(팔·다리 자리)는 그대로 쓰고, 보이는 모양만 산타로 새로 만듦
-        var sp = AcCatalog.Species("human"); float top = sp != null ? sp.top : 1.07f;
-        // 얼굴 자리를 재려고 얼굴 모양을 잠깐 붙였다가 뗌
-        Bounds fb = new Bounds(new Vector3(0, top - 0.27f, 0.27f), new Vector3(0.22f, 0.14f, 0.02f));
-        var face = AcmLoader.Spawn("face_f1", body, null, null, false);
-        bool has = false;
-        foreach (var mf in face.GetComponentsInChildren<MeshFilter>())
-        {
-            if (!mf.sharedMesh) continue; var b = mf.sharedMesh.bounds;
-            for (int i = 0; i < 8; i++)
-            {
-                var p = body.InverseTransformPoint(mf.transform.TransformPoint(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) * 2 - 1, (i & 2) - 1, ((i & 4) >> 1) - 1))));
-                if (!has) { fb = new Bounds(p, Vector3.zero); has = true; } else fb.Encapsulate(p);
-            }
-        }
-        DestroyImmediate(face);
-        float armLen = Mathf.Abs(BoneMinY(armL)), legLen = Mathf.Abs(BoneMinY(legL));
-        Vector3 hipL = legL ? body.InverseTransformPoint(legL.position) : new Vector3(-0.08f, 0.2f, 0);
-        // 원래 모양은 지움 (뼈대 Transform은 남김)
+        // 11-28: 다른 캐릭터(큰 머리 꼬마 비율)와 달리, 키가 크고 배가 나온 '진짜 산타' 비율로 새로 만듦.
+        // 뼈대(팔·다리 Transform)는 그대로 쓰되 어깨·엉덩이 자리로 옮겨서 걷기·인사 동작은 그대로 움직임.
+        float armLen0 = Mathf.Abs(BoneMinY(armL)), legLen0 = Mathf.Abs(BoneMinY(legL));
+        Vector3 hip0 = legL ? body.InverseTransformPoint(legL.position) : new Vector3(-0.08f, 0.2f, 0);
+        float g0 = hip0.y - legLen0;                         // 땅 높이 (몸 기준)
         foreach (var r in body.GetComponentsInChildren<Renderer>(true)) Destroy(r);
+        santaR = 0.3f; santaFootY = g0;
 
-        float R = Mathf.Clamp((top - fb.center.y) * 0.98f, 0.18f, 0.36f); santaR = R;
-        var hc = new Vector3(0, fb.center.y + 0.01f, fb.max.z - R * 0.96f);
-        float neckY = hc.y - R * 0.82f, hipY = hipL.y;
-        santaFootY = hipY - legLen;
-        Color red = new Color(0.84f, 0.12f, 0.14f), redD = new Color(0.66f, 0.07f, 0.1f), fur = new Color(0.99f, 0.98f, 0.96f), furS = new Color(0.88f, 0.89f, 0.92f);
-        Color skin = new Color(1f, 0.84f, 0.73f), blush = new Color(1f, 0.6f, 0.62f), black = new Color(0.1f, 0.09f, 0.1f), gold = new Color(1f, 0.8f, 0.25f);
-        Color beardC = new Color(0.96f, 0.96f, 0.98f);
+        Color red = new Color(0.8f, 0.09f, 0.12f), redD = new Color(0.58f, 0.05f, 0.08f), redL = new Color(0.9f, 0.18f, 0.18f);
+        Color fur = new Color(0.99f, 0.98f, 0.96f), furS = new Color(0.86f, 0.87f, 0.9f), black = new Color(0.09f, 0.08f, 0.09f), leather = new Color(0.14f, 0.1f, 0.09f);
+        Color skin = new Color(1f, 0.82f, 0.7f), skinD = new Color(0.95f, 0.7f, 0.6f), blush = new Color(0.98f, 0.55f, 0.55f), gold = new Color(1f, 0.78f, 0.28f);
+        Color beardW = new Color(0.97f, 0.97f, 0.99f), beardS = new Color(0.82f, 0.83f, 0.87f);
+        Vector3 G(float x, float y, float z) => new Vector3(x, g0 + y, z);
 
-        // 몸통: 통통한 빨간 외투 + 흰 털 단 + 검은 허리띠
-        var tb = new AcPB { detail = 1.4f };
-        float ty = (hipY + neckY) * 0.5f + R * 0.05f, th = (neckY - hipY) * 0.62f + R * 0.12f;
-        tb.Ellipsoid(new Vector3(0, ty, hc.z - R * 0.05f), new Vector3(R * 0.98f, th, R * 0.88f), red, 16, 24, null, u => Color.Lerp(red, redD, Mathf.Clamp01(-u.y * 0.6f)));
-        tb.Torus(new Vector3(0, ty - th * 0.82f, hc.z - R * 0.05f), Vector3.up, R * 0.62f, R * 0.17f, fur, 28, 10);                  // 아래 털 단
-        tb.Torus(new Vector3(0, ty - th * 0.2f, hc.z - R * 0.05f), Vector3.up, R * 0.94f, R * 0.075f, black, 30, 8);                   // 허리띠
-        tb.Box(new Vector3(0, ty - th * 0.2f, hc.z - R * 0.05f + R * 0.9f), new Vector3(R * 0.32f, R * 0.24f, R * 0.06f), gold);        // 버클
-        tb.Box(new Vector3(0, ty - th * 0.2f, hc.z - R * 0.05f + R * 0.93f), new Vector3(R * 0.18f, R * 0.12f, R * 0.04f), black);
-        tb.Ellipsoid(new Vector3(0, ty + th * 0.25f, hc.z + R * 0.74f), new Vector3(R * 0.14f, th * 0.55f, R * 0.08f), fur, 8, 12);    // 앞섶 털
+        // ---- 몸통: 둥근 배 + 넓은 가슴, 아래로 퍼지는 외투 자락, 흰 털 단, 가죽 허리띠 ----
+        var tb = new AcPB { detail = 1.5f };
+        System.Func<Vector3, Color> coatShade = u => Color.Lerp(Color.Lerp(redL, red, 0.55f + 0.45f * Mathf.Clamp01(1 - u.y)), redD, Mathf.Clamp01(-u.y * 0.7f) + Mathf.Clamp01(-u.z * 0.5f));
+        tb.Tube(new[] { G(0, 0.42f, 0.02f), G(0, 0.52f, 0.025f), G(0, 0.64f, 0.03f) }, new[] { 0.35f, 0.355f, 0.35f }, red, 28, new[] { redD, red, red });   // 외투 자락
+        tb.Ellipsoid(G(0, 0.72f, 0.04f), new Vector3(0.36f, 0.33f, 0.33f), red, 20, 30, null, coatShade);                // 배
+        tb.Ellipsoid(G(0, 0.95f, -0.01f), new Vector3(0.31f, 0.2f, 0.25f), red, 16, 26, null, coatShade);                // 가슴
+        tb.Ellipsoid(G(0, 1.04f, -0.02f), new Vector3(0.12f, 0.06f, 0.11f), skinD, 8, 12);                                // 목
+        tb.Torus(G(0, 0.42f, 0.02f), Vector3.up, 0.35f, 0.055f, fur, 36, 10);                                              // 아래 털 단
+        float FrontZ(float y)
+        {
+            float a = (y - 0.72f) / 0.33f, b = (y - 0.95f) / 0.2f, z = 0.38f;
+            float za = Mathf.Abs(a) < 1 ? 0.04f + 0.33f * Mathf.Sqrt(1 - a * a) : -1f, zb = Mathf.Abs(b) < 1 ? -0.01f + 0.25f * Mathf.Sqrt(1 - b * b) : -1f;
+            z = Mathf.Max(za, zb, 0.36f * (y < 0.64f ? 1f : 0f));
+            return z;
+        }
+        {   // 앞섶 흰 털: 몸 앞면을 따라 위에서 아래로
+            var fp = new List<Vector3>(); var fr = new List<float>();
+            for (int k = 0; k <= 10; k++) { float y = Mathf.Lerp(0.44f, 1.0f, k / 10f); fp.Add(G(0, y, FrontZ(y) + 0.012f)); fr.Add(0.045f); }
+            tb.Tube(fp, fr, fur, 10);
+        }
+        tb.Torus(G(0, 0.62f, 0.04f), Vector3.up, 0.345f, 0.04f, leather, 36, 8);                                           // 허리띠
+        tb.Box(G(0, 0.62f, FrontZ(0.62f) + 0.03f), new Vector3(0.13f, 0.1f, 0.025f), gold);                                  // 버클
+        tb.Box(G(0, 0.62f, FrontZ(0.62f) + 0.04f), new Vector3(0.075f, 0.05f, 0.02f), leather);
+        for (int k = 0; k < 3; k++) { float y = 0.76f + k * 0.09f; tb.Sphere(G(0.075f, y, FrontZ(y) + 0.005f), 0.016f, black, 5, 7); }   // 단추
         PbObj("santa_torso", tb, body, Vector3.zero);
 
-        // 머리: 둥근 얼굴 + 웃는 눈, 덥수룩한 눈썹, 동그란 코, 턱선을 따라 감싸는 곱슬 수염, 말려 올라간 콧수염, 늘어진 모자
-        var hb = new AcPB { detail = 1.6f };
-        hb.Ellipsoid(hc, new Vector3(R, R * 0.97f, R * 0.95f), skin, 20, 28, null, u => Color.Lerp(skin, new Color(1f, 0.78f, 0.7f), Mathf.Clamp01(u.z * 0.6f - 0.1f)));
-        float fz = hc.z + R * 0.92f;
+        // ---- 머리: 사람 비율의 작은 얼굴, 금테 안경, 장밋빛 볼과 코, 덥수룩한 눈썹, 가슴까지 내려오는 풍성한 수염 ----
+        var hb = new AcPB { detail = 1.7f };
+        var hc = G(0, 1.2f, 0.02f); float hr = 0.13f;
+        hb.Ellipsoid(hc, new Vector3(hr * 0.95f, hr * 1.05f, hr), skin, 20, 28, null, u => Color.Lerp(skin, skinD, Mathf.Clamp01(-u.z * 0.6f + 0.1f)));
+        hb.Ellipsoid(hc + new Vector3(0, 0, hr * 0.02f), new Vector3(hr * 0.18f, hr * 0.25f, hr * 0.1f), skin, 4, 6);
+        float fzz = hc.z + hr * 0.93f;
         foreach (float sg in new[] { -1f, 1f })
         {
-            // 웃는 눈: 작은 검은 눈 + 위 눈꺼풀이 살짝 덮어 반달 모양
-            var e = new Vector3(sg * R * 0.3f, hc.y + R * 0.12f, fz - R * 0.05f);
-            hb.Ellipsoid(e, new Vector3(R * 0.07f, R * 0.085f, R * 0.05f), black, 8, 12);
-            hb.Ellipsoid(e + new Vector3(-R * 0.022f, R * 0.03f, R * 0.04f), Vector3.one * R * 0.022f, Color.white, 5, 6);
-            hb.Ellipsoid(e + new Vector3(0, R * 0.065f, R * 0.012f), new Vector3(R * 0.095f, R * 0.045f, R * 0.055f), skin, 8, 12);
-            // 덥수룩한 흰 눈썹: 작은 덩어리 세 개가 바깥으로 처짐
-            for (int k = 0; k < 3; k++)
-                hb.Ellipsoid(new Vector3(sg * R * (0.18f + k * 0.11f), hc.y + R * (0.3f - k * 0.035f), fz - R * (0.07f + k * 0.05f)), new Vector3(R * 0.085f, R * 0.06f, R * 0.06f), k == 1 ? Color.white : beardC, 7, 10);
-            hb.Ellipsoid(new Vector3(sg * R * 0.52f, hc.y - R * 0.08f, fz - R * 0.2f), new Vector3(R * 0.16f, R * 0.1f, R * 0.07f), blush, 8, 12);   // 볼
-            // 옆·뒷머리: 모자 아래로 흰 곱슬머리
-            for (int k = 0; k < 4; k++)
+            var e = new Vector3(sg * hr * 0.36f, hc.y + hr * 0.12f, fzz - hr * 0.08f);
+            hb.Ellipsoid(e, new Vector3(hr * 0.13f, hr * 0.09f, hr * 0.05f), Color.white, 8, 10);                         // 흰자
+            hb.Ellipsoid(e + new Vector3(0, -hr * 0.005f, hr * 0.03f), new Vector3(hr * 0.07f, hr * 0.075f, hr * 0.04f), new Color(0.25f, 0.4f, 0.6f), 8, 10);   // 파란 눈
+            hb.Ellipsoid(e + new Vector3(0, -hr * 0.005f, hr * 0.05f), Vector3.one * hr * 0.04f, black, 5, 6);
+            hb.Ellipsoid(e + new Vector3(-hr * 0.02f, hr * 0.02f, hr * 0.07f), Vector3.one * hr * 0.016f, Color.white, 4, 5);
+            hb.Ellipsoid(e + new Vector3(0, hr * 0.065f, hr * 0.01f), new Vector3(hr * 0.15f, hr * 0.045f, hr * 0.06f), skinD, 8, 10);   // 눈꺼풀 (웃는 눈매)
+            for (int k = 0; k < 4; k++)                                                                                       // 덥수룩한 흰 눈썹
+                hb.Ellipsoid(new Vector3(sg * hr * (0.2f + k * 0.1f), hc.y + hr * (0.29f - k * 0.025f), fzz - hr * (0.06f + k * 0.06f)), new Vector3(hr * 0.09f, hr * 0.06f, hr * 0.06f), k % 2 == 0 ? beardW : furS, 6, 8);
+            hb.Ellipsoid(new Vector3(sg * hr * 0.55f, hc.y - hr * 0.1f, fzz - hr * 0.22f), new Vector3(hr * 0.2f, hr * 0.15f, hr * 0.08f), blush, 8, 10);   // 장밋빛 볼
+            hb.Ellipsoid(new Vector3(sg * hr * 0.97f, hc.y + hr * 0.02f, hc.z), new Vector3(hr * 0.1f, hr * 0.18f, hr * 0.12f), skinD, 6, 8);   // 귀
+            // 금테 동그란 안경
+            hb.Torus(e + new Vector3(0, 0, hr * 0.14f), Vector3.forward, hr * 0.17f, hr * 0.018f, gold, 22, 5);
+            hb.Tube(new[] { e + new Vector3(sg * hr * 0.17f, 0, hr * 0.13f), new Vector3(sg * hr * 0.9f, e.y + hr * 0.02f, hc.z + hr * 0.1f) }, new[] { hr * 0.014f, hr * 0.014f }, gold, 4);
+            // 옆·뒷머리: 모자 아래로 흰 머리
+            for (int k = 0; k < 5; k++)
             {
-                float a = (35f + k * 30f) * Mathf.Deg2Rad;
+                float a = (55f + k * 26f) * Mathf.Deg2Rad;
                 var hd = new Vector3(sg * Mathf.Sin(a), 0, Mathf.Cos(a));
-                hb.Ellipsoid(hc + hd * R * 0.93f + Vector3.up * (R * 0.18f - k * R * 0.03f), new Vector3(R * 0.2f, R * 0.22f, R * 0.18f), k % 2 == 0 ? beardC : Color.white, 8, 10);
+                hb.Ellipsoid(hc + hd * hr * 0.92f + Vector3.up * (hr * 0.12f - k * hr * 0.05f), new Vector3(hr * 0.22f, hr * 0.26f, hr * 0.2f), k % 2 == 0 ? beardW : furS, 7, 9);
             }
         }
-        hb.Ellipsoid(new Vector3(0, hc.y - R * 0.04f, fz + R * 0.05f), new Vector3(R * 0.14f, R * 0.12f, R * 0.12f), new Color(1f, 0.66f, 0.6f), 12, 16);   // 코
-        hb.Ellipsoid(new Vector3(-R * 0.04f, hc.y - R * 0.0f, fz + R * 0.15f), Vector3.one * R * 0.03f, new Color(1f, 0.86f, 0.82f), 5, 6);
-        // 수염: 머리 둘레를 따라 붙은 두꺼운 껍질. 옆은 구레나룻부터, 앞은 입 아래부터 시작, 턱 아래로 둥글게 늘어짐. 겉면은 곱슬곱슬 물결
+        hb.Tube(new[] { new Vector3(-hr * 0.19f, hc.y + hr * 0.12f, fzz + hr * 0.07f), new Vector3(0, hc.y + hr * 0.14f, fzz + hr * 0.1f), new Vector3(hr * 0.19f, hc.y + hr * 0.12f, fzz + hr * 0.07f) }, new[] { hr * 0.014f, hr * 0.014f, hr * 0.014f }, gold, 4);   // 안경 다리(코 위)
+        hb.Ellipsoid(new Vector3(0, hc.y - hr * 0.05f, fzz + hr * 0.06f), new Vector3(hr * 0.15f, hr * 0.14f, hr * 0.14f), new Color(0.98f, 0.6f, 0.55f), 12, 16);   // 둥근 코
+        hb.Ellipsoid(new Vector3(-hr * 0.04f, hc.y - hr * 0.0f, fzz + hr * 0.17f), Vector3.one * hr * 0.035f, new Color(1f, 0.85f, 0.8f), 4, 5);
+        // 수염: 볼에서 시작해 가슴까지 늘어지는 큰 덩어리 + 겉면의 곱슬 뭉치들
+        System.Func<Vector3, Color> beardShade = u => Color.Lerp(beardS, beardW, 0.45f + 0.55f * Mathf.Clamp01(u.y * 0.5f + u.z * 0.6f + 0.3f));
+        var bc1 = new Vector3(0, hc.y - hr * 1.15f, hc.z + hr * 0.62f);
+        hb.Ellipsoid(bc1, new Vector3(hr * 1.2f, hr * 1.25f, hr * 0.75f), beardW, 14, 20, null, beardShade);
+        var bc2 = new Vector3(0, hc.y - hr * 2.25f, hc.z + hr * 1.25f);
+        hb.Ellipsoid(bc2, new Vector3(hr * 0.85f, hr * 0.85f, hr * 0.55f), beardW, 12, 16, null, beardShade);
+        var bc3 = new Vector3(0, hc.y - hr * 2.95f, hc.z + hr * 1.6f);
+        hb.Ellipsoid(bc3, new Vector3(hr * 0.45f, hr * 0.5f, hr * 0.35f), beardW, 10, 12, null, beardShade);
+        foreach (float sg in new[] { -1f, 1f })
+            hb.Ellipsoid(new Vector3(sg * hr * 0.75f, hc.y - hr * 0.35f, hc.z + hr * 0.45f), new Vector3(hr * 0.4f, hr * 0.55f, hr * 0.45f), beardW, 10, 12, null, beardShade);   // 구레나룻
+        var rnd = new System.Random(7);
+        for (int k = 0; k < 46; k++)
         {
-            int nT = 26, nP = 16;
-            var outer = new int[nT + 1, nP + 1]; var inner = new int[nT + 1, nP + 1];
-            float thMax = 105f * Mathf.Deg2Rad;
-            for (int i = 0; i <= nT; i++)
-            {
-                float bth = Mathf.Lerp(-thMax, thMax, i / (float)nT);
-                float side = Mathf.Abs(bth) / thMax;                    // 0 = 앞, 1 = 귀 옆
-                float phTop = Mathf.Lerp(26f, -8f, Mathf.SmoothStep(0.25f, 0.85f, side)) * Mathf.Deg2Rad;   // 위쪽 경계: 앞은 입 아래, 옆은 귀 높이
-                float phBot = Mathf.Lerp(98f, 70f, side) * Mathf.Deg2Rad;
-                for (int j = 0; j <= nP; j++)
-                {
-                    float v = j / (float)nP;
-                    float ph = Mathf.Lerp(phTop, phBot, v);
-                    var dir = new Vector3(Mathf.Sin(bth) * Mathf.Cos(ph), -Mathf.Sin(ph), Mathf.Cos(bth) * Mathf.Cos(ph));
-                    float edge = Mathf.Min(Mathf.SmoothStep(0, 1, v * 4f), Mathf.SmoothStep(0, 1, (1 - side) * 6f));   // 가장자리는 얇게
-                    float curl = 0.5f + 0.5f * Mathf.Sin(bth * 9f + v * 7f) * Mathf.Sin(v * 11f + bth * 3f);
-                    float thick = R * (0.08f + 0.14f * edge + 0.05f * curl * edge);
-                    float hang = R * 0.62f * Mathf.Pow(Mathf.Max(0, Mathf.Cos(bth * 1.25f)), 2f) * Mathf.SmoothStep(0, 1, v);   // 턱 아래로 늘어짐 (가운데가 가장 길게)
-                    var po = hc + dir * (R * 0.99f + thick) + Vector3.down * hang + Vector3.forward * hang * 0.35f;
-                    var pi2 = hc + dir * (R * 0.97f) + Vector3.down * hang * 0.6f;
-                    var c = Color.Lerp(new Color(0.84f, 0.85f, 0.88f), Color.white, 0.55f + 0.45f * curl) ;
-                    outer[i, j] = hb.V(po, (dir + Vector3.down * 0.25f).normalized, c, 0.95f);
-                    inner[i, j] = hb.V(pi2, -dir, new Color(0.85f, 0.86f, 0.9f), 0.7f);
-                }
-            }
-            for (int i = 0; i < nT; i++)
-                for (int j = 0; j < nP; j++)
-                {
-                    hb.Quad(outer[i, j], outer[i + 1, j], outer[i + 1, j + 1], outer[i, j + 1]);
-                    hb.Quad(inner[i, j], inner[i, j + 1], inner[i + 1, j + 1], inner[i + 1, j]);
-                }
-            for (int i = 0; i < nT; i++) { hb.Quad(outer[i, nP], outer[i + 1, nP], inner[i + 1, nP], inner[i, nP]); hb.Quad(outer[i, 0], inner[i, 0], inner[i + 1, 0], outer[i + 1, 0]); }
+            float u = (float)rnd.NextDouble(), a = (float)(rnd.NextDouble() * 2 - 1) * 1.3f;
+            Vector3 c0 = u < 0.55f ? bc1 : u < 0.85f ? bc2 : bc3; Vector3 rr = u < 0.55f ? new Vector3(hr * 1.2f, hr * 1.25f, hr * 0.75f) : u < 0.85f ? new Vector3(hr * 0.85f, hr * 0.85f, hr * 0.55f) : new Vector3(hr * 0.45f, hr * 0.5f, hr * 0.35f);
+            float vy = (float)(rnd.NextDouble() * 1.6 - 0.9);
+            var dir = new Vector3(Mathf.Sin(a), vy, Mathf.Cos(a)).normalized;
+            var pos = c0 + Vector3.Scale(dir, rr) * 0.97f;
+            if (pos.y > hc.y - hr * 0.3f && Mathf.Abs(pos.x) < hr * 0.45f) continue;   // 입 주변은 비움
+            float cs = hr * (0.14f + 0.1f * (float)rnd.NextDouble());
+            hb.Ellipsoid(pos, new Vector3(cs, cs * 1.15f, cs), k % 3 == 0 ? beardS : beardW, 6, 8);
         }
-        // 콧수염: 코 밑에서 양쪽으로 통통하게 뻗다가 끝이 살짝 말려 올라감
+        // 콧수염: 코 밑에서 양옆으로 풍성하게, 끝은 살짝 위로
         foreach (float sg in new[] { -1f, 1f })
         {
             var mp = new List<Vector3>(); var mr2 = new List<float>();
-            for (int k = 0; k <= 10; k++)
+            for (int k = 0; k <= 12; k++)
             {
-                float t = k / 10f;
-                float x = sg * (R * 0.02f + t * R * 0.5f), y = hc.y - R * 0.2f - Mathf.Sin(t * Mathf.PI * 0.8f) * R * 0.1f + Mathf.Max(0, t - 0.75f) * R * 0.5f;
-                float z = fz + R * 0.06f - t * t * R * 0.3f;
-                mp.Add(new Vector3(x, y, z)); mr2.Add(R * (0.1f * Mathf.Sin(Mathf.Lerp(0.5f, 2.9f, t)) + 0.012f));
+                float t = k / 12f;
+                float x = sg * (hr * 0.02f + t * hr * 0.75f), y = hc.y - hr * 0.26f - Mathf.Sin(t * Mathf.PI * 0.8f) * hr * 0.12f + Mathf.Max(0, t - 0.7f) * hr * 0.7f;
+                float z = fzz + hr * 0.1f - t * t * hr * 0.45f;
+                mp.Add(new Vector3(x, y, z)); mr2.Add(hr * (0.13f * Mathf.Sin(Mathf.Lerp(0.45f, 2.9f, t)) + 0.015f));
             }
             hb.Tube(mp, mr2, Color.white, 12);
         }
-        hb.Ellipsoid(new Vector3(0, hc.y - R * 0.36f, fz - R * 0.02f), new Vector3(R * 0.09f, R * 0.045f, R * 0.04f), new Color(0.78f, 0.32f, 0.34f), 6, 8);   // 입 (수염 사이로 살짝)
+        hb.Ellipsoid(new Vector3(0, hc.y - hr * 0.44f, fzz + hr * 0.02f), new Vector3(hr * 0.12f, hr * 0.05f, hr * 0.05f), new Color(0.75f, 0.3f, 0.32f), 6, 8);   // 입 (웃음)
         // 모자: 흰 털 테 + 빨간 고깔이 뒤로 축 늘어짐 + 흰 방울
-        var brimC = new Vector3(0, hc.y + R * 0.52f, hc.z - R * 0.04f);
-        hb.Torus(brimC, Quaternion.Euler(-8f, 0, 0) * Vector3.up, R * 0.88f, R * 0.17f, fur, 32, 10);
-        var hp = new List<Vector3>(); var hr = new List<float>();
-        for (int i = 0; i <= 12; i++) { float t = i / 12f; hp.Add(brimC + new Vector3(t * R * 0.28f, Mathf.Sin(t * 2.2f) * R * 0.75f, -t * t * R * 0.95f)); hr.Add(Mathf.Lerp(R * 0.86f, R * 0.06f, Mathf.Pow(t, 0.8f))); }
-        hb.Tube(hp, hr, red, 20);
-        hb.Ellipsoid(hp[12] + new Vector3(0, -R * 0.05f, -R * 0.05f), Vector3.one * R * 0.2f, fur, 10, 14);
+        var brimC = hc + new Vector3(0, hr * 0.62f, -hr * 0.05f);
+        hb.Torus(brimC, Quaternion.Euler(-10f, 0, 0) * Vector3.up, hr * 0.95f, hr * 0.2f, fur, 32, 10);
+        var hp = new List<Vector3>(); var hrr = new List<float>();
+        for (int i = 0; i <= 14; i++) { float t = i / 14f; hp.Add(brimC + new Vector3(t * hr * 0.5f, Mathf.Sin(t * 2.3f) * hr * 1.05f, -t * t * hr * 1.45f)); hrr.Add(Mathf.Lerp(hr * 0.93f, hr * 0.07f, Mathf.Pow(t, 0.75f))); }
+        hb.Tube(hp, hrr, red, 22);
+        hb.Ellipsoid(hp[14] + new Vector3(hr * 0.05f, -hr * 0.12f, -hr * 0.05f), Vector3.one * hr * 0.26f, fur, 10, 14);
         PbObj("santa_head", hb, body, Vector3.zero);
 
-        // 팔: 빨간 소매 + 흰 소맷단 + 흰 장갑
-        foreach (var arm in new[] { armL, armR })
+        // ---- 팔: 어깨로 옮기고, 빨간 소매 + 흰 소맷단 + 검은 가죽 장갑 ----
+        float armLen = 0.47f;
+        foreach (var (arm, sg) in new[] { (armL, -1f), (armR, 1f) })
         {
             if (!arm) continue;
-            float L = Mathf.Max(0.12f, armLen), ar = R * 0.2f;
-            var ab = new AcPB { detail = 1.3f };
-            ab.Tube(new[] { new Vector3(0, ar * 0.3f, 0), new Vector3(0, -L * 0.5f, 0), new Vector3(0, -L * 0.78f, 0) }, new[] { ar * 1.15f, ar * 1.05f, ar }, red, 14);
-            ab.Torus(new Vector3(0, -L * 0.76f, 0), Vector3.up, ar * 0.95f, ar * 0.32f, fur, 18, 8);
-            ab.Ellipsoid(new Vector3(0, -L * 0.94f, ar * 0.1f), new Vector3(ar * 1.05f, ar * 1.0f, ar * 0.95f), Color.white, 10, 14);
+            arm.position = body.TransformPoint(G(sg * 0.31f, 1.0f, -0.01f));
+            float k = body.lossyScale.x / Mathf.Max(1e-4f, arm.lossyScale.x);
+            float L = armLen * k, ar = 0.072f * k;
+            var ab = new AcPB { detail = 1.4f };
+            ab.Ellipsoid(Vector3.zero, Vector3.one * ar * 1.35f, red, 10, 14, null, coatShade);                                   // 어깨
+            ab.Tube(new[] { new Vector3(0, 0, 0), new Vector3(0, -L * 0.45f, ar * 0.1f), new Vector3(0, -L * 0.8f, ar * 0.15f) }, new[] { ar * 1.2f, ar * 1.05f, ar * 1.1f }, red, 16);
+            ab.Torus(new Vector3(0, -L * 0.79f, ar * 0.15f), Vector3.up, ar * 1.05f, ar * 0.38f, fur, 20, 8);
+            ab.Ellipsoid(new Vector3(0, -L * 0.93f, ar * 0.2f), new Vector3(ar * 0.85f, ar * 1.05f, ar * 0.7f), leather, 10, 12);   // 장갑
+            ab.Ellipsoid(new Vector3(-sg * ar * 0.6f, -L * 0.88f, ar * 0.55f), new Vector3(ar * 0.3f, ar * 0.45f, ar * 0.3f), leather, 6, 8);   // 엄지
             PbObj("santa_arm", ab, arm, Vector3.zero);
         }
-        // 다리: 빨간 바지 + 검은 장화(흰 털 테)
-        foreach (var leg in new[] { legL, legR })
+        handY = 1f;   // 손 위치 다시 재기
+        // ---- 다리: 엉덩이로 옮기고, 빨간 바지 + 무릎 아래 검은 장화(접힌 목) ----
+        foreach (var (leg, sg) in new[] { (legL, -1f), (legR, 1f) })
         {
             if (!leg) continue;
-            float L = Mathf.Max(0.08f, legLen), lr = R * 0.22f;
-            var lb = new AcPB { detail = 1.3f };
-            lb.Tube(new[] { new Vector3(0, lr * 0.4f, 0), new Vector3(0, -L * 0.45f, 0) }, new[] { lr * 1.1f, lr }, red, 14);
-            lb.Tube(new[] { new Vector3(0, -L * 0.42f, 0), new Vector3(0, -L * 0.85f, 0) }, new[] { lr * 1.02f, lr * 1.02f }, black, 14);
-            lb.Torus(new Vector3(0, -L * 0.42f, 0), Vector3.up, lr * 0.98f, lr * 0.3f, fur, 18, 8);
-            lb.Ellipsoid(new Vector3(0, -L + lr * 0.45f, lr * 0.45f), new Vector3(lr * 1.1f, lr * 0.62f, lr * 1.6f), black, 10, 14);
+            leg.position = body.TransformPoint(G(sg * 0.13f, 0.5f, 0.02f));
+            float k = body.lossyScale.x / Mathf.Max(1e-4f, leg.lossyScale.x);
+            float L = 0.5f * k, lr = 0.095f * k;
+            var lb = new AcPB { detail = 1.4f };
+            lb.Tube(new[] { new Vector3(0, lr * 0.3f, 0), new Vector3(0, -L * 0.3f, 0), new Vector3(0, -L * 0.5f, 0) }, new[] { lr * 1.1f, lr * 1.0f, lr * 0.95f }, red, 16);
+            lb.Tube(new[] { new Vector3(0, -L * 0.48f, 0), new Vector3(0, -L * 0.88f, 0) }, new[] { lr * 1.05f, lr * 0.98f }, black, 16);
+            lb.Torus(new Vector3(0, -L * 0.48f, 0), Vector3.up, lr * 1.02f, lr * 0.2f, leather, 18, 6);                          // 장화 목 접힘
+            lb.Ellipsoid(new Vector3(0, -L + lr * 0.42f, lr * 0.55f), new Vector3(lr * 1.05f, lr * 0.55f, lr * 1.75f), black, 12, 16);   // 발
+            lb.Box(new Vector3(0, -L + lr * 0.06f, lr * 0.5f), new Vector3(lr * 1.9f, lr * 0.12f, lr * 3.2f), leather);           // 밑창
             PbObj("santa_leg", lb, leg, Vector3.zero);
         }
     }

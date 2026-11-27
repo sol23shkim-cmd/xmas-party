@@ -117,11 +117,14 @@ public partial class AcRoom
     float TreeDist => Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
     bool NearTree => phase == Phase.Play && !Outside && TreeDist < TreeR + 2.4f && AreaAt(me.transform.position) == "트리 거실";   // 트리 바로 앞, 거실 안에서만 (옆방 피아노 앞에서 안 뜨게)
     Vector3 firePos;
-    bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f;
+    bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f && SameRoom(firePos);
+    // 같은 방(또는 둘 다 바깥)일 때만 근처 기능을 켬: 벽 너머 옆방 물건엔 버튼이 안 뜨게 (11-28)
+    string RoomOf(Vector3 p) => InHouse(p) ? AreaAt(p) : "밖";
+    bool SameRoom(Vector3 p) => me != null && RoomOf(me.transform.position) == RoomOf(p);
     bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "쿠키 공방";
     Vector3 mailPos = new Vector3(9999, 0, 9999), mailPos2 = new Vector3(9999, 0, 9999);
     // 편지함: 입구 우편함·앞마당 우편함·거실 벽난로 옆
-    bool InStudy => phase == Phase.Play && (Flat(me.transform.position, mailPos) < 2.8f || Flat(me.transform.position, mailPos2) < 2.4f || NearFireplace);
+    bool InStudy => phase == Phase.Play && ((Flat(me.transform.position, mailPos) < 2.8f && SameRoom(mailPos)) || (Flat(me.transform.position, mailPos2) < 2.4f && SameRoom(mailPos2)) || NearFireplace);
 
     // 큰 버튼 옆 작은 버튼: 오른쪽에 자리가 없으면 큰 버튼 위에 둠 (화면 밖으로 나가거나 겹치지 않게)
     Rect Side(Rect r, float w)
