@@ -22,7 +22,7 @@ public partial class AcRoom
         if (!soon && Time.unscaledTime < shotCheckAt) return;
         if (decorating || building || kitchenOpen || playingGame || treeOverview || showCustom || GiftBusy) return;   // 다른 화면 중이면 다음에
         shotSoonAt = -1; shotCheckAt = Time.unscaledTime + UnityEngine.Random.Range(150f, 240f);
-        string h = "v3-" + net.OrnHash();   // v2: 사진 구도를 바꾸면 숫자를 올려서 새로 찍게
+        string h = "v4-" + net.OrnHash();   // v2: 사진 구도를 바꾸면 숫자를 올려서 새로 찍게
         if (h == shotLastH) return;
         var cur = net.Get("shot"); string oldH = "";
         if (cur != null && cur.TryGetValue("tree", out var v) && v is Dictionary<string, object> d) oldH = AcJson.S(d, "h");
