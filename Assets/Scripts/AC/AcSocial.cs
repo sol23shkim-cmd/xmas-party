@@ -148,7 +148,6 @@ public partial class AcRoom
         var gextra = new List<(string, Action, float)>();
         if (label == null && GreenContext(out var gl, out var ga, gextra)) { label = gl; act = ga; }
         if (label == null && InGiftRoom) { label = "선물 포장하기"; act = OpenWrap; }
-        if (label == null && pillowMode) { label = "베개 휘두르기"; act = () => SwingPillow(null); }   // 침실: 화면 아무 데나 누르는 대신 버튼으로
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;

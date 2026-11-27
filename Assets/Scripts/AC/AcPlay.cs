@@ -791,7 +791,7 @@ public partial class AcRoom
         if (pillowMode != pillowWas)
         {
             pillowWas = pillowMode;
-            if (pillowMode) Toast(IsMobile ? "베개 싸움! '베개 휘두르기'를 누르거나 화면을 톡 눌러요" : "베개 싸움! 클릭이나 F, '베개 휘두르기'로 휘둘러요");
+            if (pillowMode) Toast(IsMobile ? "베개 싸움! 오른쪽 아래 '스윙!'을 누르거나 화면을 톡 눌러요" : "베개 싸움! 클릭이나 F, '스윙!'으로 휘둘러요");
         }
         if (me) { me.holdPillow = pillowMode; me.pillowColor = Color.Lerp(me.look.sweater, Color.white, 0.55f); }
         foreach (var r in remotes.Values) if (r.c) { r.c.holdPillow = InBedroom(r.c.transform.position); r.c.pillowColor = Color.Lerp(r.c.look.sweater, Color.white, 0.55f); }
@@ -884,9 +884,21 @@ public partial class AcRoom
     void PillowHUD()
     {
         if (!pillowMode) return;
-        float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : SW < 1000 ? 112 : 60;
+        float w = 230, top = chatLog.Count > 0 ? 30 + 22 * chatLog.Count : (IsMobile ? 150 : 140);   // 오늘의 퀘스트 버튼 아래
         var r = new Rect(12, top, w, 36);
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 12, r.y + 7, w - 20, 24), $"<b>베개 싸움</b>  퍽! {pwHits}, 맞음 {pwTaken}", sSmall);
+        // 휘두르기: 오른쪽 아래 동그란 '스윙!' 버튼 (다른 화면으로 들어가는 버튼들과 모양을 다르게)
+        float bs = IsMobile ? 96 : 84;
+        var b = new Rect(SW - bs - 18, SH - (IsMobile ? 78 : 64) - bs - 14, bs, bs);
+        bool hot = Time.unscaledTime - pillowBtnAt < 0.15f;
+        var br = hot ? new Rect(b.x + 5, b.y + 5, b.width - 10, b.height - 10) : b;
+        AcUiTheme.DrawGlow(br, 0.5f + 0.4f * Mathf.Sin(Time.time * 4f));
+        AcUiTheme.Circle(new Rect(br.x + 2, br.y + 5, br.width, br.height), new Color(0.3f, 0.15f, 0.25f, 0.25f));
+        AcUiTheme.Circle(br, new Color(0.98f, 0.55f, 0.72f));
+        AcUiTheme.CircleRing(br, new Color(1f, 0.92f, 0.96f));
+        GUI.Label(br, "<size=" + (IsMobile ? 24 : 21) + "><b><color=#ffffff>스윙!</color></b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter });
+        if (GUI.Button(R(b), "", GUIStyle.none)) { pillowBtnAt = Time.unscaledTime; SwingPillow(null); }
     }
+    float pillowBtnAt = -10f;
 }
