@@ -1,7 +1,8 @@
 // AcQuest.cs - 오늘의 퀘스트 + 퀘스트 포인트 보상 (11-27)
-// 매일(한국 시간 자정 기준) 사람마다 가벼운 퀘스트 3개. 하나 끝낼 때마다 퀘스트 포인트 +1.
+// 매일(한국 시간 자정 기준) 사람마다 가벼운 퀘스트 3개. 3개를 모두 끝내야 퀘스트 포인트 +1 (하루 최대 1).
+// 이름 = 계정: 같은 이름으로 들어오면 어느 기기에서든 포인트·펫·오늘 진행이 이어짐 (이 기기 저장도 이름별로 따로)
 // 보상: 3포인트 = 반짝이는 이름표 / 7포인트 = 펫 시스템 열림 + 루돌프 / 그 뒤 3포인트마다 새 펫 하나(남은 펫 중 랜덤)
-// 저장: orn/x~quest~<이름키> = {qp, pets:"rudolph,fox", day, prog:"piano:2|skate:1", done:"piano", sc:"눈사람id,..."} + 이 기기 PlayerPrefs (둘 중 큰 쪽)
+// 저장: orn/x~quest~<이름키> = {qv:2, qp, aw:포인트받은날, pets:"rudolph,fox", day, prog:"piano:2|skate:1", done:"piano", sc:"눈사람id,..."} + 이 기기 PlayerPrefs (둘 중 큰 쪽)
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +42,7 @@ public partial class AcRoom
     readonly Dictionary<string, int> questProg = new Dictionary<string, int>();
     readonly HashSet<string> questDone = new HashSet<string>(), questSnowc = new HashSet<string>();
     readonly List<string> petsOwned = new List<string>();
+    string questKey = ""; int questAwardDay = -1;
     bool questLoaded, questDirty; float questSaveAt, questMergeAt; bool questOpen;
     float skateAcc, skateLastAng = float.NaN;
 
@@ -51,8 +53,8 @@ public partial class AcRoom
     List<string> MyPets => AllPets ? PetIds.ToList() : petsOwned;
     string CurPet
     {
-        get { if (IsSantaMe) return "rudolph"; var p = PlayerPrefs.GetString("pet_cur", ""); return p == "-" ? "" : (MyPets.Contains(p) ? p : (MyPets.Count > 0 ? MyPets[0] : "")); }
-        set { PlayerPrefs.SetString("pet_cur", string.IsNullOrEmpty(value) ? "-" : value); PlayerPrefs.Save(); }
+        get { if (IsSantaMe) return "rudolph"; var p = PlayerPrefs.GetString(QK("pet_cur"), PlayerPrefs.GetString("pet_cur", "")); return p == "-" ? "" : (MyPets.Contains(p) ? p : (MyPets.Count > 0 ? MyPets[0] : "")); }
+        set { PlayerPrefs.SetString(QK("pet_cur"), string.IsNullOrEmpty(value) ? "-" : value); PlayerPrefs.Save(); }
     }
 
     QuestDef QDef(string id) => QuestPool.FirstOrDefault(q => q.id == id);
@@ -68,17 +70,22 @@ public partial class AcRoom
         questToday.AddRange(ids.Take(3));
     }
 
+    // 이 기기 저장 키: 이름별로 따로 (다른 이름으로 들어오면 그 사람 기록)
+    string QK(string k) => k + "~" + myKey;
     void QuestLoadLocal()
     {
         int day = TodayKst;
-        questPoints = PlayerPrefs.GetInt("quest_qp", 0);
-        petsOwned.Clear(); petsOwned.AddRange(PlayerPrefs.GetString("quest_pets", "").Split(',').Where(p => Array.IndexOf(PetIds, p) >= 0).Distinct());
-        questProg.Clear(); questDone.Clear(); questSnowc.Clear();
-        if (PlayerPrefs.GetInt("quest_day", -1) == day)
+        questKey = myKey;
+        questProg.Clear(); questDone.Clear(); questSnowc.Clear(); petsOwned.Clear(); questPoints = 0; questAwardDay = -1;
+        if (PlayerPrefs.GetInt(QK("quest_qv"), 0) < 2) { questMergeAt = Time.unscaledTime + 2f; questDay = day; PickToday(day); return; }   // 예전(기기 공용) 기록은 안 씀: 서버 기록에서 이어받음
+        questPoints = PlayerPrefs.GetInt(QK("quest_qp"), 0);
+        questAwardDay = PlayerPrefs.GetInt(QK("quest_aw"), -1);
+        petsOwned.AddRange(PlayerPrefs.GetString(QK("quest_pets"), "").Split(',').Where(p => Array.IndexOf(PetIds, p) >= 0).Distinct());
+        if (PlayerPrefs.GetInt(QK("quest_day"), -1) == day)
         {
-            ParseProg(PlayerPrefs.GetString("quest_prog", ""), questProg);
-            foreach (var d in PlayerPrefs.GetString("quest_done", "").Split(',')) if (d != "") questDone.Add(d);
-            foreach (var d in PlayerPrefs.GetString("quest_sc", "").Split(',')) if (d != "") questSnowc.Add(d);
+            ParseProg(PlayerPrefs.GetString(QK("quest_prog"), ""), questProg);
+            foreach (var d in PlayerPrefs.GetString(QK("quest_done"), "").Split(',')) if (d != "") questDone.Add(d);
+            foreach (var d in PlayerPrefs.GetString(QK("quest_sc"), "").Split(',')) if (d != "") questSnowc.Add(d);
         }
         questDay = day; PickToday(day);
     }
@@ -90,16 +97,31 @@ public partial class AcRoom
 
     void QuestSaveLocal()
     {
-        PlayerPrefs.SetInt("quest_qp", questPoints); PlayerPrefs.SetString("quest_pets", string.Join(",", petsOwned));
-        PlayerPrefs.SetInt("quest_day", questDay); PlayerPrefs.SetString("quest_prog", ProgStr);
-        PlayerPrefs.SetString("quest_done", string.Join(",", questDone)); PlayerPrefs.SetString("quest_sc", string.Join(",", questSnowc));
+        PlayerPrefs.SetInt(QK("quest_qv"), 2);
+        PlayerPrefs.SetInt(QK("quest_qp"), questPoints); PlayerPrefs.SetInt(QK("quest_aw"), questAwardDay); PlayerPrefs.SetString(QK("quest_pets"), string.Join(",", petsOwned));
+        PlayerPrefs.SetInt(QK("quest_day"), questDay); PlayerPrefs.SetString(QK("quest_prog"), ProgStr);
+        PlayerPrefs.SetString(QK("quest_done"), string.Join(",", questDone)); PlayerPrefs.SetString(QK("quest_sc"), string.Join(",", questSnowc));
         PlayerPrefs.Save();
+    }
+
+    // 오늘 3개를 다 했는데 아직 포인트를 안 받았으면 +1
+    void QuestCheckAward(bool announce)
+    {
+        if (questToday.Count == 0 || questAwardDay == questDay || !questToday.All(questDone.Contains)) return;
+        questAwardDay = questDay; questPoints++; questDirty = true; questSaveAt = 0;
+        if (announce)
+        {
+            Sfx("candy_win", 0.6f); FxBurst("star", me.transform.position + Vector3.up * 1.6f, 30, 2.4f, 0.07f, FxGold, 1.5f, 1f);
+            string extra = questPoints == 3 ? "  이름표가 반짝반짝해졌어요!" : "";
+            Toast($"오늘의 퀘스트 모두 완료! 포인트 +1 (모두 {questPoints}){extra}");
+        }
+        GrantPets(announce);
     }
 
     void QuestUpdate(float dt)
     {
         if (me == null || string.IsNullOrWhiteSpace(uiName)) return;
-        if (!questLoaded) { questLoaded = true; QuestLoadLocal(); questMergeAt = Time.unscaledTime + 2f; }
+        if (!questLoaded || questKey != myKey) { questLoaded = true; QuestLoadLocal(); questMergeAt = Time.unscaledTime + 1f; }
         if (TodayKst != questDay) { questDay = TodayKst; questProg.Clear(); questDone.Clear(); questSnowc.Clear(); PickToday(questDay); questDirty = true; }
         // 서버 기록과 합치기 (처음 한 번 + 가끔): 다른 기기에서 한 것도 이어짐
         if (questMergeAt > 0 && Time.unscaledTime > questMergeAt && net != null && !net.Offline)
@@ -109,7 +131,10 @@ public partial class AcRoom
             if (all != null && all.TryGetValue(myKey, out var v) && v is Dictionary<string, object> d)
             {
                 int qp = (int)AcJson.D(d, "qp");
+                if ((int)AcJson.D(d, "qv") < 2) qp /= 3;   // 예전 규칙(퀘스트 1개당 1점) 기록은 3개=1점으로 환산
                 if (qp > questPoints) { questPoints = qp; questDirty = true; }
+                int aw = d.ContainsKey("aw") ? (int)AcJson.D(d, "aw") : -1;
+                if (aw > questAwardDay) questAwardDay = aw;
                 foreach (var p in AcJson.S(d, "pets").Split(',')) if (Array.IndexOf(PetIds, p) >= 0 && !petsOwned.Contains(p)) { petsOwned.Add(p); questDirty = true; }
                 if ((int)AcJson.D(d, "day") == questDay)
                 {
@@ -117,8 +142,10 @@ public partial class AcRoom
                     foreach (var x in AcJson.S(d, "done").Split(',')) if (x != "" && questDone.Add(x)) questDirty = true;
                     foreach (var x in AcJson.S(d, "sc").Split(',')) if (x != "" && questSnowc.Add(x)) questDirty = true;
                 }
+                if ((int)AcJson.D(d, "qv") < 2 && questToday.All(questDone.Contains)) questAwardDay = questDay;   // 예전 규칙으로 오늘 3개 다 한 날은 이미 받은 걸로
             }
             GrantPets(false);
+            QuestCheckAward(true);
             questDirty = true;
         }
         // 스케이트로 집 둘레 돌기: 집 가운데를 기준으로 돈 각도를 모음
@@ -137,8 +164,8 @@ public partial class AcRoom
     void QuestSave()
     {
         QuestSaveLocal();
-        if (net == null || net.Offline || string.IsNullOrWhiteSpace(uiName)) return;
-        net.Put("quest/" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"qp\":" + questPoints + ",\"pets\":" + AcJson.Esc(string.Join(",", petsOwned)) +
+        if (net == null || net.Offline || string.IsNullOrWhiteSpace(uiName) || questMergeAt > 0) return;   // 서버 기록을 받아오기 전엔 덮어쓰지 않음
+        net.Put("quest/" + myKey, "{\"qv\":2,\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"qp\":" + questPoints + ",\"aw\":" + questAwardDay + ",\"pets\":" + AcJson.Esc(string.Join(",", petsOwned)) +
                 ",\"day\":" + questDay + ",\"prog\":" + AcJson.Esc(ProgStr) + ",\"done\":" + AcJson.Esc(string.Join(",", questDone)) + ",\"sc\":" + AcJson.Esc(string.Join(",", questSnowc)) +
                 ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
     }
@@ -154,12 +181,12 @@ public partial class AcRoom
         questProg[id] = Math.Min(nv, q.target); questDirty = true;
         if (nv >= q.target)
         {
-            questDone.Add(id); questPoints++;
-            Sfx("candy_win", 0.5f); FxBurst("star", me.transform.position + Vector3.up * 1.6f, 18, 2f, 0.06f, FxGold, 1.3f, 1f);
-            string extra = questPoints == 3 ? "  이름표가 반짝반짝해졌어요!" : "";
-            Toast($"퀘스트 완료! '{QText(q)}'  포인트 +1 (모두 {questPoints}){extra}");
-            GrantPets(true);
+            questDone.Add(id);
+            int nd = questToday.Count(questDone.Contains);
+            Sfx("candy_win", 0.4f); FxBurst("star", me.transform.position + Vector3.up * 1.6f, 14, 2f, 0.06f, FxGold, 1.2f, 1f);
+            if (nd < questToday.Count) Toast($"퀘스트 완료! '{QText(q)}'  ({nd}/{questToday.Count}) 다 하면 포인트 +1");
             questSaveAt = 0;
+            QuestCheckAward(true);
         }
         else if (!asMax || id == "skate") Toast($"퀘스트: {QText(q)}  ({questProg[id]}/{q.target})");
     }
@@ -221,10 +248,10 @@ public partial class AcRoom
         }
         // 포인트와 다음 보상
         GUI.Label(new Rect(r.x + 18, y + 4, w - 36, 24), $"<size=15><b>퀘스트 포인트 {questPoints}</b></size>", sLabel);
-        string next = questPoints < 3 ? $"{3 - questPoints}포인트 더 모으면 반짝이는 이름표"
+        string next = (questAwardDay == questDay ? "오늘 포인트 받았어요! " : "3개 모두 하면 +1 · ") + (questPoints < 3 ? $"{3 - questPoints}포인트 더 모으면 반짝이는 이름표"
                     : questPoints < 7 ? $"{7 - questPoints}포인트 더 모으면 펫 '루돌프'가 따라다녀요"
                     : petsOwned.Count < PetIds.Length ? $"{3 - (questPoints - 7) % 3}포인트 더 모으면 새 펫 (지금 {MyPets.Count}마리)"
-                    : "펫을 모두 모았어요!";
+                    : "펫을 모두 모았어요!");
         if (AllPets) next = $"모든 펫이 열려 있어요 ({PetIds.Length}마리). 꾸미기에서 골라요";
         GUI.Label(new Rect(r.x + 18, y + 30, w - 36, 22), "<size=13>" + next + "</size>", sSmall);
     }
