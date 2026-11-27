@@ -25,6 +25,7 @@ public partial class AcRoom
         public Vector3 vel;
         public MaterialPropertyBlock mpb;
         public float[] legRestY;
+        public Transform harness; public Vector3 lastOwner; public bool hasLastOwner;
     }
 
     // ===== 만들기 도우미 =====
@@ -143,6 +144,21 @@ public partial class AcRoom
             b.Ellipsoid(new Vector3(0, 0.08f, 0.17f), new Vector3(0.085f, 0.11f, 0.08f), fur, 12, 16, Quaternion.Euler(-30, 0, 0), Belly(fur, cream, 0.1f, 0.35f, 1.2f));   // 목
         });
         PCollar(rig.body, new Vector3(0, 0.1f, 0.19f), 0.072f, -35f);
+        // 썰매 끌 때만 보이는 마구: 몸에 두른 빨간 띠 + 금방울, 썰매까지 이어진 고삐 두 줄
+        rig.harness = PPivot(rig.root, "harness", Vector3.zero);
+        PPart(rig.harness, "strap", Vector3.zero, b =>
+        {
+            Color strap = C(0.75f, 0.1f, 0.14f), goldC = C(1f, 0.8f, 0.25f), rein = C(0.45f, 0.25f, 0.15f);
+            b.Torus(new Vector3(0, 0.34f, 0.02f), Vector3.forward, 0.15f, 0.018f, strap, 28, 6);
+            for (int k = -2; k <= 2; k++) { float a = k * 0.42f; b.Sphere(new Vector3(Mathf.Sin(a) * 0.16f, 0.34f + Mathf.Cos(a) * 0.16f, 0.04f), 0.022f, goldC, 8, 10); }
+            foreach (float sg in new[] { -1f, 1f })
+            {
+                var pts = new List<Vector3>(); var rr = new List<float>();
+                for (int i = 0; i <= 10; i++) { float t = i / 10f; pts.Add(new Vector3(sg * Mathf.Lerp(0.15f, 0.26f, t), Mathf.Lerp(0.36f, 0.3f, t) - Mathf.Sin(t * Mathf.PI) * 0.05f, Mathf.Lerp(0.02f, -RudolphGap, t))); rr.Add(0.011f); }
+                b.Tube(pts, rr, rein, 6);
+            }
+        });
+        rig.harness.gameObject.SetActive(false);
         rig.tail = PPart(rig.body, "tail", new Vector3(0, 0.07f, -0.22f), b => b.Ellipsoid(new Vector3(0, 0.01f, -0.025f), new Vector3(0.045f, 0.055f, 0.04f), cream, 8, 12));
         rig.head = PPivot(rig.body, "head", new Vector3(0, 0.22f, 0.25f));
         PPart(rig.head, "skull", Vector3.zero, b =>
@@ -490,25 +506,46 @@ public partial class AcRoom
 
     // ===== 움직임 =====
     // owner: 따라갈 캐릭터. 펫 위치·자세를 이번 프레임에 맞게
-    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap, Vector2? slot = null, float? idleFace = null)
+    const float RudolphGap = 0.95f;   // 루돌프 몸 가운데에서 썰매 앞까지 (고삐 길이)
+    // 산타 썰매: 루돌프를 썰매 앞에 단단히 붙여서 끌게 함 (펫처럼 따라오지 않음)
+    void PetHarness(PetRig rig, AcCharacter owner, float dt)
+    {
+        var fwd = owner.transform.forward; fwd.y = 0; fwd.Normalize();
+        float front = owner.SantaR * 5.2f * 0.5f - owner.SantaR * 0.4f;   // 썰매 앞 끝 (AcCharacter.BuildSled 기준)
+        var pos = owner.transform.position + fwd * (front + RudolphGap);
+        var ov = rig.hasLastOwner && dt > 0 ? (owner.transform.position - rig.lastOwner) / dt : Vector3.zero; ov.y = 0;
+        rig.lastOwner = owner.transform.position; rig.hasLastOwner = true;
+        if (rig.harness && !rig.harness.gameObject.activeSelf) rig.harness.gameObject.SetActive(true);
+        rig.root.position = pos;
+        rig.vel = Vector3.ClampMagnitude(ov, 3.2f);   // 걸음 움직임은 빨라도 달리기 정도까지만
+        rig.yaw = Mathf.Atan2(fwd.x, fwd.z) * Mathf.Rad2Deg;
+        PetStep(rig, owner.transform, rig.yaw, dt, false, null, null, true);
+    }
+
+    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap, Vector2? slot = null, float? idleFace = null, bool harnessed = false)
     {
         if (rig == null || rig.root == null || owner == null) return;
+        if (!harnessed && rig.harness && rig.harness.gameObject.activeSelf) { rig.harness.gameObject.SetActive(false); rig.hasLastOwner = false; }
         var fwd = Quaternion.Euler(0, ownerYaw, 0) * Vector3.forward; var right = Quaternion.Euler(0, ownerYaw, 0) * Vector3.right;
         var so = slot ?? new Vector2(0.6f, -0.75f);
         var target = owner.position + fwd * so.y + right * so.x; target.y = owner.position.y;
         var pos = rig.root.position;
         var flat = new Vector3(target.x - pos.x, 0, target.z - pos.z);
         float d = flat.magnitude;
-        if (snap || d > 9f) { rig.root.position = target; rig.vel = Vector3.zero; rig.yaw = ownerYaw; pos = target; d = 0; flat = Vector3.zero; }
+        if (harnessed) { pos = rig.root.position; d = 0; flat = Vector3.zero; }
+        else if (snap || d > 9f) { rig.root.position = target; rig.vel = Vector3.zero; rig.yaw = ownerYaw; pos = target; d = 0; flat = Vector3.zero; }
         // 따라가기: 멀수록 빨리 (최대 8 m/s), 가까우면 멈춤
         Vector3 want = Vector3.zero;
-        if (d > 0.35f) want = flat / d * Mathf.Min(16f, (d - 0.25f) * 2.6f + 0.6f);
-        rig.vel = Vector3.Lerp(rig.vel, want, 1 - Mathf.Exp(-dt * 7f));
-        pos += rig.vel * dt; pos.y = Mathf.Lerp(pos.y, target.y, 1 - Mathf.Exp(-dt * 10f));
-        rig.root.position = pos;
+        if (!harnessed)
+        {
+            if (d > 0.35f) want = flat / d * Mathf.Min(16f, (d - 0.25f) * 2.6f + 0.6f);
+            rig.vel = Vector3.Lerp(rig.vel, want, 1 - Mathf.Exp(-dt * 7f));
+            pos += rig.vel * dt; pos.y = Mathf.Lerp(pos.y, target.y, 1 - Mathf.Exp(-dt * 10f));
+            rig.root.position = pos;
+        }
         float spd = rig.vel.magnitude; rig.spd = Mathf.Lerp(rig.spd, spd, 1 - Mathf.Exp(-dt * 8f));
         bool moving = rig.spd > 0.12f;
-        float wantYaw = moving ? Mathf.Atan2(rig.vel.x, rig.vel.z) * Mathf.Rad2Deg : (rig.idle > 1.2f ? (idleFace ?? Mathf.Atan2(owner.position.x - pos.x, owner.position.z - pos.z) * Mathf.Rad2Deg) : rig.yaw);
+        float wantYaw = harnessed ? ownerYaw : moving ? Mathf.Atan2(rig.vel.x, rig.vel.z) * Mathf.Rad2Deg : (rig.idle > 1.2f ? (idleFace ?? Mathf.Atan2(owner.position.x - pos.x, owner.position.z - pos.z) * Mathf.Rad2Deg) : rig.yaw);
         rig.yaw = Mathf.LerpAngle(rig.yaw, wantYaw, 1 - Mathf.Exp(-dt * (moving ? 9f : 3f)));
         rig.root.rotation = Quaternion.Euler(0, rig.yaw, 0);
         rig.idle = moving ? 0 : rig.idle + dt;
@@ -682,8 +719,8 @@ public partial class AcRoom
             bool vis = phase != Phase.Lobby && me.gameObject.activeInHierarchy && !me.Hidden && !kitchenOpen && !GiftBusy && !playingGame;
             if (vis && !myPet.root.gameObject.activeSelf) { SetPetVisible(myPet, true); PetStep(myPet, me.transform, yaw, dt, true); }
             else SetPetVisible(myPet, vis);
-            bool pull = IsSantaMe && me.skating;   // 산타 썰매: 루돌프가 앞에서 끔
-            if (vis) PetStep(myPet, me.transform, yaw, dt, false, pull ? new Vector2(0, 1.7f) : (Vector2?)null, pull ? yaw : (float?)null);
+            bool pull = IsSantaMe && me.skating && me.santa;   // 산타 썰매: 루돌프가 마구를 차고 앞에서 끔
+            if (vis) { if (pull) PetHarness(myPet, me, dt); else PetStep(myPet, me.transform, yaw, dt, false); }
         }
         // 다른 사람 펫
         foreach (var kv in remotes)
@@ -697,7 +734,7 @@ public partial class AcRoom
             if (vis && !rp.root.gameObject.activeSelf) { SetPetVisible(rp, true); PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, true); }
             else SetPetVisible(rp, vis);
             bool rpull = r.c.santa && r.c.skating;
-            if (vis) PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, false, rpull ? new Vector2(0, 1.7f) : (Vector2?)null, rpull ? r.c.transform.eulerAngles.y : (float?)null);
+            if (vis) { if (rpull) PetHarness(rp, r.c, dt); else PetStep(rp, r.c.transform, r.c.transform.eulerAngles.y, dt, false); }
         }
         // 나간 사람 펫 정리
         List<string> gone = null;
