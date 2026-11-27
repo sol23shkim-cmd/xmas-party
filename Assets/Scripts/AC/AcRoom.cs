@@ -251,6 +251,34 @@ public partial class AcRoom : MonoBehaviour
 
     // ========================================================
     // 방
+    // 오두막(house_cottage) 박공벽: 벽 위(y 3)와 지붕 아래 사이 오각형을 앞뒤로 막고, 앞쪽엔 둥근 다락 창
+    static void CottageGable(Transform cot)
+    {
+        var b = new AcPB { detail = 1.2f };
+        Color wall = new Color(0.93f, 0.86f, 0.73f), trim = new Color(0.98f, 0.96f, 0.92f);
+        var pent = new[] { new Vector2(-2.48f, 2.95f), new Vector2(2.48f, 2.95f), new Vector2(2.48f, 3.38f), new Vector2(0f, 5.36f), new Vector2(-2.48f, 3.38f) };
+        foreach (float zf in new[] { 2.17f, -2.17f })
+        {
+            var nrm = new Vector3(0, 0, Mathf.Sign(zf));
+            int c0 = b.V(new Vector3(0, 3.8f, zf), nrm, wall, 1f);
+            var idx = new int[pent.Length];
+            for (int i = 0; i < pent.Length; i++) idx[i] = b.V(new Vector3(pent[i].x, pent[i].y, zf), nrm, wall, 0.92f);
+            for (int i = 0; i < pent.Length; i++) b.Tri(c0, idx[i], idx[(i + 1) % pent.Length]);
+            // 나무 판자 느낌의 가로 줄
+            for (int k = 0; k < 5; k++) { float y = 3.25f + k * 0.38f; float hw = Mathf.Min(2.45f, (5.36f - y) / 0.79f); if (hw > 0.15f) b.Box(new Vector3(0, y, zf + 0.012f * Mathf.Sign(zf)), new Vector3(hw * 2f, 0.025f, 0.01f), new Color(0.86f, 0.78f, 0.64f)); }
+        }
+        // 위아래 사이를 막는 몸통(지붕 밑 다락) — 옆에서 봐도 비지 않게
+        b.Box(new Vector3(0, 3.15f, 0), new Vector3(4.96f, 0.4f, 4.34f), wall);
+        var go = ProcObj("cottage_gable", b.M("cottage_gable"), cot);
+        // 둥근 다락 창 (밤에 불빛)
+        var wb = new AcPB { detail = 1.4f };
+        wb.Torus(new Vector3(0, 4.15f, 2.2f), Vector3.forward, 0.34f, 0.05f, trim, 24, 6);
+        wb.Disk(new Vector3(0, 4.15f, 2.19f), Vector3.forward, 0.32f, new Color(1f, 0.86f, 0.5f), 20, false);
+        wb.Box(new Vector3(0, 4.15f, 2.2f), new Vector3(0.6f, 0.04f, 0.02f), trim);
+        wb.Box(new Vector3(0, 4.15f, 2.2f), new Vector3(0.04f, 0.6f, 0.02f), trim);
+        ProcObj("cottage_attic", wb.M("cottage_attic"), cot, 0.6f);
+    }
+
     GameObject Put(string name, Vector3 pos, float rotY = 0, float scale = 1, Dictionary<string, Color> tints = null, Transform parent = null)
     {
         var go = AcCatalog.Spawn(name, parent ? parent : world, tints);
@@ -361,7 +389,8 @@ public partial class AcRoom : MonoBehaviour
         }
         Put("frozen_pond", new Vector3(-HouseHalf * 0.55f, 0, HalfZ + 10f), 10, 1.0f, null, o);
         Put("frozen_pond", new Vector3(HouseHalf * 0.6f, 0, HouseZ0 - 9f), -15, 1.0f, null, o);
-        Put("house_cottage", new Vector3(-6f, 0, HouseZ0 - 13f), 15, 1.2f, null, o);
+        var cot = Put("house_cottage", new Vector3(-6f, 0, HouseZ0 - 13f), 15, 1.2f, null, o);
+        if (cot) CottageGable(cot.transform);   // 지붕 밑 삼각형 벽(박공)이 모델에 없어 하늘이 비쳐 보이던 것 메움
         for (int i = -3; i <= 2; i++) Put("fence", new Vector3(-6f + i * 2.1f * 1.2f, 0, HouseZ0 - 8.5f), 0, 1.2f, null, o);
         // 안뜰: 벤치·가로등·작은 나무
         Put("bench", new Vector3(-4.5f, 0, -HalfZ - 7f), 90, 1.2f, null, o);
