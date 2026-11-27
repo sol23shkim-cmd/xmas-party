@@ -413,19 +413,19 @@ public class AcCharacter : MonoBehaviour
             float thMax = 105f * Mathf.Deg2Rad;
             for (int i = 0; i <= nT; i++)
             {
-                float th = Mathf.Lerp(-thMax, thMax, i / (float)nT);
-                float side = Mathf.Abs(th) / thMax;                    // 0 = 앞, 1 = 귀 옆
+                float bth = Mathf.Lerp(-thMax, thMax, i / (float)nT);
+                float side = Mathf.Abs(bth) / thMax;                    // 0 = 앞, 1 = 귀 옆
                 float phTop = Mathf.Lerp(26f, -8f, Mathf.SmoothStep(0.25f, 0.85f, side)) * Mathf.Deg2Rad;   // 위쪽 경계: 앞은 입 아래, 옆은 귀 높이
                 float phBot = Mathf.Lerp(98f, 70f, side) * Mathf.Deg2Rad;
                 for (int j = 0; j <= nP; j++)
                 {
                     float v = j / (float)nP;
                     float ph = Mathf.Lerp(phTop, phBot, v);
-                    var dir = new Vector3(Mathf.Sin(th) * Mathf.Cos(ph), -Mathf.Sin(ph), Mathf.Cos(th) * Mathf.Cos(ph));
+                    var dir = new Vector3(Mathf.Sin(bth) * Mathf.Cos(ph), -Mathf.Sin(ph), Mathf.Cos(bth) * Mathf.Cos(ph));
                     float edge = Mathf.Min(Mathf.SmoothStep(0, 1, v * 4f), Mathf.SmoothStep(0, 1, (1 - side) * 6f));   // 가장자리는 얇게
-                    float curl = 0.5f + 0.5f * Mathf.Sin(th * 9f + v * 7f) * Mathf.Sin(v * 11f + th * 3f);
+                    float curl = 0.5f + 0.5f * Mathf.Sin(bth * 9f + v * 7f) * Mathf.Sin(v * 11f + bth * 3f);
                     float thick = R * (0.08f + 0.14f * edge + 0.05f * curl * edge);
-                    float hang = R * 0.62f * Mathf.Pow(Mathf.Max(0, Mathf.Cos(th * 1.25f)), 2f) * Mathf.SmoothStep(0, 1, v);   // 턱 아래로 늘어짐 (가운데가 가장 길게)
+                    float hang = R * 0.62f * Mathf.Pow(Mathf.Max(0, Mathf.Cos(bth * 1.25f)), 2f) * Mathf.SmoothStep(0, 1, v);   // 턱 아래로 늘어짐 (가운데가 가장 길게)
                     var po = hc + dir * (R * 0.99f + thick) + Vector3.down * hang + Vector3.forward * hang * 0.35f;
                     var pi2 = hc + dir * (R * 0.97f) + Vector3.down * hang * 0.6f;
                     var c = Color.Lerp(new Color(0.84f, 0.85f, 0.88f), Color.white, 0.55f + 0.45f * curl) ;
