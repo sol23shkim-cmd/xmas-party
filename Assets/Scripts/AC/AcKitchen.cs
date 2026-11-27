@@ -1,6 +1,6 @@
 // AcKitchen.cs - 부엌의 '산타의 크리스마스 주방' (오버쿡처럼 함께 요리하기, 11-26)
 // 부엌에서 '크리스마스 주방 게임' → 따로 떨어진 주방 무대(6000,0,6000)로 들어가 대기실(연습 가능) → 누군가 '시작!'
-// 시작한 사람이 방장: 주문·판정을 맡고 상태를 ck/st 에 0.2초마다 올림. 손님은 행동(잡기/놓기·문지르기)을 act "ka"로 보냄.
+// 시작한 사람이 방장: 주문·판정을 맡고 상태를 ck/st 에 0.2초마다 올림. 손님은 행동(잡기/놓기·썰기)을 act "ka"로 보냄.
 // 내 캐릭터를 무대로 옮겨서 움직이므로, 다른 사람 위치는 원래 동기화 그대로 보임.
 // 저장: orn/x~ck~cur (판 정보), orn/x~ck~st (진행 상태), orn/x~cks~<스테이지>~<시각> (기록: names, score, stars, n)
 using System;
@@ -286,7 +286,10 @@ public partial class AcRoom
     void PutKState() => net.Put("ck/st", "{\"j\":" + AcJson.Esc(JsonUtility.ToJson(ks)) + "}");
 
     // ===== 움직이기 =====
-    Vector3 kVel; Vector2 kStick; int kTarget = -1; float kChopAccum;
+    Vector3 kVel; Vector2 kStick; int kTarget = -1;
+    int kAutoChop = -1; float kAutoChopNext; const float AutoChopGap = 0.3f;
+    bool CanChopHere() => kTarget >= 0 && Kc.At(KS, kTarget) == 'X' && Kc.Chopped(Kc.ItemAt(ks, kTarget)) != null;
+    void StartAutoChop() { if (km == KMode.Count || km == KMode.Result || !CanChopHere()) return; if (kAutoChop != kTarget) { kAutoChop = kTarget; kAutoChopNext = Time.time; } }
     void KitchenMove(float dt)
     {
         // 손가락이 없을 때(마우스로 휴대폰 화면을 흉내 낼 때): 왼쪽을 누른 채 끌면 이동
@@ -302,7 +305,7 @@ public partial class AcRoom
         if (want.sqrMagnitude > 1) want.Normalize();
         var cell = KCell(me.transform.position);
         bool ice = KAt(cell.x, cell.y) == 'i';
-        const float speed = 3.4f;
+        const float speed = 4.8f;   // 휴대폰에서도 답답하지 않게 (예전 3.4)
         kVel = ice ? Vector3.Lerp(kVel, want * speed * 1.15f, 1 - Mathf.Exp(-dt * 1.6f)) : Vector3.Lerp(kVel, want * speed, 1 - Mathf.Exp(-dt * 14f));
         var p = me.transform.position + kVel * dt;
         p = KCollide(p, 0.34f);
@@ -315,9 +318,15 @@ public partial class AcRoom
         me.transform.rotation = Quaternion.Slerp(me.transform.rotation, Quaternion.Euler(0, yaw, 0), 1 - Mathf.Exp(-dt * 16f));
         // 바라보는 칸
         kTarget = FindTarget();
-        // PC: 스페이스 잡기/놓기, E 문지르기
+        // PC: 스페이스 잡기/놓기, E 썰기 (한 번 누르면 다 썰릴 때까지 알아서)
         if (Key("space") || Key("j")) { if (kTarget >= 0) KDo('g', kTarget); }
-        if ((Key("e") || Key("k")) && kTarget >= 0 && Kc.At(KS, kTarget) == 'X') KDo('c', kTarget);
+        if ((Key("e") || Key("k")) && CanChopHere()) StartAutoChop();
+        // 자동 썰기: 도마 앞에 서 있는 동안 일정 간격으로 한 번씩. 움직이거나 다른 곳을 보면 멈춤
+        if (kAutoChop >= 0)
+        {
+            if (kAutoChop != kTarget || want.sqrMagnitude > 0.09f || !CanChopHere()) kAutoChop = -1;
+            else if (Time.time >= kAutoChopNext) { kAutoChopNext = Time.time + AutoChopGap; KDo('c', kAutoChop); }
+        }
     }
 
     int FindTarget()
@@ -368,21 +377,27 @@ public partial class AcRoom
         // 주방이 들어갈 화면 띠 (아래는 조작 버튼, 위는 주문표): 화면 아래에서부터의 비율
         float lo = portrait ? (km == KMode.Lobby ? 0.41f : 0.21f) : (km == KMode.Lobby ? 0.3f : 0.14f);   // 아래: 조작 막대·버튼 위로
         float hi = portrait ? (km == KMode.Lobby ? 0.97f : 0.79f) : (km == KMode.Lobby ? 0.97f : 0.82f);  // 위: 주문표·시간·점수 아래로
-        if (Mathf.Abs(kCamAspect - cam.aspect) > 0.001f || kCamMode != km || kCamDist <= 0) { kCamAspect = cam.aspect; kCamMode = km; FitKitchenCamera(pitch, lo, hi); }
+        // 세로 화면에서 게임 중: 주방 전체 대신 가로 약 6칸만 크게 보여주고 내 캐릭터를 따라 좌우로 움직임
+        float fullHx = Kc.W * Kc.Tile * 0.5f + 0.2f;
+        float fitHx = portrait && km != KMode.Lobby ? Mathf.Min(fullHx, 3.15f * Kc.Tile + 0.2f) : fullHx;
+        if (Mathf.Abs(kCamAspect - cam.aspect) > 0.001f || kCamMode != km || kCamDist <= 0 || Mathf.Abs(kCamHx - fitHx) > 0.01f) { kCamAspect = cam.aspect; kCamMode = km; kCamHx = fitHx; FitKitchenCamera(pitch, lo, hi, fitHx); }
+        float panMax = fullHx - fitHx;
+        float wantX = panMax > 0.01f ? Mathf.Clamp(me.transform.position.x - KO.x, -panMax, panMax) : 0f;
+        kCamX = snap ? wantX : Mathf.Lerp(kCamX, wantX, 1 - Mathf.Exp(-dt * 5f));
         var rot = Quaternion.Euler(pitch, 0, 0);
-        var want = KO + new Vector3(0, 0.5f, kCamFz) - rot * Vector3.forward * kCamDist;
+        var want = KO + new Vector3(kCamX, 0.5f, kCamFz) - rot * Vector3.forward * kCamDist;
         cam.transform.position = snap ? want : Vector3.Lerp(cam.transform.position, want, 1 - Mathf.Exp(-dt * 8f));
         cam.transform.rotation = rot;
         cam.nearClipPlane = 0.3f;
         return true;
     }
-    float kCamAspect, kCamDist, kCamFz; KMode kCamMode = (KMode)(-1);
+    float kCamAspect, kCamDist, kCamFz, kCamHx, kCamX; KMode kCamMode = (KMode)(-1);
 
     // 주방 네 귀퉁이가 화면 띠 안에 꼭 들어오는 가장 가까운 거리와 위치를 찾음
-    void FitKitchenCamera(float pitch, float lo, float hi)
+    void FitKitchenCamera(float pitch, float lo, float hi, float hx)
     {
         var rot = Quaternion.Euler(pitch, 0, 0);
-        float hx = Kc.W * Kc.Tile * 0.5f + 0.2f, hz = Kc.H * Kc.Tile * 0.5f + 0.2f;
+        float hz = Kc.H * Kc.Tile * 0.5f + 0.2f;
         var corners = new List<Vector3>();
         foreach (float x in new[] { -hx, hx }) foreach (float z in new[] { -hz, hz }) foreach (float y in new[] { 0f, 1.1f }) corners.Add(KO + new Vector3(x, y, z));
         var oldPos = cam.transform.position; var oldRot = cam.transform.rotation;
@@ -825,7 +840,7 @@ public partial class AcRoom
 
     // ===== 화면 =====
     // 조작 영역 (화면 UI 좌표)
-    Rect kBtnRect, kPadRect; Vector2 kStickBase; bool kStickOn; int kStickTouch = -1, kPadTouch = -1; Vector2 kPadLast; bool kBtnTouchDown;
+    Rect kBtnRect, kPadRect; Vector2 kStickBase; bool kStickOn; int kStickTouch = -1; bool kBtnTouchDown; readonly HashSet<int> kKnownTouch = new HashSet<int>(), kNowTouch = new HashSet<int>();
 
     void KitchenGUI()
     {
@@ -1005,7 +1020,7 @@ public partial class AcRoom
         }
     }
 
-    // 조작: 왼쪽 아래 고정 조작 막대 = 이동 (늘 같은 자리에 보임), 오른쪽 아래 동그란 버튼 = 잡기/놓기, 도마 앞이면 버튼 위 문지르기 판
+    // 조작: 왼쪽 아래 고정 조작 막대 = 이동 (늘 같은 자리에 보임), 오른쪽 아래 동그란 버튼 = 잡기/놓기, 도마 앞이면 버튼 위 썰기 버튼 (한 번 누르면 자동으로 다 썰림)
     float KJoyR => SW < 640 ? 62 : 56;
     float kLobbyTop;   // 대기실 판 위쪽 (대기실에서는 조작 막대를 판 바로 위에)
     Vector2 KJoyC => km == KMode.Lobby ? new Vector2(18 + KJoyR + 6, kLobbyTop - KJoyR - 14) : new Vector2(18 + KJoyR + 6, SH - 24 - KJoyR - 6);
@@ -1023,9 +1038,9 @@ public partial class AcRoom
         bool narrow = SW < 640;
         float bs = narrow ? 104 : 92;
         kBtnRect = new Rect(SW - bs - 20, SH - bs - 26, bs, bs);
-        bool chopHere = kTarget >= 0 && Kc.At(KS, kTarget) == 'X' && Kc.Chopped(Kc.ItemAt(ks, kTarget)) != null;
-        float pw = narrow ? 190 : 210, ph = narrow ? 108 : 100;
-        kPadRect = chopHere ? new Rect(SW - 16 - pw, kBtnRect.y - ph - 14, pw, ph) : new Rect(-999, -999, 0, 0);
+        bool chopHere = CanChopHere();
+        float cs = narrow ? 88 : 80;   // 썰기 버튼: 잡기 버튼 바로 위, 동그랗게
+        kPadRect = chopHere ? new Rect(kBtnRect.center.x - cs / 2 - (narrow ? 18 : 14), kBtnRect.y - cs - 16, cs, cs) : new Rect(-999, -999, 0, 0);
         string label = KActionLabel();
         var mid = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter };
         // 동그란 행동 버튼: 할 수 있는 일이 있으면 빨갛게 빛남, 없으면 흐린 흰색
@@ -1044,28 +1059,18 @@ public partial class AcRoom
         {
             bool spread = Kc.IsSpread(Kc.ItemAt(ks, kTarget));
             var t = Kc.TileAt(ks, kTarget, false);
-            AcUiTheme.Fill(new Rect(kPadRect.x + 1, kPadRect.y + 4, kPadRect.width, kPadRect.height), new Color(0.3f, 0.2f, 0.2f, 0.2f), 3);
-            AcUiTheme.Fill(kPadRect, new Color(1f, 0.97f, 0.88f, 0.96f), 3);
-            AcUiTheme.Ring(kPadRect, AcUiTheme.Gold, 3);
-            GUI.Label(new Rect(kPadRect.x, kPadRect.y + 6, kPadRect.width, 30), "<size=17><b>" + (spread ? "쓱쓱 문질러 바르기" : "쓱쓱 문질러 썰기") + "</b></size>", mid);
-            int done = t != null ? Mathf.RoundToInt(t.p) : 0;
-            for (int k = 0; k < Kc.Strokes; k++)
-            {
-                var d = new Rect(kPadRect.center.x - Kc.Strokes * 17 + k * 34 + 5, kPadRect.y + 40, 24, 24);
-                AcUiTheme.Circle(d, k < done ? new Color(1f, 0.7f, 0.2f) : new Color(0.86f, 0.83f, 0.79f));
-            }
-            // 좌우로 움직이는 손 표시
-            float hx = kPadRect.center.x + Mathf.Sin(Time.time * 6f) * (kPadRect.width * 0.3f);
-            AcUiTheme.Circle(new Rect(hx - 7, kPadRect.yMax - 26, 14, 14), new Color(0.75f, 0.55f, 0.35f, 0.6f));
-            GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 24, kPadRect.width, 22), "<size=12>" + (IsMobile ? "좌우로 문질러요" : "끌거나 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+            float prog = t != null ? Mathf.Clamp01(t.p / Kc.Strokes) : 0;
+            bool going = kAutoChop == kTarget;
+            var cr = going ? new Rect(kPadRect.x + 3, kPadRect.y + 3, kPadRect.width - 6, kPadRect.height - 6) : kPadRect;
+            if (!going) AcUiTheme.DrawGlow(cr, 0.6f + 0.4f * Mathf.Sin(Time.time * 6f));
+            AcUiTheme.Circle(new Rect(cr.x + 2, cr.y + 5, cr.width, cr.height), new Color(0.3f, 0.15f, 0.2f, 0.25f));
+            AcUiTheme.Circle(cr, new Color(1f, 0.66f, 0.18f));
+            AcUiTheme.CircleRing(cr, AcUiTheme.Gold);
+            // 진행: 아래에서부터 차오르는 띠
+            if (prog > 0) AcUiTheme.Fill(new Rect(cr.x + cr.width * 0.18f, cr.yMax - 16, cr.width * 0.64f * prog, 6), new Color(1f, 1f, 1f, 0.95f), 0);
+            GUI.Label(new Rect(cr.x, cr.y - 4, cr.width, cr.height), "<size=" + (narrow ? 20 : 18) + "><b><color=#ffffff>" + (spread ? "바르기" : "썰기") + "</color></b></size>", mid);
             R(kPadRect);
-            var e = Event.current;
-            if (Time.unscaledTime - kTouchAt > 1.5f)
-            {
-                if (e.type == EventType.MouseDown && kPadRect.Contains(e.mousePosition)) { kPadMouse = true; kPadLast = e.mousePosition; kChopAccum = 0; e.Use(); }
-                if (e.type == EventType.MouseDrag && kPadMouse) { kChopAccum += (e.mousePosition - kPadLast).magnitude; kPadLast = e.mousePosition; if (kChopAccum > 70f) { kChopAccum = 0; KDo('c', kTarget); } e.Use(); }
-                if (e.type == EventType.MouseUp) kPadMouse = false;
-            }
+            if (GUI.Button(kPadRect, "", GUIStyle.none) && Time.unscaledTime - kTouchAt > 1.5f) StartAutoChop();
         }
         // 고정 조작 막대 (휴대폰): 받침은 늘 같은 자리, 손잡이만 움직임
         if (IsMobile)
@@ -1083,10 +1088,10 @@ public partial class AcRoom
             AcUiTheme.CircleRing(new Rect(kp.x - kr, kp.y - kr, kr * 2, kr * 2), new Color(0.75f, 0.72f, 0.86f));
         }
         else if (km != KMode.Lobby)
-            GUI.Label(new Rect(16, SH - 34, SW * 0.6f, 24), "<size=12>WASD/방향키 이동,  스페이스 잡기/놓기,  E 문지르기</size>", sSmall);
+            GUI.Label(new Rect(16, SH - 34, SW * 0.6f, 24), "<size=12>WASD/방향키 이동,  스페이스 잡기/놓기,  E 썰기</size>", sSmall);
         KTouch();
     }
-    bool kPadMouse, kBtnMouse; float kBtnMouseAt;
+    bool kBtnMouse; float kBtnMouseAt;
 
     string KActionLabel()
     {
@@ -1102,42 +1107,39 @@ public partial class AcRoom
         return "";
     }
 
-    // 여러 손가락 (이동 + 버튼 + 문지르기 동시에)
+    // 여러 손가락 (이동 + 버튼 동시에)
     void KTouch()
     {
         if (Event.current.type != EventType.Repaint) return;
 #if ENABLE_INPUT_SYSTEM
         var ts = Touchscreen.current;
         if (ts == null) return;
-        bool stickAlive = false, padAlive = false;
+        bool stickAlive = false;
+        kNowTouch.Clear();
         foreach (var t in ts.touches)
         {
             int id = t.touchId.ReadValue();
             var ph = t.phase.ReadValue();
             var pos = t.position.ReadValue();                       // 화면 픽셀, 아래가 0
             var ui = new Vector2(pos.x / UiK, (Screen.height - pos.y) / UiK);
-            bool began = ph == UnityEngine.InputSystem.TouchPhase.Began;
             bool active = ph == UnityEngine.InputSystem.TouchPhase.Began || ph == UnityEngine.InputSystem.TouchPhase.Moved || ph == UnityEngine.InputSystem.TouchPhase.Stationary;
             if (!active) continue;
+            kNowTouch.Add(id);
+            // 새 손가락: Began을 한 프레임 놓쳐도 처음 보는 손가락이면 새로 누른 것으로 침
+            bool began = ph == UnityEngine.InputSystem.TouchPhase.Began || !kKnownTouch.Contains(id);
             if (began)
             {
                 kTouchAt = Time.unscaledTime;
                 var bc = kBtnRect.center; float br = kBtnRect.width * 0.62f;   // 동그란 버튼 + 둘레 조금 너그럽게
                 if ((ui - bc).magnitude < br) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
-                if (kPadRect.Contains(ui)) { kPadTouch = id; kPadLast = ui; kChopAccum = 0; continue; }
+                if (kPadRect.width > 0 && (ui - kPadRect.center).magnitude < kPadRect.width * 0.62f) { StartAutoChop(); continue; }
                 if (KJoyZone(ui) && kStickTouch < 0) kStickTouch = id;
             }
             if (id == kStickTouch) { stickAlive = true; kStick = KJoyVec(ui); }
-            if (id == kPadTouch)
-            {
-                padAlive = true;
-                kChopAccum += (ui - kPadLast).magnitude; kPadLast = ui;
-                if (kChopAccum > 55f) { kChopAccum = 0; if (kTarget >= 0) KDo('c', kTarget); }
-            }
         }
+        kKnownTouch.Clear(); foreach (var id in kNowTouch) kKnownTouch.Add(id);
         if (!stickAlive && kStickTouch >= 0) { kStickTouch = -1; kStick = Vector2.zero; kStickOn = false; }
         if (stickAlive) kStickOn = true;
-        if (!padAlive) kPadTouch = -1;
         bool anyBtn = false; foreach (var t in ts.touches) if (t.touchId.ReadValue() == kBtnSeen && t.press.isPressed) anyBtn = true;
         if (!anyBtn) kBtnSeen = -1;
 #endif
