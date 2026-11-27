@@ -490,7 +490,7 @@ public partial class AcRoom
 
     // ===== 움직임 =====
     // owner: 따라갈 캐릭터. 펫 위치·자세를 이번 프레임에 맞게
-    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap, Vector2? slot = null)
+    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap, Vector2? slot = null, float? idleFace = null)
     {
         if (rig == null || rig.root == null || owner == null) return;
         var fwd = Quaternion.Euler(0, ownerYaw, 0) * Vector3.forward; var right = Quaternion.Euler(0, ownerYaw, 0) * Vector3.right;
@@ -508,7 +508,7 @@ public partial class AcRoom
         rig.root.position = pos;
         float spd = rig.vel.magnitude; rig.spd = Mathf.Lerp(rig.spd, spd, 1 - Mathf.Exp(-dt * 8f));
         bool moving = rig.spd > 0.12f;
-        float wantYaw = moving ? Mathf.Atan2(rig.vel.x, rig.vel.z) * Mathf.Rad2Deg : (rig.idle > 1.2f ? Mathf.Atan2(owner.position.x - pos.x, owner.position.z - pos.z) * Mathf.Rad2Deg : rig.yaw);
+        float wantYaw = moving ? Mathf.Atan2(rig.vel.x, rig.vel.z) * Mathf.Rad2Deg : (rig.idle > 1.2f ? (idleFace ?? Mathf.Atan2(owner.position.x - pos.x, owner.position.z - pos.z) * Mathf.Rad2Deg) : rig.yaw);
         rig.yaw = Mathf.LerpAngle(rig.yaw, wantYaw, 1 - Mathf.Exp(-dt * (moving ? 9f : 3f)));
         rig.root.rotation = Quaternion.Euler(0, rig.yaw, 0);
         rig.idle = moving ? 0 : rig.idle + dt;
@@ -657,8 +657,8 @@ public partial class AcRoom
             if (galleryPets.Count == 0) foreach (var id in PetIds) galleryPets.Add(MakePet(id));
             for (int i = 0; i < galleryPets.Count; i++)
             {
-                var slot = new Vector2((i % 4 - 1.5f) * 0.85f, -1.2f - (i / 4) * 0.9f);
-                PetStep(galleryPets[i], me.transform, yaw, dt, false, slot);
+                var slot = new Vector2((i % 4 - 1.5f) * 0.8f, 1.0f + (2 - i / 4) * 0.75f);   // 내 앞(카메라 쪽)에 4마리씩 세 줄
+                PetStep(galleryPets[i], me.transform, 0f, dt, false, slot, -20f + (i % 4) * 13f);
             }
             return;
         }
