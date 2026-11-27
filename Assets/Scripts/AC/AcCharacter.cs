@@ -304,6 +304,7 @@ public class AcCharacter : MonoBehaviour
         }
         if (armL) armL.localRotation = Quaternion.Euler(aL);
         if (armR) armR.localRotation = Quaternion.Euler(aR);
+        ArmsClearHead();
         if (legL) legL.localRotation = Quaternion.Euler(lL);
         if (legR) legR.localRotation = Quaternion.Euler(lR);
         if (tail) tail.localRotation = Quaternion.Euler(0, s * 25f, 0);
@@ -536,6 +537,22 @@ public class AcCharacter : MonoBehaviour
         sled.GetComponent<MeshRenderer>().enabled = !hidden;
     }
 
+    // 팔을 번쩍 들 때 손이 큰 머리 속으로 파묻히지 않게: 머리 위쪽으로 향하면 옆으로 벌려(머리 옆에서 멈춤) 줌
+    void ArmsClearHead() { ClearArm(armL, -1f); ClearArm(armR, 1f); }
+    static void ClearArm(Transform arm, float side)
+    {
+        if (!arm) return;
+        var d = arm.localRotation * Vector3.down;            // 손이 향하는 방향 (몸 기준: x 옆, y 위, z 앞)
+        if (d.y < 0.25f) return;                              // 어깨 높이 아래면 그대로
+        float o = d.x * side, f = d.z;
+        const float minOut = 0.8f;                            // 머리 옆으로 비켜나는 정도
+        if (o >= minOut || f >= 0.62f) return;                // 이미 옆이나 앞으로 충분히 나가 있음
+        float nz = Mathf.Max(f, 0f) * 0.6f;
+        float ny = Mathf.Sqrt(Mathf.Max(0f, 1f - minOut * minOut - nz * nz));
+        var nd = new Vector3(minOut * side, ny, nz);
+        arm.localRotation = Quaternion.FromToRotation(Vector3.down, nd);
+    }
+
     void Update()
     {
         float dt = Time.deltaTime;
@@ -623,6 +640,7 @@ public class AcCharacter : MonoBehaviour
                     if (armR) armR.localRotation = Quaternion.Euler(-k * 70f, 0, 20f * k);
                     break;
             }
+            ArmsClearHead();
         }
         if (skating && et >= 1.8f)
         {
