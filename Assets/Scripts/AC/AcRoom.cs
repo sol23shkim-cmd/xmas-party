@@ -170,6 +170,7 @@ public partial class AcRoom : MonoBehaviour
         if (!solo && code == "") { lobbyMsg = "방 코드를 입력하세요 (같은 코드끼리 만나요)"; return; }
         if (uiName.Trim() == "") { lobbyMsg = "이름을 입력하세요"; return; }
         if (uiName.Trim() == SantaName && !SantaAllowed) { lobbyMsg = "'산타'는 주인이 정해진 이름이라 쓸 수 없어요"; return; }
+        if (CheckOldLookFirst(code, solo)) return;   // 같은 이름이면 예전 모습을 불러올지 먼저 물어봄
         uiPath = code;
         PlayerPrefs.SetString("ac_room", code); PlayerPrefs.SetString("xmas_name", uiName.Trim()); PlayerPrefs.Save();
         online = !solo;
@@ -1287,6 +1288,7 @@ public partial class AcRoom : MonoBehaviour
     void LobbyGUI()
     {
         if (!lobbyEditInit) { lobbyEditInit = true; lobbyEdit = string.IsNullOrWhiteSpace(uiName); }
+        if (LookAskGUI()) return;
         float lw = Mathf.Min(440, SW - 20);
         bool portrait = Screen.height > Screen.width;
         if (!lobbyEdit)
