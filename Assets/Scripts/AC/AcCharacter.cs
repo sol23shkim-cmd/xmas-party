@@ -590,8 +590,9 @@ public class AcCharacter : MonoBehaviour
         float s = Mathf.Clamp01(speed / 2.2f);
         phase += dt * (4f + 6f * s);
         float sw = Mathf.Sin(phase) * 38f * s;
-        if (armL) armL.localRotation = Quaternion.Euler(sw, 0, -4f);
-        if (armR) armR.localRotation = Quaternion.Euler(-sw, 0, 4f);
+        float sOut = santa ? 22f : 4f;   // 산타는 배가 나와서 팔을 조금 벌림
+        if (armL) armL.localRotation = Quaternion.Euler(sw, 0, -sOut);
+        if (armR) armR.localRotation = Quaternion.Euler(-sw, 0, sOut);
         if (legL) legL.localRotation = Quaternion.Euler(-sw * 0.9f, 0, 0);
         if (legR) legR.localRotation = Quaternion.Euler(sw * 0.9f, 0, 0);
         if (tail) tail.localRotation = Quaternion.Euler(0, Mathf.Sin(phase * 0.5f + 1) * 12f, 0);
