@@ -384,16 +384,16 @@ public class AcCharacter : MonoBehaviour
         // ---- 몸통: 둥근 배 + 넓은 가슴, 아래로 퍼지는 외투 자락, 흰 털 단, 가죽 허리띠 ----
         var tb = new AcPB { detail = 1.5f };
         System.Func<Vector3, Color> coatShade = u => Color.Lerp(Color.Lerp(redL, red, 0.55f + 0.45f * Mathf.Clamp01(1 - u.y)), redD, Mathf.Clamp01(-u.y * 0.7f) + Mathf.Clamp01(-u.z * 0.5f));
-        tb.Tube(new[] { G(0, 0.42f, 0.02f), G(0, 0.52f, 0.025f), G(0, 0.64f, 0.03f) }, new[] { 0.35f, 0.355f, 0.35f }, red, 28, new[] { redD, red, red });   // 외투 자락
-        tb.Ellipsoid(G(0, 0.72f, 0.04f), new Vector3(0.36f, 0.33f, 0.33f), red, 20, 30, null, coatShade);                // 배
-        tb.Ellipsoid(G(0, 0.95f, -0.01f), new Vector3(0.31f, 0.2f, 0.25f), red, 16, 26, null, coatShade);                // 가슴
+        tb.Tube(new[] { G(0, 0.42f, 0.02f), G(0, 0.52f, 0.025f), G(0, 0.64f, 0.03f) }, new[] { 0.31f, 0.325f, 0.325f }, red, 28, new[] { redD, red, red });   // 외투 자락
+        tb.Ellipsoid(G(0, 0.72f, 0.05f), new Vector3(0.33f, 0.32f, 0.32f), red, 20, 30, null, coatShade);                // 배
+        tb.Ellipsoid(G(0, 0.96f, -0.01f), new Vector3(0.26f, 0.19f, 0.22f), red, 16, 26, null, coatShade);                // 가슴
         tb.Ellipsoid(G(0, 1.04f, -0.02f), new Vector3(0.12f, 0.06f, 0.11f), skinD, 8, 12);                                // 목
-        tb.Torus(G(0, 0.42f, 0.02f), Vector3.up, 0.35f, 0.055f, fur, 36, 10);                                              // 아래 털 단
+        tb.Torus(G(0, 0.42f, 0.02f), Vector3.up, 0.31f, 0.05f, fur, 36, 10);                                              // 아래 털 단
         float FrontZ(float y)
         {
-            float a = (y - 0.72f) / 0.33f, b = (y - 0.95f) / 0.2f, z = 0.38f;
-            float za = Mathf.Abs(a) < 1 ? 0.04f + 0.33f * Mathf.Sqrt(1 - a * a) : -1f, zb = Mathf.Abs(b) < 1 ? -0.01f + 0.25f * Mathf.Sqrt(1 - b * b) : -1f;
-            z = Mathf.Max(za, zb, 0.36f * (y < 0.64f ? 1f : 0f));
+            float a = (y - 0.72f) / 0.32f, b = (y - 0.96f) / 0.19f, z = 0.38f;
+            float za = Mathf.Abs(a) < 1 ? 0.05f + 0.32f * Mathf.Sqrt(1 - a * a) : -1f, zb = Mathf.Abs(b) < 1 ? -0.01f + 0.22f * Mathf.Sqrt(1 - b * b) : -1f;
+            z = Mathf.Max(za, zb, 0.34f * (y < 0.64f ? 1f : 0f));
             return z;
         }
         {   // 앞섶 흰 털: 몸 앞면을 따라 위에서 아래로
@@ -401,7 +401,7 @@ public class AcCharacter : MonoBehaviour
             for (int k = 0; k <= 10; k++) { float y = Mathf.Lerp(0.44f, 1.0f, k / 10f); fp.Add(G(0, y, FrontZ(y) + 0.012f)); fr.Add(0.045f); }
             tb.Tube(fp, fr, fur, 10);
         }
-        tb.Torus(G(0, 0.62f, 0.04f), Vector3.up, 0.345f, 0.04f, leather, 36, 8);                                           // 허리띠
+        tb.Torus(G(0, 0.62f, 0.05f), Vector3.up, 0.322f, 0.038f, leather, 36, 8);                                           // 허리띠
         tb.Box(G(0, 0.62f, FrontZ(0.62f) + 0.03f), new Vector3(0.13f, 0.1f, 0.025f), gold);                                  // 버클
         tb.Box(G(0, 0.62f, FrontZ(0.62f) + 0.04f), new Vector3(0.075f, 0.05f, 0.02f), leather);
         for (int k = 0; k < 3; k++) { float y = 0.76f + k * 0.09f; tb.Sphere(G(0.075f, y, FrontZ(y) + 0.005f), 0.016f, black, 5, 7); }   // 단추
@@ -409,7 +409,7 @@ public class AcCharacter : MonoBehaviour
 
         // ---- 머리: 사람 비율의 작은 얼굴, 금테 안경, 장밋빛 볼과 코, 덥수룩한 눈썹, 가슴까지 내려오는 풍성한 수염 ----
         var hb = new AcPB { detail = 1.7f };
-        var hc = G(0, 1.2f, 0.02f); float hr = 0.13f;
+        var hc = G(0, 1.22f, 0.02f); float hr = 0.145f;
         hb.Ellipsoid(hc, new Vector3(hr * 0.95f, hr * 1.05f, hr), skin, 20, 28, null, u => Color.Lerp(skin, skinD, Mathf.Clamp01(-u.z * 0.6f + 0.1f)));
         hb.Ellipsoid(hc + new Vector3(0, 0, hr * 0.02f), new Vector3(hr * 0.18f, hr * 0.25f, hr * 0.1f), skin, 4, 6);
         float fzz = hc.z + hr * 0.93f;
@@ -489,7 +489,7 @@ public class AcCharacter : MonoBehaviour
         foreach (var (arm, sg) in new[] { (armL, -1f), (armR, 1f) })
         {
             if (!arm) continue;
-            arm.position = body.TransformPoint(G(sg * 0.29f, 1.0f, -0.01f));
+            arm.position = body.TransformPoint(G(sg * 0.25f, 1.02f, -0.01f));
             float k = body.lossyScale.x / Mathf.Max(1e-4f, arm.lossyScale.x);
             float L = armLen * k, ar = 0.058f * k;
             var ab = new AcPB { detail = 1.4f };
