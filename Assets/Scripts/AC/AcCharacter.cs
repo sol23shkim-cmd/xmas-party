@@ -308,8 +308,93 @@ public class AcCharacter : MonoBehaviour
     }
     public void SetRunPose(int p) { if (p != runPose) { runPose = p; runT = 0; } }
 
+    // ===== 산타 수염 (이름이 '산타'인 캐릭터만, 꾸미기 칸에는 없음) =====
+    public bool beard; GameObject beardObj;
+    void UpdateBeard()
+    {
+        if (beard && beardObj == null && body) BuildBeard();
+        else if (!beard && beardObj != null) { Destroy(beardObj); beardObj = null; }
+    }
+    void BuildBeard()
+    {
+        // 얼굴(눈·입) 모양이 있는 곳을 몸 기준 좌표로 재서, 그 아래·양옆에 덥수룩한 은발 수염을 붙임
+        Bounds fb = new Bounds(); bool has = false;
+        foreach (var a in attached)
+        {
+            if (!a || !a.name.Contains("face")) continue;
+            foreach (var mf in a.GetComponentsInChildren<MeshFilter>())
+            {
+                if (!mf.sharedMesh) continue; var b = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var p = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) * 2 - 1, (i & 2) - 1, ((i & 4) >> 1) - 1));
+                    var lp = body.InverseTransformPoint(mf.transform.TransformPoint(p));
+                    if (!has) { fb = new Bounds(lp, Vector3.zero); has = true; } else fb.Encapsulate(lp);
+                }
+            }
+        }
+        var sp = AcCatalog.Species(look.species); float top = sp != null ? sp.top : 1.04f;
+        if (!has) fb = new Bounds(new Vector3(0, top - 0.27f, 0.27f), new Vector3(0.22f, 0.14f, 0.02f));
+        float R = Mathf.Clamp((top - fb.center.y) * 0.98f, 0.18f, 0.36f);
+        var hc = new Vector3(0, fb.center.y + 0.01f, fb.max.z - R * 0.96f);   // 머리 가운데 (대략)
+        float mouthY = fb.min.y;
+        var rng = new System.Random(7);
+        Color silver = new Color(0.94f, 0.95f, 0.97f), shade = new Color(0.8f, 0.82f, 0.86f), warm = new Color(0.98f, 0.97f, 0.95f);
+        Color Pick() { float t = (float)rng.NextDouble(); return t < 0.55f ? Color.Lerp(silver, warm, (float)rng.NextDouble()) : Color.Lerp(silver, shade, (float)rng.NextDouble() * 0.8f); }
+        float J(float a) => ((float)rng.NextDouble() * 2f - 1f) * a;
+        var pb = new AcPB { detail = 1.2f };
+        // 1) 턱·볼을 감싸는 몽글몽글한 덩어리들 (머리 둘레를 따라)
+        for (int ti = -6; ti <= 6; ti++)
+        {
+            float th = ti / 6f * 78f * Mathf.Deg2Rad;
+            float side = Mathf.Abs(ti) / 6f;
+            for (int pi = 0; pi < 5; pi++)
+            {
+                float ph = Mathf.Lerp(Mathf.Lerp(-5f, 22f, 1 - side), 72f, pi / 4f) * Mathf.Deg2Rad;   // 옆쪽은 귀 근처(구레나룻)까지 올라감
+                var dir = new Vector3(Mathf.Sin(th) * Mathf.Cos(ph), -Mathf.Sin(ph), Mathf.Cos(th) * Mathf.Cos(ph));
+                var p = hc + dir * R * 1.02f;
+                if (side < 0.45f && p.y > mouthY - 0.005f) continue;   // 앞쪽은 입 아래부터
+                float r = R * (0.2f + 0.06f * (float)rng.NextDouble());
+                pb.Ellipsoid(p + new Vector3(J(0.01f), J(0.01f), J(0.008f)), new Vector3(r * 1.05f, r * 0.95f, r * 0.8f), Pick(), 7, 10, Quaternion.LookRotation(dir), null, 0.82f);
+            }
+        }
+        // 2) 턱 아래로 늘어진 풍성한 수염 (아래로 갈수록 좁아지고 끝이 둥글게)
+        float chinY = hc.y - R * 0.92f, chinZ = hc.z + R * 0.55f;
+        for (int row = 0; row < 6; row++)
+        {
+            float t = row / 5f;
+            float y = chinY - t * R * 0.95f, z = chinZ + R * 0.12f - t * R * 0.05f;
+            float halfW = R * Mathf.Lerp(0.78f, 0.22f, t * t);
+            int n = Mathf.Max(2, Mathf.RoundToInt(Mathf.Lerp(6, 2, t)));
+            for (int k = 0; k < n; k++)
+            {
+                float x = n == 1 ? 0 : Mathf.Lerp(-halfW, halfW, k / (float)(n - 1));
+                float r = R * Mathf.Lerp(0.27f, 0.2f, t) * (0.9f + 0.2f * (float)rng.NextDouble());
+                pb.Ellipsoid(new Vector3(x + J(0.012f), y + J(0.012f), z - Mathf.Abs(x) * 0.35f + J(0.01f)), new Vector3(r, r * 1.1f, r * 0.85f), Pick(), 7, 10, null, null, 0.78f);
+            }
+        }
+        // 3) 콧수염: 입 위에서 양쪽으로 말려 올라감
+        foreach (float s in new[] { -1f, 1f })
+        {
+            var basePos = new Vector3(0, mouthY + R * 0.1f, fb.max.z + R * 0.06f);
+            for (int k = 0; k < 4; k++)
+            {
+                float t = k / 3f;
+                var p = basePos + new Vector3(s * (R * 0.08f + t * R * 0.42f), -t * R * 0.12f + t * t * R * 0.2f, -t * t * R * 0.25f);
+                float r = R * Mathf.Lerp(0.15f, 0.08f, t);
+                pb.Ellipsoid(p, new Vector3(r * 1.25f, r * 0.8f, r * 0.85f), Color.Lerp(warm, silver, t), 7, 10, Quaternion.Euler(0, 0, s * (10f + t * 25f)), null, 0.85f);
+            }
+        }
+        beardObj = new GameObject("SantaBeard");
+        beardObj.transform.SetParent(body, false);
+        beardObj.AddComponent<MeshFilter>().sharedMesh = pb.M("santa_beard");
+        var mr = beardObj.AddComponent<MeshRenderer>(); mr.sharedMaterial = AcmLoader.Mat;
+        mr.enabled = !hidden;
+    }
+
     void Update()
     {
+        UpdateBeard();
         float dt = Time.deltaTime;
         if (runPose > 0) { RunAnim(dt); return; }
         UpdatePillow();

@@ -615,6 +615,8 @@ public partial class AcRoom : MonoBehaviour
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
         QuestUpdate(dt);
         PetsUpdate(dt);
+        if (me) me.beard = uiName.Trim() == "산타";   // 산타만 은발 수염
+        foreach (var rr in remotes.Values) if (rr.c && rr.net != null) rr.c.beard = (rr.net.name ?? "").Trim() == "산타";
         UpdateCloseupQuality();
         GiftUpdate(dt);
         KitchenUpdate(dt);

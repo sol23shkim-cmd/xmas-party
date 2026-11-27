@@ -22,7 +22,7 @@ public partial class AcRoom
         if (!soon && Time.unscaledTime < shotCheckAt) return;
         if (decorating || building || kitchenOpen || playingGame || treeOverview || showCustom || GiftBusy) return;   // 다른 화면 중이면 다음에
         shotSoonAt = -1; shotCheckAt = Time.unscaledTime + UnityEngine.Random.Range(150f, 240f);
-        string h = "v2-" + net.OrnHash();   // v2: 사진 구도를 바꾸면 숫자를 올려서 새로 찍게
+        string h = "v3-" + net.OrnHash();   // v2: 사진 구도를 바꾸면 숫자를 올려서 새로 찍게
         if (h == shotLastH) return;
         var cur = net.Get("shot"); string oldH = "";
         if (cur != null && cur.TryGetValue("tree", out var v) && v is Dictionary<string, object> d) oldH = AcJson.S(d, "h");
@@ -52,6 +52,7 @@ public partial class AcRoom
         RenderTexture rt = null; Texture2D tex = null;
         try
         {
+            RestoreOccluders();   // 걸어 다닐 때 카메라를 가려서 반투명하게 숨겨 둔 것(트리 포함)을 먼저 되돌림 — 다음 확인 때 다시 숨김
             // 사람들은 잠깐 숨김
             foreach (var go in new[] { me ? me.gameObject : null }) if (go && go.activeSelf) { go.SetActive(false); hiddenGo.Add(go); }
             foreach (var r in remotes.Values) if (r.c && r.c.gameObject.activeSelf) { r.c.gameObject.SetActive(false); hiddenGo.Add(r.c.gameObject); }
