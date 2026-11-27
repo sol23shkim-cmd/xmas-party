@@ -1,7 +1,7 @@
 // AcQuest.cs - 오늘의 퀘스트 + 퀘스트 포인트 보상 (11-27)
 // 매일(한국 시간 자정 기준) 사람마다 가벼운 퀘스트 3개. 3개를 모두 끝내야 퀘스트 포인트 +1 (하루 최대 1).
 // 이름 = 계정: 같은 이름으로 들어오면 어느 기기에서든 포인트·펫·오늘 진행이 이어짐 (이 기기 저장도 이름별로 따로)
-// 보상: 3포인트 = 반짝이는 이름표 / 7포인트 = 펫 시스템 열림 + 루돌프 / 그 뒤 3포인트마다 새 펫 하나(남은 펫 중 랜덤)
+// 보상: 3포인트 = 반짝이는 이름표 / 5포인트 = 펫 시스템 열림 + 루돌프 / 그 뒤 3포인트마다 새 펫 하나(남은 펫 중 랜덤)
 // 저장: orn/x~quest~<이름키> = {qv:2, qp, aw:포인트받은날, pets:"rudolph,fox", day, prog:"piano:2|skate:1", done:"piano", sc:"눈사람id,..."} + 이 기기 PlayerPrefs (둘 중 큰 쪽)
 using System;
 using System.Collections.Generic;
@@ -48,7 +48,8 @@ public partial class AcRoom
 
     static int TodayKst => (int)Math.Floor((AcSync.UnixMs + 9 * 3600000.0) / 86400000.0);
     bool AllPets => myKey == AllPetsName;
-    bool PetUnlocked => AllPets || IsSantaMe || questPoints >= 7 || petsOwned.Count > 0;
+    const int PetPts = 5;   // 펫 시스템이 열리는 포인트 (루돌프)
+    bool PetUnlocked => AllPets || IsSantaMe || questPoints >= PetPts || petsOwned.Count > 0;
     bool FancyName => questPoints >= 3;
     List<string> MyPets => AllPets ? PetIds.ToList() : petsOwned;
     string CurPet
@@ -192,10 +193,10 @@ public partial class AcRoom
     }
     void QuestSnowman(string snowId) { if (questToday.Contains("snowc") && !questDone.Contains("snowc") && questSnowc.Add(snowId)) QuestProgress("snowc", 1); }
 
-    // 포인트만큼 펫 주기: 7포인트에 루돌프, 그 뒤 3포인트마다 하나씩(랜덤)
+    // 포인트만큼 펫 주기: 5포인트에 루돌프, 그 뒤 3포인트마다 하나씩(랜덤)
     void GrantPets(bool announce)
     {
-        int want = questPoints >= 7 ? Mathf.Min(PetIds.Length, 1 + (questPoints - 7) / 3) : 0;
+        int want = questPoints >= PetPts ? Mathf.Min(PetIds.Length, 1 + (questPoints - PetPts) / 3) : 0;
         bool first = petsOwned.Count == 0;
         while (petsOwned.Count < want)
         {
@@ -249,8 +250,8 @@ public partial class AcRoom
         // 포인트와 다음 보상
         GUI.Label(new Rect(r.x + 18, y + 4, w - 36, 24), $"<size=15><b>퀘스트 포인트 {questPoints}</b></size>", sLabel);
         string next = (questAwardDay == questDay ? "오늘 포인트 받았어요! " : "3개 모두 하면 +1 · ") + (questPoints < 3 ? $"{3 - questPoints}포인트 더 모으면 반짝이는 이름표"
-                    : questPoints < 7 ? $"{7 - questPoints}포인트 더 모으면 펫 '루돌프'가 따라다녀요"
-                    : petsOwned.Count < PetIds.Length ? $"{3 - (questPoints - 7) % 3}포인트 더 모으면 새 펫 (지금 {MyPets.Count}마리)"
+                    : questPoints < PetPts ? $"{PetPts - questPoints}포인트 더 모으면 펫 '루돌프'가 따라다녀요"
+                    : petsOwned.Count < PetIds.Length ? $"{3 - (questPoints - PetPts) % 3}포인트 더 모으면 새 펫 (지금 {MyPets.Count}마리)"
                     : "펫을 모두 모았어요!");
         if (AllPets) next = $"모든 펫이 열려 있어요 ({PetIds.Length}마리). 꾸미기에서 골라요";
         GUI.Label(new Rect(r.x + 18, y + 30, w - 36, 22), "<size=13>" + next + "</size>", sSmall);
@@ -259,7 +260,7 @@ public partial class AcRoom
     // 꾸미기 창 아래: 펫 고르기
     void PetCustomControls()
     {
-        if (!PetUnlocked) { if (questLoaded) { GUILayout.Space(6); GUILayout.Label($"<size=12>펫: 퀘스트 포인트 7이 되면 열려요 (지금 {questPoints})</size>", sSmall); } return; }
+        if (!PetUnlocked) { if (questLoaded) { GUILayout.Space(6); GUILayout.Label($"<size=12>펫: 퀘스트 포인트 {PetPts}이 되면 열려요 (지금 {questPoints})</size>", sSmall); } return; }
         GUILayout.Space(8);
         GUILayout.Label("펫", sSmall);
         var list = new List<string> { "" }; list.AddRange(MyPets);
