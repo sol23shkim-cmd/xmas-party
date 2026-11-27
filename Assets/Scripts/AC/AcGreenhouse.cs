@@ -1,10 +1,11 @@
 // AcGreenhouse.cs - 겨울 온실 화분 키우기 (11-26)
 // 빈 화분 12개. 식물 5가지(포인세티아·아기 전나무·아마릴리스·크리스마스 선인장·호랑가시나무) 중 골라 심고 화분 색도 고름.
-// 물은 4시간마다 한 번씩: 그 4시간 동안 주인이 물을 주면 +4단계, 다른 사람이 주면 한 사람당 +1단계. 최대 100단계.
+// 물은 준 뒤 2시간이 지나면 다시 줄 수 있음 (11-27): 주인이 주면 +4단계, 다른 사람이 주면 +1단계. 최대 100단계.
+// (예전 기록은 4시간 칸 번호, 새 기록은 '분' 단위 시각을 칸 자리에 씀 → 한 번 줄 때마다 따로 셈)
 // 물을 안 줘도 심은 뒤 8시간마다 저절로 +1단계 (11-27).
 // 다 자라면 '다 자랐어요!' + 반짝임, 주인은 눈사람처럼 장식을 붙여 꾸밀 수 있음.
 // 저장: orn/x~plant~p<번호> = {slot, owner, name, kind, pot, ct, d(장식 json)}
-//       orn/x~pw~p<번호>~<심은 시각>~<4시간 칸 번호>~<물 준 사람> = {name, t}
+//       orn/x~pw~p<번호>~<심은 시각>~<4시간 칸 번호(예전) 또는 분 단위 시각(새)>~<물 준 사람> = {name, t}
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +25,8 @@ public partial class AcRoom
         "마디마디 늘어지다 끝에 분홍 꽃이 펴요",
         "뾰족한 잎 사이로 빨간 열매가 열려요" };
     const int PlantMax = 100;
-    const double WaterWinMs = 4 * 3600 * 1000.0;
+    const double WaterWinMs = 4 * 3600 * 1000.0;     // 예전 기록용
+    const double WaterCoolMs = 2 * 3600 * 1000.0;    // 물 준 뒤 다시 줄 수 있을 때까지
     const double PassiveGrowMs = 8 * 3600 * 1000.0;   // 저절로 자라기: 8시간마다 1단계
     const float PotTop = 0.29f;
     // 온실 안 화분 자리 (방 가운데 기준, 미터). 가운데 돌길과 옆방 문 앞은 비워 둠
@@ -42,7 +44,7 @@ public partial class AcRoom
         public Transform root; public GameObject pot, plant, decoRoot;
         public MeshCollider col; public Mesh mesh;
         public bool planted; public int kind = -1, stage = -1; public string potHex = "", owner = "", name = "", decoJson = "", builtKey = "", decoBuilt = "";
-        public double ct; public bool iWatered; public readonly List<string> waterNames = new List<string>();
+        public double ct, myLastW; public bool iWatered; public readonly List<string> waterNames = new List<string>();
         public float pop, height = 0.3f, nextSparkle;
     }
     PlantSlot[] slots;
@@ -323,7 +325,7 @@ public partial class AcRoom
         if (slots == null || net == null || Time.unscaledTime < nextPlantPoll) return;
         nextPlantPoll = Time.unscaledTime + 0.5f;
         var node = net.Get("plants"); var pw = net.Get("pw");
-        long win = CurWin;
+        long win = CurWin; _ = win;
         foreach (var s in slots)
         {
             Dictionary<string, object> d = null;
@@ -341,7 +343,7 @@ public partial class AcRoom
             // 물 준 기록으로 단계 계산
             string pre = "p" + s.i + "~" + ((long)ct).ToString() + "~";
             var byWin = new Dictionary<long, (bool owner, int others)>();
-            s.waterNames.Clear(); s.iWatered = false;
+            s.waterNames.Clear(); s.iWatered = false; s.myLastW = 0; int perWater = 0;
             if (pw != null)
                 foreach (var kv in pw)
                 {
@@ -349,17 +351,26 @@ public partial class AcRoom
                     var parts = kv.Key.Substring(pre.Length).Split('~');
                     if (parts.Length < 2 || !long.TryParse(parts[0], out long w)) continue;
                     string who = parts[1];
-                    byWin.TryGetValue(w, out var cur);
-                    if (who == s.owner) cur.owner = true; else cur.others++;
-                    byWin[w] = cur;
-                    if (w == win)
+                    var wd = kv.Value as Dictionary<string, object>;
+                    bool isNew = w > 1000000;   // 새 기록: 분 단위 시각
+                    double wt = isNew ? w * 60000.0 : w * WaterWinMs;
+                    if (wd != null && AcJson.D(wd, "t") > 0) wt = AcJson.D(wd, "t");
+                    if (isNew) perWater += who == s.owner ? 4 : 1;
+                    else
                     {
-                        if (who == myKey) s.iWatered = true;
-                        var wd = kv.Value as Dictionary<string, object>;
-                        string nm = wd != null ? AcJson.S(wd, "name") : who; s.waterNames.Add(nm != "" ? nm : who);
+                        byWin.TryGetValue(w, out var cur);
+                        if (who == s.owner) cur.owner = true; else cur.others++;
+                        byWin[w] = cur;
+                    }
+                    if (who == myKey && wt > s.myLastW) s.myLastW = wt;
+                    if (NowMs - wt < WaterCoolMs)
+                    {
+                        string nm = wd != null ? AcJson.S(wd, "name") : who; nm = nm != "" ? nm : who;
+                        if (!s.waterNames.Contains(nm)) s.waterNames.Add(nm);
                     }
                 }
-            int stage = 0;
+            s.iWatered = s.myLastW > 0 && NowMs - s.myLastW < WaterCoolMs;
+            int stage = perWater;
             foreach (var kv in byWin) stage += (kv.Value.owner ? 4 : 0) + kv.Value.others;
             if (ct > 0 && NowMs > ct) stage += (int)Math.Floor((NowMs - ct) / PassiveGrowMs);   // 물을 안 줘도 심은 뒤 8시간마다 +1
             stage = Mathf.Clamp(stage, 0, PlantMax);
@@ -545,34 +556,42 @@ public partial class AcRoom
         // 화분 위쪽(내 쪽)에서 기울여 붓기
         var toMe = me.transform.position - s.pos; toMe.y = 0; if (toMe.sqrMagnitude < 0.01f) toMe = Vector3.back; toMe.Normalize();
         float tilt = Mathf.SmoothStep(0, 1, Mathf.Clamp01(waterT / 0.35f)) * (waterT > 1.45f ? Mathf.Clamp01((1.75f - waterT) / 0.3f) : 1f);
-        var basePos = s.pos + toMe * 0.42f + Vector3.up * (PotTop + Mathf.Max(0.35f, s.height * 0.8f) + 0.05f);
-        waterCan.transform.position = basePos;
-        waterCan.transform.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.up, -toMe), Vector3.up) * Quaternion.Euler(0, 90, 0) * Quaternion.Euler(0, 0, -50f * tilt);
+        // 캐릭터가 오른손으로 물뿌리개 손잡이를 쥐고 앞으로 기울여 부음
+        me.pour = tilt;
+        FaceTo(s.pos);
+        var rot = Quaternion.LookRotation(Vector3.Cross(Vector3.up, -toMe), Vector3.up) * Quaternion.Euler(0, 90, 0) * Quaternion.Euler(0, 0, -50f * tilt);
+        const float canK = 1.5f;
+        waterCan.transform.localScale = Vector3.one * canK;
+        waterCan.transform.rotation = rot;
+        waterCan.transform.position = me.HandR - rot * (new Vector3(-0.07f, 0.12f, 0) * canK);
         // 물줄기
         if (waterT > 0.3f && waterT < 1.5f)
         {
             var spout = waterCan.transform.TransformPoint(new Vector3(0.24f, 0.2f, 0));
-            for (int k = 0; k < 2; k++)
-                FxOne("drop", spout + UnityEngine.Random.insideUnitSphere * 0.01f, (s.pos + Vector3.up * PotTop - spout).normalized * 0.6f + Vector3.up * 0.3f + UnityEngine.Random.insideUnitSphere * 0.15f, 0.025f, FxWater[UnityEngine.Random.Range(0, 2)], 0.55f, 5f);
+            var aim = s.pos + Vector3.up * (PotTop + 0.05f);
+            const float T = 0.42f;   // 꼭지에서 화분 흙까지 날아가는 시간 (중력 5로 포물선)
+            var v0 = (aim - spout) / T + Vector3.up * (0.5f * 5f * T);
+            for (int k = 0; k < 3; k++)
+                FxOne("drop", spout + UnityEngine.Random.insideUnitSphere * 0.015f, v0 + UnityEngine.Random.insideUnitSphere * 0.12f, 0.025f, FxWater[UnityEngine.Random.Range(0, 2)], T + 0.15f, 5f);
         }
         if (waterT > 1.0f && waterT - dt <= 1.0f && net != null)
         {
-            string key = "p" + s.i + "~" + ((long)s.ct).ToString() + "~" + CurWin + "~" + myKey;
+            string key = "p" + s.i + "~" + ((long)s.ct).ToString() + "~" + ((long)Math.Floor(NowMs / 60000.0)).ToString() + "~" + myKey;
             QuestProgress("water", 1);
             net.Put("pw/" + key, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"t\":" + Math.Floor(NowMs).ToString("0") + "}");
-            s.iWatered = true; nextPlantPoll = 0;
+            s.iWatered = true; s.myLastW = NowMs; nextPlantPoll = 0;
             int add = s.owner == myKey ? 4 : 1;
             int after = Mathf.Min(PlantMax, Mathf.Max(0, s.stage) + add);
             FxBurst("drop", s.pos + Vector3.up * (PotTop + 0.02f), 8, 1.0f, 0.03f, FxWater, 0.5f, 5f);
             Toast(after >= PlantMax ? "다 자랐어요! 반짝반짝" : (s.owner == myKey ? $"물을 줬어요! 쑥쑥 +4 ({after}/{PlantMax})" : $"{s.name} 님 화분에 물을 줬어요! +1 ({after}/{PlantMax})"));
             if (after >= PlantMax && s.stage < PlantMax) { FxBurst("star", s.pos + Vector3.up * (PotTop + s.height), 24, 2.4f, 0.06f, FxGold, 1.4f, 1f); Sfx("candy_win", 0.5f); }
         }
-        if (waterT > 1.8f) { waterSlot = -1; waterCan.SetActive(false); }
+        if (waterT > 1.8f) { waterSlot = -1; waterCan.SetActive(false); me.pour = -1f; }
     }
 
-    string NextWaterText()
+    string NextWaterText(PlantSlot s)
     {
-        double left = (CurWin + 1) * WaterWinMs - NowMs;
+        double left = s.myLastW + WaterCoolMs - NowMs;
         int mins = Mathf.Max(1, (int)Math.Ceiling(left / 60000.0));
         return mins >= 60 ? $"{mins / 60}시간 {mins % 60}분 뒤" : $"{mins}분 뒤";
     }
@@ -776,7 +795,7 @@ public partial class AcRoom
         GUI.Label(new Rect(bar.xMax + 8, bar.y - 4, 70, 22), $"<size=13>{Mathf.Max(0, s.stage)}/{PlantMax}</size>", sSmall);
         string who = s.waterNames.Count > 0 ? string.Join(", ", s.waterNames.Take(4)) + (s.waterNames.Count > 4 ? $" 외 {s.waterNames.Count - 4}명" : "") : "아직 없어요";
         GUI.Label(new Rect(r.x + 16, r.y + 62, w - 32, 22), "<size=12>최근 물 준 사람: " + who + "</size>", sSmall);
-        GUI.Label(new Rect(r.x + 16, r.y + 82, w - 32, 22), "<size=12>" + (s.iWatered ? "다음 물 주기: " + NextWaterText() : grown ? "물을 주면 반짝반짝 기뻐해요" : (mine ? "지금 물을 주면 +4" : "지금 물을 주면 +1")) + "</size>", sSmall);
+        GUI.Label(new Rect(r.x + 16, r.y + 82, w - 32, 22), "<size=12>" + (s.iWatered ? "다음 물 주기: " + NextWaterText(s) : grown ? "물을 주면 반짝반짝 기뻐해요" : (mine ? "지금 물을 주면 +4" : "지금 물을 주면 +1")) + "</size>", sSmall);
         float by = r.yMax - 42, bw = narrowBtn(w, 4);
         float x = r.x + 16;
         if (plantDelAsk)

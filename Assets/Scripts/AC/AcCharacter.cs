@@ -85,6 +85,31 @@ public class AcCharacter : MonoBehaviour
     }
 
     // ===== 베개 (침실 베개 싸움) =====
+    // 물뿌리개 들기: 0~1 = 기울임 정도, 음수면 안 듦 (오른팔을 앞으로 뻗음)
+    public float pour = -1f;
+    float handY = 1f;
+    // 오른손 위치 (팔 모양의 가장 아래쪽 끝)
+    public Vector3 HandR
+    {
+        get
+        {
+            if (!armR) return transform.position + Vector3.up * 0.5f;
+            if (handY > 0f)
+            {
+                handY = -0.3f;
+                foreach (var mf in armR.GetComponentsInChildren<MeshFilter>())
+                {
+                    if (!mf.sharedMesh) continue; var b = mf.sharedMesh.bounds;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        var p = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) * 2 - 1, (i & 2) - 1, ((i & 4) >> 1) - 1));
+                        handY = Mathf.Min(handY, armR.InverseTransformPoint(mf.transform.TransformPoint(p)).y);
+                    }
+                }
+            }
+            return armR.TransformPoint(0, handY, 0);
+        }
+    }
     public bool holdPillow; public Color pillowColor = new Color(0.98f, 0.86f, 0.9f);
     GameObject pillow; static Mesh pillowMesh; const float PillowK = 0.85f;   // 베개 크기 (캐릭터 키의 약 절반)
     void UpdatePillow()
@@ -642,6 +667,7 @@ public class AcCharacter : MonoBehaviour
             }
             if (emote != "swing" && emote != "throw") ArmsClearHead();   // 휘두르기·던지기는 뒤로 크게 젖히는 동작이라 그대로
         }
+        if (pour >= 0f && armR) armR.localRotation = Quaternion.Euler(-78f + 12f * pour + Mathf.Sin(Time.time * 9f) * 1.5f * pour, 0, 6f);   // 물뿌리개를 앞으로 들고 붓기
         if (skating && et >= 1.8f)
         {
             // 스케이트: 다리를 번갈아 옆뒤로 밀고, 몸은 앞으로 숙이고 좌우로 실룩
