@@ -107,20 +107,20 @@ public partial class AcRoom : MonoBehaviour
             using (var r = UnityWebRequest.Get(Application.streamingAssetsPath + "/models/catalog.json"))
             {
                 yield return r.SendWebRequest();
-                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; yield break; }
+                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; WebLoading(-1); yield break; }
                 AcCatalog.PendingText = r.downloadHandler.text;
             }
             using (var r = UnityWebRequest.Get(Application.streamingAssetsPath + "/models/models.pack"))
             {
                 var op = r.SendWebRequest();
-                while (!op.isDone) { loadingMsg = $"크리스마스 파티 불러오는 중... {Mathf.RoundToInt(r.downloadProgress * 100)}%"; yield return null; }
-                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; yield break; }
+                while (!op.isDone) { loadingMsg = $"크리스마스 파티 불러오는 중... {Mathf.RoundToInt(r.downloadProgress * 100)}%"; WebLoading(r.downloadProgress); yield return null; }
+                if (r.result != UnityWebRequest.Result.Success) { loadingMsg = "불러오기 실패: " + r.error; WebLoading(-1); yield break; }
                 loadingMsg = "집 짓는 중...";
                 yield return null;
                 AcmLoader.SetPack(r.downloadHandler.data);
             }
         }
-        loadingMsg = "집 짓는 중...";
+        loadingMsg = "집 짓는 중..."; WebLoading(2);
         yield return null;
         AcCatalog.Load();
         world = new GameObject("World").transform;
@@ -150,7 +150,15 @@ public partial class AcRoom : MonoBehaviour
         ornTypes.Insert(0, BeadsId); ornTypes.Insert(0, TinselId);   // 두르는 줄은 맨 앞
         UpdateCamera(0, true);
         loadingMsg = null;
+        yield return null; yield return null;   // 첫 화면이 그려진 다음에 로딩 영상을 걷음
+        WebLoading(-1);
     }
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern void AcWeb_Loading(float p);
+    static void WebLoading(float p) { AcWeb_Loading(p); }
+#else
+    static void WebLoading(float p) { }
+#endif
 
     string loadingMsg = "불러오는 중...";
     bool Ready => loadingMsg == null && me != null;

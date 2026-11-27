@@ -25,17 +25,28 @@
     var el = document.getElementById("xp-load"), fill = document.getElementById("xp-fill"), label = document.getElementById("xp-label"), v = el.querySelector("video");
     var p0 = 0, done = false;
     try { v.muted = true; var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
-    window.xpProgress = function (p) {
+    // 한 화면으로 끝까지: 웹 파일 받기(0~60%) → 게임 안에서 모델 받기·집 짓기(60~100%) → 게임이 다 되면 사라짐
+    function show(pct, text) {
       if (done) return;
-      var shown = Math.min(99, Math.round(p * 100)); if (shown < p0) return; p0 = shown;
-      fill.style.width = shown + "%";
-      label.textContent = p >= 0.9 ? "준비 중" : "불러오는 중 " + shown + "%";
+      pct = Math.max(p0, Math.min(99, Math.round(pct))); p0 = pct;
+      fill.style.width = pct + "%";
+      label.textContent = text != null ? text : "불러오는 중 " + pct + "%";
+    }
+    window.xpProgress = function (p) { show(p * 60, p >= 1 ? "준비 중" : null); };   // 웹 파일
+    window.xpDone = function () {   // 웹 파일 끝: 게임이 알려줄 때까지 계속 보여 줌 (혹시 소식이 없으면 30초 뒤 닫음)
+      show(60, "준비 중");
+      setTimeout(function () { window.xpFinish(); }, 30000);
     };
-    window.xpDone = function () {
+    window.xpStage = function (p, msg) {   // 게임 안에서: p 0~1 (모델 받기), 2 = 집 짓는 중, -1 = 끝
+      if (p < 0) { window.xpFinish(); return; }
+      if (p >= 2) show(97, "집 짓는 중");
+      else show(60 + p * 36, null);
+    };
+    window.xpFinish = function () {
       if (done) return; done = true;
       fill.style.width = "100%"; label.textContent = "준비 완료";
-      setTimeout(function () { el.style.opacity = "0"; el.style.pointerEvents = "none"; }, 350);
-      setTimeout(function () { try { v.pause(); } catch (e) {} el.remove(); }, 1200);
+      setTimeout(function () { el.style.opacity = "0"; el.style.pointerEvents = "none"; }, 300);
+      setTimeout(function () { try { v.pause(); } catch (e) {} el.remove(); }, 1100);
     };
   })();
 </script>

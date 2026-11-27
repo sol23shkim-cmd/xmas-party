@@ -1,5 +1,6 @@
 // AcWeb.jslib — 웹(휴대폰 브라우저)에서만 쓰는 기능: Firebase 실시간 스트림, 글 입력창, 기기 확인
 mergeInto(LibraryManager.library, {
+  AcWeb_Loading: function (p) { try { if (window.xpStage) window.xpStage(p); } catch (e) {} },   // 로딩 화면(index.html)에 진행 알림
   AcWeb_Stream: function (urlPtr, goPtr) {
     var url = UTF8ToString(urlPtr), go = UTF8ToString(goPtr);
     if (window._acStream) { try { window._acStream.close(); } catch (e) {} }
