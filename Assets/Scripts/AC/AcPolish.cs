@@ -81,18 +81,24 @@ public partial class AcRoom
         return p;
     }
 
-    // ===== 바깥(눈 마당)은 하얗게 날아가 보여서 빛을 조금 낮춤 =====
+    // ===== 빛: 안팎 모두 늘 낮 (11-27: 밖에서 어두워지던 것 없앰). 트리 전경 '야경'일 때만 밤 =====
     float outdoorK = -1f;
     void OutdoorTone(float dt)
     {
         var m = AcmLoader.Mat; if (m == null) return;
-        bool outside = phase != Phase.Lobby && me != null && Outside && !kitchenOpen && !GiftBusy && !playingGame;
-        float want = outside ? 1f : 0f;
-        float k = outdoorK < 0 ? want : Mathf.MoveTowards(outdoorK, want, dt * 1.5f);
-        if (Mathf.Abs(k - outdoorK) < 1e-4f) return;
-        outdoorK = k;
-        m.SetVector("_LightTint", Vector4.Lerp(new Vector4(1.04f, 1.0f, 0.94f, 1), new Vector4(0.93f, 0.9f, 0.86f, 1), k));
-        m.SetVector("_AmbTop", Vector4.Lerp(new Vector4(1.0f, 1.0f, 1.04f, 1), new Vector4(0.9f, 0.92f, 0.98f, 1), k));
-        m.SetVector("_ShadowTint", Vector4.Lerp(new Vector4(0.8f, 0.8f, 0.95f, 1), new Vector4(0.68f, 0.7f, 0.86f, 1), k));   // 눈 위 그림자가 또렷하게
+        float want = NightOn ? 1f : 0f;
+        float k = outdoorK < 0 ? want : Mathf.MoveTowards(outdoorK, want, dt * 1.4f);
+        if (Mathf.Abs(k - outdoorK) > 1e-4f)
+        {
+            outdoorK = k;
+            m.SetVector("_LightTint", Vector4.Lerp(new Vector4(1.04f, 1.0f, 0.94f, 1), new Vector4(0.30f, 0.34f, 0.58f, 1), k));
+            m.SetVector("_AmbTop", Vector4.Lerp(new Vector4(1.0f, 1.0f, 1.04f, 1), new Vector4(0.30f, 0.34f, 0.56f, 1), k));
+            m.SetVector("_AmbBottom", Vector4.Lerp(new Vector4(0.86f, 0.82f, 0.86f, 1), new Vector4(0.17f, 0.16f, 0.27f, 1), k));
+            m.SetVector("_ShadowTint", Vector4.Lerp(new Vector4(0.8f, 0.8f, 0.95f, 1), new Vector4(0.13f, 0.15f, 0.30f, 1), k));
+            if (cam) cam.backgroundColor = Color.Lerp(new Color(0.62f, 0.78f, 0.92f), new Color(0.04f, 0.06f, 0.15f), k);
+            RenderSettings.fogColor = Color.Lerp(new Color(0.82f, 0.88f, 0.95f), new Color(0.06f, 0.08f, 0.18f), k);
+            if (snowMat) snowMat.SetFloat("_Emit", Mathf.Lerp(0.55f, 0.85f, k));
+        }
+        NightLights(dt, k);
     }
 }

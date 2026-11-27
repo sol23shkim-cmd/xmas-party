@@ -1478,6 +1478,8 @@ public partial class AcRoom : MonoBehaviour
         var r = new Rect(SW / 2 - bw / 2, SH - bh - 14, bw, bh);
         R(r);
         if (GUI.Button(r, "<b>나가기</b>", sBtnBig)) treeOverview = false;
+        var nr = new Rect(r.x - r.width * 0.82f - 10, r.y, r.width * 0.82f, r.height); R(nr);
+        NightToggleGUI(r);
     }
 
     void OverviewInput()

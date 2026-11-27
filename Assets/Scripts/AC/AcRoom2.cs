@@ -410,7 +410,8 @@ public partial class AcRoom
     void BuildSnow()
     {
         var flake = SnowFlakeMesh();
-        var mat = new Material(AcmLoader.Mat) { name = "Snow" };
+        var mat = new Material(AcmLoader.Mat) { name = "Snow" }; snowMat = mat;
+        var kill = SnowKillBoxes();
         mat.SetFloat("_Emit", 0.55f); mat.SetFloat("_HasTint", 0);
         float wx = 2 * HouseHalf + 2 * YardW + 8, sy = 20f, houseD = HalfZ - HouseZ0;
         // (중심, 크기, 개수/초) — 높은 곳(20m)에서 내려서 트리 전경을 볼 때도 위에서부터 내림
@@ -447,9 +448,30 @@ public partial class AcRoom
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = flake; r.sharedMaterial = mat;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            var trg = ps.trigger; trg.enabled = true;   // 집 안으로 날려 들어온 눈은 바로 사라짐 (실내엔 눈 안 내림)
+            trg.inside = ParticleSystemOverlapAction.Kill; trg.enter = ParticleSystemOverlapAction.Kill; trg.outside = ParticleSystemOverlapAction.Ignore;
+            for (int i = 0; i < kill.Count; i++) trg.SetCollider(i, kill[i]);
             go.SetActive(true);
             ps.Play();
         }
+    }
+
+    Material snowMat;
+    // 집(거실 + 방들) 위를 덮는 보이지 않는 상자: 눈이 들어오면 지움. 레이캐스트에 안 걸리게 Ignore Raycast 층
+    List<Component> SnowKillBoxes()
+    {
+        var list = new List<Component>();
+        var root = new GameObject("SnowKill"); root.transform.SetParent(world, false); root.layer = 2;
+        void Box(float x0, float z0, float x1, float z1)
+        {
+            var g = new GameObject("k"); g.layer = 2; g.transform.SetParent(root.transform, false);
+            g.transform.position = new Vector3((x0 + x1) / 2, 10.5f, (z0 + z1) / 2);
+            var bc = g.AddComponent<BoxCollider>(); bc.isTrigger = true; bc.size = new Vector3(x1 - x0 + 0.3f, 23f, z1 - z0 + 0.3f);
+            list.Add(bc);
+        }
+        Box(-HalfX, -HalfZ, HalfX, HalfZ);
+        foreach (var a in areasR) Box(a.r.xMin, a.r.yMin, a.r.xMax, a.r.yMax);
+        return list;
     }
 
     static Mesh SnowFlakeMesh()
