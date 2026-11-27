@@ -30,7 +30,7 @@ public partial class AcRoom
     // ===== 만들기 도우미 =====
     // 펫 미리보기: 주소에 ?petgallery 를 붙이고 '혼자 둘러보기'로 들어가면 12마리가 모두 뒤를 따라옴 (확인용)
     bool PetGallery => net != null && net.Offline && Application.absoluteURL.Contains("petgallery");
-    readonly List<PetRig> galleryPets = new List<PetRig>();
+    readonly List<PetRig> galleryPets = new List<PetRig>(); AcCharacter gallerySanta, gallerySled;
 
     static Transform PPivot(Transform parent, string name, Vector3 lp)
     {
@@ -655,6 +655,13 @@ public partial class AcRoom
         if (PetGallery && phase != Phase.Lobby)
         {
             if (galleryPets.Count == 0) foreach (var id in PetIds) galleryPets.Add(MakePet(id));
+            if (gallerySanta == null)
+            {   // 산타 미리보기: 서 있는 산타 + 썰매 탄 산타
+                gallerySanta = AcCharacter.Create(me.look, world); gallerySanta.SetSanta(true);
+                gallerySled = AcCharacter.Create(me.look, world); gallerySled.SetSanta(true); gallerySled.SetSkates(true);
+            }
+            gallerySanta.transform.SetPositionAndRotation(me.transform.position + new Vector3(1.9f, 0, 0.6f), Quaternion.Euler(0, -20f, 0));
+            gallerySled.transform.SetPositionAndRotation(me.transform.position + new Vector3(-2.3f, 0, 0.4f), Quaternion.Euler(0, 35f, 0));
             for (int i = 0; i < galleryPets.Count; i++)
             {
                 var slot = new Vector2((i % 4 - 1.5f) * 0.8f, 1.0f + (2 - i / 4) * 0.75f);   // 내 앞(카메라 쪽)에 4마리씩 세 줄
