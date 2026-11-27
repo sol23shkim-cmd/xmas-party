@@ -640,7 +640,7 @@ public class AcCharacter : MonoBehaviour
                     if (armR) armR.localRotation = Quaternion.Euler(-k * 70f, 0, 20f * k);
                     break;
             }
-            ArmsClearHead();
+            if (emote != "swing" && emote != "throw") ArmsClearHead();   // 휘두르기·던지기는 뒤로 크게 젖히는 동작이라 그대로
         }
         if (skating && et >= 1.8f)
         {
