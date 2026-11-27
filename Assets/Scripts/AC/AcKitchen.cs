@@ -147,7 +147,7 @@ public partial class AcRoom
         UpdateKitchenFx(dt);
         if (!kitchenOpen) return;
         ProcessKitchenIcons();   // 아이콘은 화면 그리기 중이 아니라 여기서 만듦
-        if (Key("esc") && km != KMode.Play) { CloseKitchen(); return; }
+        if (Key("esc") && km != KMode.Play) { if (km == KMode.Count) KitchenFlee(); else CloseKitchen(); return; }
         if (km == KMode.Lobby && Time.unscaledTime > kBeat) { kBeat = Time.unscaledTime + 1.5f; AddAct("kj", kStage.ToString()); }
         if (km == KMode.Count)
         {
