@@ -23,6 +23,8 @@ using UnityEngine;
     public List<CkHand> hands = new List<CkHand>();
     public List<CkOrder> orders = new List<CkOrder>();
     public List<CkAck> acks = new List<CkAck>();
+    public string host = "";                                // 방장이 도망가면 다음 방장 id (그 사람이 이어받음)
+    public List<string> gone = new List<string>();         // 도망간 사람들
     public string lastEv = "";   // 방장이 마지막으로 판정한 일 (손님 화면 소리용) "번호:종류:내용"
     public int evN;
 }

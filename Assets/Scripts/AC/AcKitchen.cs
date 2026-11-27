@@ -130,6 +130,14 @@ public partial class AcRoom
                     kInbox.Add((rid, seq, v[2][0], tile));
                     break;
                 }
+            case "kx":   // 누가 도망감: 그 사람이 들고 있던 것은 사라지고 나머지는 계속
+                {
+                    if (!kHost || data != kSid || (km != KMode.Play && km != KMode.Count)) break;
+                    if (!ks.gone.Contains(rid)) ks.gone.Add(rid);
+                    ks.hands.RemoveAll(h => h.id == rid);
+                    if (r?.net != null) Toast(r.net.name + " 님이 주방에서 도망갔어요!");
+                    break;
+                }
         }
     }
 
@@ -202,6 +210,38 @@ public partial class AcRoom
         kPending.RemoveAll(p => p.seq <= acked);
         ks = JsonUtility.FromJson<CkState>(JsonUtility.ToJson(snap));
         foreach (var p in kPending) { if (p.a == 'c') Kc.Chop(ks, KS, p.tile); else Kc.Interact(ks, KS, myId, p.tile); }
+        // 방장이 도망가면서 나를 다음 방장으로 정함: 이 상태부터 내가 이어서 판정·주문을 맡음
+        if (!kHost && snap.host == myId)
+        {
+            kHost = true; kHostId = myId; kRng = new System.Random(snap.seed + snap.seq * 7919);
+            kPending.Clear(); kInbox.Clear(); kSendAt = 0;
+            Toast("방장이 도망가서 이제 내가 주방을 맡아요");
+        }
+    }
+
+    // 도망가기: 나만 빠지고, 함께하던 사람들은 계속함 (방장이면 다른 사람에게 넘김)
+    float kFleeAsk = -10f;
+    void KitchenFlee()
+    {
+        if (kitchenOpen && ks.nPlayers > 1 && net != null && !string.IsNullOrEmpty(kSid))
+        {
+            if (kHost)
+            {
+                var next = ks.hands.Select(h => h.id).Concat(ks.acks.Select(a => a.id))
+                    .FirstOrDefault(id => id != myId && !ks.gone.Contains(id) && remotes.ContainsKey(id));
+                if (next != null)
+                {
+                    ks.host = next;
+                    if (!ks.gone.Contains(myId)) ks.gone.Add(myId);
+                    ks.hands.RemoveAll(h => h.id == myId);
+                    ks.seq++; PutKState();
+                }
+            }
+            else AddAct("kx", kSid);
+        }
+        kSid = ""; kHost = true; kPending.Clear(); kInbox.Clear();
+        CloseKitchen();
+        Toast("주방에서 도망쳤어요!");
     }
 
     // 내 행동: 바로 내 화면에 + 방장에게 보냄
@@ -898,6 +938,7 @@ public partial class AcRoom
         if (km == KMode.Lobby) { KitchenLobbyGUI(); KControls(); return; }
         if (km == KMode.Result) { KitchenResultGUI(); return; }
         OrdersGUI();
+        if (!kitchenOpen) return;   // 방금 도망감
         var mid = new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter };
         if (km == KMode.Count)
         {
@@ -1006,7 +1047,15 @@ public partial class AcRoom
         GUI.Label(new Rect(tr.x + 30, tr.y, tr.width - 34, tr.height), $"<size=18><b>{(int)remain / 60}:{(int)remain % 60:00}</b></size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleCenter, normal = { textColor = low ? new Color(0.85f, 0.2f, 0.2f) : sLabel.normal.textColor } });
         int ni = Mathf.Clamp(ks.nPlayers, 1, 4) - 1;
         float t3 = Mathf.Max(1, s.thr[ni, 2]);
-        float sw2 = Mathf.Min(220, SW - 10 - tr.xMax - 14);
+        // 도망가기: 시간 옆. 두 번 눌러야 나감 (실수 방지). 함께하는 중이면 나만 빠짐
+        {
+            bool ask = Time.unscaledTime - kFleeAsk < 2.5f;
+            var fr = new Rect(tr.xMax + 6, hy, 84, 36);
+            if (GUI.Button(R(fr), "<size=14><b>" + (ask ? "한 번 더!" : "도망가기") + "</b></size>", ask ? sBtnBig : sBtn))
+            { if (ask) { kFleeAsk = -10f; KitchenFlee(); return; } kFleeAsk = Time.unscaledTime; }
+            if (ask) GUI.Label(new Rect(fr.x - 20, fr.yMax + 2, fr.width + 40, 18), "<size=11>누르면 나만 나가요</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+        }
+        float sw2 = Mathf.Min(220, SW - 10 - (tr.xMax + 6 + 84) - 8);
         var sr = new Rect(SW - 10 - sw2, hy, sw2, 36);
         AcUiTheme.Fill(sr, new Color(1f, 1f, 1f, 0.94f), 3);
         GUI.Label(new Rect(sr.x + 8, sr.y, 70, sr.height), $"<size=18><b>{ks.score}</b></size><size=11>점</size>", new GUIStyle(sLabel) { alignment = TextAnchor.MiddleLeft });
