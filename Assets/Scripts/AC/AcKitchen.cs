@@ -328,10 +328,14 @@ public partial class AcRoom
     // ===== 움직이기 =====
     Vector3 kVel; Vector2 kStick; int kTarget = -1;
     bool CanChopHere() => kTarget >= 0 && Kc.At(KS, kTarget) == 'X' && Kc.Chopped(Kc.ItemAt(ks, kTarget)) != null;
-    // 도마 판: 한 번 끌 때마다(손가락을 대고 일정 거리 이상 밀면) 한 번 썰림. 두 번이면 끝
-    const float SwipeLen = 34f;
-    int kPadTouch = -1; Vector2 kPadStart; bool kPadCounted, kPadMouse;
-    void PadDrag(Vector2 ui) { if (!kPadCounted && (ui - kPadStart).magnitude >= SwipeLen) { kPadCounted = true; if (CanChopHere()) KDo('c', kTarget); } }
+    // 도마 판: 판 위에서 손가락이 움직인 길이를 모아서, 일정 길이마다 한 번 썰림 (짧게 문질러도, 길게 한 번 끌어도 됨)
+    const float SwipeLen = 30f;
+    int kPadTouch = -1; Vector2 kPadStart; bool kPadMouse; float kPadPath;
+    void PadDrag(Vector2 ui)
+    {
+        kPadPath += (ui - kPadStart).magnitude; kPadStart = ui;
+        while (kPadPath >= SwipeLen) { kPadPath -= SwipeLen; if (CanChopHere()) KDo('c', kTarget); else { kPadPath = 0; break; } }
+    }
     void KitchenMove(float dt)
     {
         // 손가락이 없을 때(마우스로 휴대폰 화면을 흉내 낼 때): 왼쪽을 누른 채 끌면 이동
@@ -1118,7 +1122,7 @@ public partial class AcRoom
             AcUiTheme.Fill(new Rect(kPadRect.x + 1, kPadRect.y + 4, kPadRect.width, kPadRect.height), new Color(0.3f, 0.2f, 0.2f, 0.2f), 3);
             AcUiTheme.Fill(kPadRect, new Color(1f, 0.97f, 0.88f, 0.97f), 3);
             AcUiTheme.Ring(kPadRect, AcUiTheme.Gold, 3);
-            GUI.Label(new Rect(kPadRect.x, kPadRect.y + 6, kPadRect.width, 30), "<size=18><b>" + (spread ? "쓱 쓱 두 번 바르기" : "쓱 쓱 두 번 썰기") + "</b></size>", mid);
+            GUI.Label(new Rect(kPadRect.x, kPadRect.y + 6, kPadRect.width, 30), "<size=18><b>" + (spread ? "드래그해서 바르기" : "드래그해서 썰기") + "</b></size>", mid);
             for (int k = 0; k < Kc.Strokes; k++)
             {
                 var d = new Rect(kPadRect.center.x - Kc.Strokes * 20 + k * 40 + 6, kPadRect.y + 40, 28, 28);
@@ -1129,12 +1133,12 @@ public partial class AcRoom
             float hx = kPadRect.x + kPadRect.width * (0.2f + 0.6f * Mathf.SmoothStep(0, 1, ph2));
             var hc = new Color(0.75f, 0.55f, 0.35f, 0.7f * (1 - ph2 * 0.6f));
             AcUiTheme.Circle(new Rect(hx - 8, kPadRect.yMax - 28, 16, 16), hc);
-            GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 24, kPadRect.width, 22), "<size=12>" + (IsMobile ? "손가락으로 쓱 밀어요" : "끌거나 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 24, kPadRect.width, 22), "<size=12>" + (IsMobile ? "이 판 위를 드래그" : "드래그 또는 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
             R(kPadRect);
             var e = Event.current;
             if (Time.unscaledTime - kTouchAt > 1.5f)
             {
-                if (e.type == EventType.MouseDown && kPadRect.Contains(e.mousePosition)) { kPadMouse = true; kPadStart = e.mousePosition; kPadCounted = false; e.Use(); }
+                if (e.type == EventType.MouseDown && kPadRect.Contains(e.mousePosition)) { kPadMouse = true; kPadStart = e.mousePosition; kPadPath = 0; e.Use(); }
                 if (e.type == EventType.MouseDrag && kPadMouse) { PadDrag(e.mousePosition); e.Use(); }
                 if (e.type == EventType.MouseUp) kPadMouse = false;
             }
@@ -1199,7 +1203,7 @@ public partial class AcRoom
                 kTouchAt = Time.unscaledTime;
                 var bc = kBtnRect.center; float br = kBtnRect.width * 0.62f;   // 동그란 버튼 + 둘레 조금 너그럽게
                 if ((ui - bc).magnitude < br) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
-                if (kPadRect.Contains(ui)) { kPadTouch = id; kPadStart = ui; kPadCounted = false; continue; }
+                if (kPadRect.Contains(ui)) { kPadTouch = id; kPadStart = ui; kPadPath = 0; continue; }
                 if (KJoyZone(ui) && kStickTouch < 0) kStickTouch = id;
             }
             if (id == kStickTouch) { stickAlive = true; kStick = KJoyVec(ui); }
