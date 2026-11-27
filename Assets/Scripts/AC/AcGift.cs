@@ -40,7 +40,7 @@ public partial class AcRoom
         new GiftItem("p_bouquet", "꽃다발", 1, 0.5f, "bloom"),
         new GiftItem("p_crown", "반짝 왕관", 1, 0.22f, "spin"),
         new GiftItem("p_ring", "보석 반지", 1, 0.2f, "spin"),
-        new GiftItem("snow_globe", "스노우볼", 1, 0.32f, "spin"),
+        new GiftItem("snow_globe", "스노우볼", 1, 0.34f, "globe"),
         new GiftItem("star_lantern", "별 램프", 1, 0.36f, "glow"),
         new GiftItem("wreath", "크리스마스 리스", 1, 0.42f, "spin"),
         new GiftItem("ice_sculpture", "얼음 별 조각", 1, 0.5f, "spin"),
@@ -368,6 +368,7 @@ public partial class AcRoom
             var c = AcCharacter.Create(l, null);
             g = c.gameObject;
         }
+        else if (id == "snow_globe") g = ProcItem("p_snowglobe");   // 유리 안에 눈 내리는 작은 마을 (11-27)
         else if (id.StartsWith("p_", StringComparison.Ordinal)) g = ProcItem(id);
         else g = AcmLoader.Exists(id) ? AcCatalog.Spawn(id, null, id == "gift_box" ? new Dictionary<string, Color> { { "box", new Color(0.3f, 0.6f, 0.95f) }, { "ribbon", new Color(1f, 0.85f, 0.3f) } } : null) : ProcItem("p_cupcake");
         var holder = FitHolder(g, def.h, "item_" + id);
@@ -479,6 +480,67 @@ public partial class AcRoom
                         b.Ellipsoid(new Vector3(Mathf.Cos(a + 0.39f) * 0.124f, 0.035f, Mathf.Sin(a + 0.39f) * 0.124f), new Vector3(0.016f, 0.016f, 0.016f), gem, 4, 6);
                     }
                     Part("crown", b, Vector3.zero, 0.15f);
+                    break;
+                }
+            case "p_snowglobe":
+                {
+                    // 나무 받침 + 금테
+                    var wood = new Color(0.55f, 0.34f, 0.2f); var gold = new Color(1f, 0.8f, 0.35f);
+                    b.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 0.085f, 0), 0.135f, 0.112f, wood, 28);
+                    b.Torus(new Vector3(0, 0.085f, 0), Vector3.up, 0.11f, 0.009f, gold, 32, 6);
+                    b.Torus(new Vector3(0, 0.02f, 0), Vector3.up, 0.132f, 0.006f, gold, 32, 6);
+                    Part("globe_base", b, Vector3.zero);
+                    // 눈 덮인 땅 (유리 안쪽 바닥)
+                    var snowC = new Color(0.97f, 0.98f, 1f);
+                    var gb = new AcPB();
+                    gb.Ellipsoid(new Vector3(0, 0.1f, 0), new Vector3(0.106f, 0.022f, 0.106f), snowC, 8, 20);
+                    // 작은 집 3채 (벽·지붕·굴뚝)
+                    var houses = new[] { (new Vector3(-0.042f, 0.112f, 0.03f), 25f, new Color(0.95f, 0.82f, 0.62f), new Color(0.75f, 0.18f, 0.2f)),
+                                         (new Vector3(0.045f, 0.112f, 0.022f), -30f, new Color(0.7f, 0.85f, 0.95f), new Color(0.3f, 0.38f, 0.6f)),
+                                         (new Vector3(0.0f, 0.112f, -0.05f), 5f, new Color(0.98f, 0.92f, 0.85f), new Color(0.45f, 0.62f, 0.38f)) };
+                    var win = new AcPB();
+                    foreach (var (hp, yaw, wall, roof) in houses)
+                    {
+                        var q = Quaternion.Euler(0, yaw, 0);
+                        float w = 0.038f, d = 0.03f, hh = 0.03f;
+                        gb.Box(hp + Vector3.up * hh / 2, new Vector3(w, hh, d), wall, q);
+                        // 지붕: 양쪽으로 기운 판 + 지붕 위 눈
+                        gb.Box(hp + q * new Vector3(-w * 0.27f, hh + 0.011f, 0), new Vector3(w * 0.62f, 0.006f, d * 1.25f), roof, q * Quaternion.Euler(0, 0, 38f));
+                        gb.Box(hp + q * new Vector3(w * 0.27f, hh + 0.011f, 0), new Vector3(w * 0.62f, 0.006f, d * 1.25f), roof, q * Quaternion.Euler(0, 0, -38f));
+                        gb.Box(hp + q * new Vector3(0, hh + 0.024f, 0), new Vector3(0.006f, 0.005f, d * 1.25f), snowC, q);
+                        gb.Box(hp + q * new Vector3(w * 0.28f, hh + 0.02f, d * 0.2f), new Vector3(0.006f, 0.014f, 0.006f), new Color(0.6f, 0.35f, 0.28f), q);
+                        // 창문 (불 켜짐) + 문
+                        win.Box(hp + q * new Vector3(-w * 0.22f, hh * 0.55f, d / 2 + 0.001f), new Vector3(0.008f, 0.008f, 0.002f), new Color(1f, 0.85f, 0.45f), q);
+                        win.Box(hp + q * new Vector3(w * 0.22f, hh * 0.55f, d / 2 + 0.001f), new Vector3(0.008f, 0.008f, 0.002f), new Color(1f, 0.85f, 0.45f), q);
+                        gb.Box(hp + q * new Vector3(0, 0.007f, d / 2 + 0.001f), new Vector3(0.008f, 0.014f, 0.002f), new Color(0.45f, 0.28f, 0.18f), q);
+                    }
+                    // 전나무들 + 가운데 큰 트리
+                    var pine = new Color(0.18f, 0.5f, 0.3f);
+                    void Pine(Vector3 at, float hgt)
+                    {
+                        gb.Cylinder(at, at + Vector3.up * hgt * 0.2f, hgt * 0.06f, hgt * 0.05f, new Color(0.45f, 0.3f, 0.2f), 6);
+                        for (int k = 0; k < 3; k++) { float y0 = hgt * (0.15f + k * 0.26f), r0 = hgt * (0.34f - k * 0.08f); gb.Cylinder(at + Vector3.up * y0, at + Vector3.up * (y0 + hgt * 0.4f), r0, 0.002f, pine, 10); gb.Cylinder(at + Vector3.up * (y0 + hgt * 0.25f), at + Vector3.up * (y0 + hgt * 0.3f), r0 * 0.4f, r0 * 0.3f, snowC, 10, false); }
+                    }
+                    Pine(new Vector3(0.058f, 0.106f, -0.04f), 0.05f);
+                    Pine(new Vector3(-0.07f, 0.104f, -0.02f), 0.045f);
+                    Pine(new Vector3(0.02f, 0.11f, 0.06f), 0.035f);
+                    Pine(new Vector3(-0.015f, 0.112f, 0.005f), 0.085f);
+                    win.Sphere(new Vector3(-0.015f, 0.112f + 0.087f, 0.005f), 0.008f, new Color(1f, 0.85f, 0.3f), 5, 7);   // 트리 꼭대기 별빛
+                    // 트리 전구 몇 개
+                    Color[] bc = { new Color(1f, 0.3f, 0.3f), new Color(0.4f, 0.75f, 1f), new Color(1f, 0.85f, 0.4f) };
+                    for (int k = 0; k < 9; k++) { float u = k / 9f, a = k * 2.3f, yy = 0.125f + u * 0.055f, rr = 0.026f * (1 - u * 0.8f); win.Sphere(new Vector3(-0.015f + Mathf.Cos(a) * rr, yy, 0.005f + Mathf.Sin(a) * rr), 0.003f, bc[k % 3], 3, 4); }
+                    var town = ProcObj("globe_town", gb.M("globe_town"), root.transform);
+                    town.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+                    ProcObj("globe_lights", win.M("globe_lights"), root.transform, 1f, false);
+                    // 눈송이 (AnimItem에서 위에서 아래로 계속 떨어뜨림)
+                    var fb = new AcPB(); fb.Sphere(Vector3.zero, 0.0035f, Color.white, 3, 4); var fm = fb.M("flake");
+                    for (int k = 0; k < 40; k++) { var f = ProcObj("flake", fm, root.transform, 0.6f, false); f.transform.localPosition = new Vector3(0, 0.2f, 0); }
+                    // 유리 구 (비치는 재질)
+                    var glb = new AcPB(); glb.Sphere(new Vector3(0, 0.205f, 0), 0.118f, Color.white, 22, 32);
+                    var glass = new GameObject("globe_glass"); glass.transform.SetParent(root.transform, false);
+                    glass.AddComponent<MeshFilter>().sharedMesh = glb.M("globe_glass");
+                    var gr = glass.AddComponent<MeshRenderer>(); gr.sharedMaterial = GlassMat; gr.shadowCastingMode = ShadowCastingMode.Off;
+                    if (GlassMat == null) glass.SetActive(false);
                     break;
                 }
             case "p_ring":
@@ -759,6 +821,22 @@ public partial class AcRoom
         return root;
     }
 
+    static Material glassMat; static bool glassTried;
+    static Material GlassMat
+    {
+        get
+        {
+            if (!glassTried)
+            {
+                glassTried = true;
+                var sh = Resources.Load<Shader>("ACGlass"); if (sh == null) sh = Shader.Find("XmasParty/ACGlass");
+                if (sh != null) glassMat = new Material(sh) { name = "Glass", renderQueue = 3000 };
+            }
+            return glassMat;
+        }
+    }
+
+    static float Frac(float v) => v - Mathf.Floor(v);
     static float BoingBase(string id) => id == "p_jack" ? 0.12f : id == "p_snakecan" ? 0.13f : 0.11f;   // 늘어나는 부분이 시작하는 높이
 
     // 내용물 움직이기 (holder: 맞춘 크기 물체, 원점 바닥 가운데)
@@ -771,6 +849,25 @@ public partial class AcRoom
         {
             case "bob": y = 0.02f + 0.02f * Mathf.Sin(t * 2.5f); yaw += t * 30f; break;
             case "spin": y = 0.03f + 0.015f * Mathf.Sin(t * 2f); yaw += t * 70f; break;
+            case "globe":
+                {   // 스노우볼: 천천히 돌고, 유리 안에서 눈이 계속 내림 (가끔 흔들면 눈보라)
+                    y = 0.01f + 0.006f * Mathf.Sin(t * 1.6f); yaw += t * 22f;
+                    float shake = Mathf.Max(0f, Mathf.Sin(t * 0.45f) - 0.85f) * 6.5f;   // 약 14초마다 살짝 흔듦
+                    rz = shake * 7f * Mathf.Sin(t * 22f);
+                    int k = 0;
+                    foreach (var c in holder.GetComponentsInChildren<Transform>())
+                    {
+                        if (c.name != "flake") continue;
+                        float h1 = Frac(Mathf.Sin(k * 12.9898f) * 43758.55f), h2 = Frac(Mathf.Sin(k * 78.233f) * 12543.31f), h3 = Frac(Mathf.Sin(k * 39.425f) * 24634.63f);
+                        float fall = Frac(t * (0.07f + 0.05f * h3) * (1f + shake * 2f) + h1);
+                        float yy = 0.31f - fall * 0.19f;                                  // 0.31 → 0.12 (땅 위)
+                        float lim = Mathf.Sqrt(Mathf.Max(0f, 0.105f * 0.105f - (yy - 0.205f) * (yy - 0.205f)));
+                        float a = h2 * Mathf.PI * 2f + t * (0.4f + h1) * (1f + shake * 4f), rr = Mathf.Sqrt(h3) * lim * 0.92f;
+                        c.localPosition = new Vector3(Mathf.Cos(a) * rr, yy, Mathf.Sin(a) * rr);
+                        k++;
+                    }
+                    break;
+                }
             case "hop": { float p = Mathf.Repeat(t * 1.5f, 1f); y = 0.09f * 4 * p * (1 - p) * def.h / 0.4f; sy = p < 0.12f ? 1 - 0.15f * (1 - p / 0.12f) : 1; yaw += Mathf.Sin(t * 0.8f) * 25f; break; }
             case "sway": rz = 9f * Mathf.Sin(t * 2.2f); yaw += 20f * Mathf.Sin(t * 0.7f); break;
             case "waddle": rz = 11f * Mathf.Sin(t * 6f); y = 0.012f * Mathf.Abs(Mathf.Sin(t * 6f)); yaw += 20f * Mathf.Sin(t * 0.8f); break;
