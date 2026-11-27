@@ -91,8 +91,8 @@ public partial class AcRoom
         if (Mathf.Abs(k - outdoorK) > 1e-4f)
         {
             outdoorK = k;
-            m.SetVector("_LightTint", Vector4.Lerp(new Vector4(1.04f, 1.0f, 0.94f, 1), new Vector4(0.30f, 0.34f, 0.58f, 1), k));
-            m.SetVector("_AmbTop", Vector4.Lerp(new Vector4(1.0f, 1.0f, 1.04f, 1), new Vector4(0.30f, 0.34f, 0.56f, 1), k));
+            m.SetVector("_LightTint", Vector4.Lerp(new Vector4(1.04f, 1.0f, 0.94f, 1), new Vector4(0.40f, 0.44f, 0.70f, 1), k));
+            m.SetVector("_AmbTop", Vector4.Lerp(new Vector4(1.0f, 1.0f, 1.04f, 1), new Vector4(0.38f, 0.42f, 0.64f, 1), k));
             m.SetVector("_AmbBottom", Vector4.Lerp(new Vector4(0.86f, 0.82f, 0.86f, 1), new Vector4(0.17f, 0.16f, 0.27f, 1), k));
             m.SetVector("_ShadowTint", Vector4.Lerp(new Vector4(0.8f, 0.8f, 0.95f, 1), new Vector4(0.13f, 0.15f, 0.30f, 1), k));
             if (cam) cam.backgroundColor = Color.Lerp(new Color(0.62f, 0.78f, 0.92f), new Color(0.04f, 0.06f, 0.15f), k);

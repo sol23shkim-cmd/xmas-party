@@ -409,7 +409,7 @@ public partial class AcRoom : MonoBehaviour
         // 트리
         Put("tree_skirt", TreePos, 0, 1.15f * TreeK, null, f);
         var tree = Put("tree_giant", TreePos + new Vector3(0, 0.04f, 0), 0, TreeScale, null, f);
-        Put("tree_star_topper", TreePos + new Vector3(0, 6.85f * TreeScale, 0), 0, TreeScale * 1.1f, null, f);
+        treeStar = Put("tree_star_topper", TreePos + new Vector3(0, 6.85f * TreeScale, 0), 0, TreeScale * 1.1f, null, f);
         var leaves = AcmLoader.Find(tree, "leaves");
         if (leaves) { var mc = leaves.gameObject.AddComponent<MeshCollider>(); mc.sharedMesh = leaves.GetComponent<MeshFilter>().sharedMesh; treeCol = mc; }
         var trunk = AcmLoader.Find(tree, "trunk");

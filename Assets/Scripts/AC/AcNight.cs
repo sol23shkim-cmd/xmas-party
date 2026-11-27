@@ -11,9 +11,33 @@ public partial class AcRoom
     GameObject nightBulbs;
     readonly List<(Renderer r, float phase, float speed)> bulbGroups = new List<(Renderer, float, float)>();
     MaterialPropertyBlock bulbMpb;
+    GameObject treeStar;
+    float glowK = -1f;
+    readonly Dictionary<Renderer, float> glowOrig = new Dictionary<Renderer, float>();
+
+    // 밤엔 꼭대기 별과 트리 장식이 은은하게 빛남 (원래 색(틴트)은 그대로 두고 _Emit만 올림)
+    void NightGlow(float k)
+    {
+        if (Mathf.Abs(k - glowK) < 0.01f && !(k > 0 && glowK <= 0)) { if (k > 0.02f && treeStar) SetEmit(treeStar, k * (0.85f + 0.15f * Mathf.Sin(Time.unscaledTime * 2.2f)), true); return; }
+        glowK = k;
+        if (treeStar) SetEmit(treeStar, k, true);
+        foreach (var tag in world.GetComponentsInChildren<AcOrnTag>(true)) SetEmit(tag.gameObject, k * 0.5f, false);
+    }
+    void SetEmit(GameObject g, float v, bool full)
+    {
+        bulbMpb ??= new MaterialPropertyBlock();
+        foreach (var r in g.GetComponentsInChildren<Renderer>())
+        {
+            r.GetPropertyBlock(bulbMpb);
+            if (!glowOrig.TryGetValue(r, out float o)) { o = bulbMpb.isEmpty ? 0f : bulbMpb.GetFloat("_Emit"); glowOrig[r] = o; }
+            bulbMpb.SetFloat("_Emit", Mathf.Max(o, v));
+            r.SetPropertyBlock(bulbMpb);
+        }
+    }
 
     void NightLights(float dt, float k)
     {
+        NightGlow(k);
         bool show = k > 0.02f;
         if (show && nightBulbs == null) BuildNightBulbs();
         if (nightBulbs == null) return;
@@ -60,7 +84,7 @@ public partial class AcRoom
                 if (treeCol.Raycast(new Ray(from, (axis - from).normalized), out var hit, TreeR * 3f + 2f)) p = hit.point + (hit.point - axis).normalized * 0.06f;
             }
             int gi = (i % G) + G * ((i / G) % 2);
-            builders[gi].Sphere(p, 0.055f, cols[i % G], 6, 8);
+            builders[gi].Sphere(p, 0.075f, cols[i % G], 6, 8);
             if (hasPrev && (p - prev).magnitude < 1.2f) wire.Tube(new[] { prev, p }, new[] { 0.008f, 0.008f }, new Color(0.12f, 0.2f, 0.12f), 4);
             prev = p; hasPrev = true;
         }
