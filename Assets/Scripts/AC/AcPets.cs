@@ -28,6 +28,10 @@ public partial class AcRoom
     }
 
     // ===== 만들기 도우미 =====
+    // 펫 미리보기: 주소에 ?petgallery 를 붙이고 '혼자 둘러보기'로 들어가면 12마리가 모두 뒤를 따라옴 (확인용)
+    bool PetGallery => net != null && net.Offline && Application.absoluteURL.Contains("petgallery");
+    readonly List<PetRig> galleryPets = new List<PetRig>();
+
     static Transform PPivot(Transform parent, string name, Vector3 lp)
     {
         var t = new GameObject(name).transform; t.SetParent(parent, false); t.localPosition = lp; return t;
@@ -486,11 +490,12 @@ public partial class AcRoom
 
     // ===== 움직임 =====
     // owner: 따라갈 캐릭터. 펫 위치·자세를 이번 프레임에 맞게
-    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap)
+    void PetStep(PetRig rig, Transform owner, float ownerYaw, float dt, bool snap, Vector2? slot = null)
     {
         if (rig == null || rig.root == null || owner == null) return;
         var fwd = Quaternion.Euler(0, ownerYaw, 0) * Vector3.forward; var right = Quaternion.Euler(0, ownerYaw, 0) * Vector3.right;
-        var target = owner.position - fwd * 0.75f + right * 0.6f; target.y = owner.position.y;
+        var so = slot ?? new Vector2(0.6f, -0.75f);
+        var target = owner.position + fwd * so.y + right * so.x; target.y = owner.position.y;
         var pos = rig.root.position;
         var flat = new Vector3(target.x - pos.x, 0, target.z - pos.z);
         float d = flat.magnitude;
@@ -647,6 +652,16 @@ public partial class AcRoom
     void PetsUpdate(float dt)
     {
         if (world == null || me == null) return;
+        if (PetGallery && phase != Phase.Lobby)
+        {
+            if (galleryPets.Count == 0) foreach (var id in PetIds) galleryPets.Add(MakePet(id));
+            for (int i = 0; i < galleryPets.Count; i++)
+            {
+                var slot = new Vector2((i % 4 - 1.5f) * 0.85f, -1.2f - (i / 4) * 0.9f);
+                PetStep(galleryPets[i], me.transform, yaw, dt, false, slot);
+            }
+            return;
+        }
         // 내 펫
         string want = PetUnlocked ? CurPet : "";
         if (want != myPetId || (myPet != null && myPet.root == null))

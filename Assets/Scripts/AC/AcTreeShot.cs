@@ -22,7 +22,7 @@ public partial class AcRoom
         if (!soon && Time.unscaledTime < shotCheckAt) return;
         if (decorating || building || kitchenOpen || playingGame || treeOverview || showCustom || GiftBusy) return;   // 다른 화면 중이면 다음에
         shotSoonAt = -1; shotCheckAt = Time.unscaledTime + UnityEngine.Random.Range(150f, 240f);
-        string h = net.OrnHash();
+        string h = "v2-" + net.OrnHash();   // v2: 사진 구도를 바꾸면 숫자를 올려서 새로 찍게
         if (h == shotLastH) return;
         var cur = net.Get("shot"); string oldH = "";
         if (cur != null && cur.TryGetValue("tree", out var v) && v is Dictionary<string, object> d) oldH = AcJson.S(d, "h");
@@ -63,7 +63,9 @@ public partial class AcRoom
             {
                 if (!r.enabled || r.shadowCastingMode == ShadowCastingMode.ShadowsOnly) continue;
                 var b = r.bounds;
-                if (b.size.y < 0.25f || b.Intersects(tb) && b.size.x < tb.size.x * 2f) continue;   // 바닥·트리와 그 장식은 그대로
+                if (b.size.y < 0.25f || (b.Intersects(tb) && b.size.x < tb.size.x * 2f)) continue;   // 바닥·트리와 그 장식은 그대로
+                // 트리보다 카메라 쪽(앞)에 있는 벽·기둥·가구는 모두 숨김 (사진 아래쪽을 가리지 않게)
+                if (b.min.z > TreePos.z + TreeR + 0.6f && b.max.y > 0.3f) { hiddenR.Add((r, r.shadowCastingMode)); r.shadowCastingMode = ShadowCastingMode.ShadowsOnly; continue; }
                 foreach (var t in targets)
                 {
                     var dir = t - pos; float len = dir.magnitude;
