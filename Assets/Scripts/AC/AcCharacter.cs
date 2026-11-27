@@ -568,14 +568,14 @@ public class AcCharacter : MonoBehaviour
     {
         if (!arm) return;
         var d = arm.localRotation * Vector3.down;            // 손이 향하는 방향 (몸 기준: x 옆, y 위, z 앞)
-        if (d.y < 0.25f) return;                              // 어깨 높이 아래면 그대로
-        float o = d.x * side, f = d.z;
-        const float minOut = 0.8f;                            // 머리 옆으로 비켜나는 정도
-        if (o >= minOut || f >= 0.62f) return;                // 이미 옆이나 앞으로 충분히 나가 있음
-        float nz = Mathf.Max(f, 0f) * 0.6f;
-        float ny = Mathf.Sqrt(Mathf.Max(0f, 1f - minOut * minOut - nz * nz));
-        var nd = new Vector3(minOut * side, ny, nz);
-        arm.localRotation = Quaternion.FromToRotation(Vector3.down, nd);
+        if (d.y < 0.2f) return;                               // 어깨보다 조금 위까지는 그대로
+        if (d.z >= 0.75f) return;                             // 앞으로 내민 팔(선물 들기 등)은 그대로
+        // 머리가 커서 팔을 머리 위로 올리면 손이 머리에 파묻힘 → 옆으로 벌린 채 어깨 살짝 위(약 20~30°)에서 멈춤
+        float up = Mathf.Clamp01((d.y - 0.2f) / 0.8f);         // 원래 얼마나 들었는지 (흔들기 움직임은 조금 남김)
+        float ny = 0.2f + 0.3f * up;
+        float nz = Mathf.Clamp(d.z, 0f, 0.3f);
+        float nx = Mathf.Sqrt(Mathf.Max(0f, 1f - ny * ny - nz * nz));
+        arm.localRotation = Quaternion.FromToRotation(Vector3.down, new Vector3(nx * side, ny, nz));
     }
 
     void Update()
