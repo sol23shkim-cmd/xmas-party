@@ -47,6 +47,16 @@ public static class AcWebBuild
             string html = File.ReadAllText(idx);
             html = html.Replace("<title>Unity Web Player | ", "<title>")
                        .Replace("if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {", "if (true) {   // 휴대폰·PC 모두 브라우저 창 전체를 게임 화면으로");
+            // 로딩 화면: <프로젝트>/WebExtras 의 영상·글꼴·오버레이를 빌드에 넣음
+            string extras = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "WebExtras"));
+            string overlay = Path.Combine(extras, "loading-overlay.html");
+            if (File.Exists(overlay))
+            {
+                foreach (var f in Directory.GetFiles(extras)) if (!f.EndsWith(".html")) File.Copy(f, Path.Combine(outDir, Path.GetFileName(f)), true);
+                html = html.Replace("<body>", "<body>\n" + File.ReadAllText(overlay))
+                           .Replace("progressBarFull.style.width = 100 * progress + \"%\";", "progressBarFull.style.width = 100 * progress + \"%\"; if (window.xpProgress) xpProgress(progress);")
+                           .Replace("}).then((unityInstance) => {", "}).then((unityInstance) => { if (window.xpDone) xpDone();");
+            }
             File.WriteAllText(idx, html);
         }
         Debug.Log($"[AcWebBuild] {rep.summary.result}  {rep.summary.totalSize / 1048576f:0.0}MB  {rep.summary.totalTime}  → {outDir}");
