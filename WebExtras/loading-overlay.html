@@ -1,8 +1,9 @@
 <!-- 로딩 화면: 눈 내리는 크리스마스 마을 영상 + 제목 + 진행 막대 (AcWebBuild가 index.html의 <body> 바로 뒤에 넣음) -->
 <style>
-  @font-face { font-family: "JuaLoad"; src: url("jua-load.woff") format("woff"); font-display: block; }
+  @font-face { font-family: "GowunLoad"; src: url("gowun-load-b.woff") format("woff"); font-weight: 700; font-display: block; }
+  @font-face { font-family: "GowunLoad"; src: url("gowun-load.woff") format("woff"); font-weight: 400; font-display: block; }
   #unity-loading-container { display: none !important; }
-  #xp-load { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #3b4a5a url("loading.jpg") center / cover no-repeat; transition: opacity .7s ease; font-family: "JuaLoad", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  #xp-load { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #3b4a5a url("loading.jpg") center / cover no-repeat; transition: opacity .7s ease; font-family: "GowunLoad", "Nanum Myeongjo", "AppleMyungjo", serif; }
   #xp-snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
   #xp-load.still { animation: xp-zoom 14s ease-in-out infinite alternate; background-size: auto 112%; }
   @keyframes xp-zoom { from { background-size: auto 104%; } to { background-size: auto 116%; } }
@@ -10,10 +11,12 @@
   #xp-load::before, #xp-load::after { content: ""; position: absolute; left: 0; right: 0; pointer-events: none; z-index: 1; }
   #xp-load::before { top: 0; height: 42%; background: linear-gradient(to bottom, rgba(20,28,44,.55), rgba(20,28,44,0)); }
   #xp-load::after { bottom: 0; height: 26%; background: linear-gradient(to top, rgba(20,28,44,.6), rgba(20,28,44,0)); }
-  #xp-title { position: absolute; z-index: 2; left: 0; right: 0; top: 17%; text-align: center; color: #fff; font-size: clamp(46px, 13.5vw, 84px); line-height: 1.1; letter-spacing: .02em;
-              text-shadow: 0 3px 0 rgba(150, 30, 40, .55), 0 6px 22px rgba(10, 20, 40, .6); animation: xp-in 1.1s ease-out both; }
+  #xp-title { position: absolute; z-index: 2; left: 0; right: 0; top: 17%; text-align: center; color: #fffaf0; font-weight: 700; font-size: clamp(40px, 11.5vw, 76px); line-height: 1.15; letter-spacing: .06em;
+              text-shadow: 0 2px 4px rgba(20, 30, 50, .35), 0 6px 26px rgba(10, 20, 40, .55); animation: xp-in 1.4s ease-out both; }
+  #xp-title::before, #xp-title::after { content: ""; display: block; width: min(46%, 220px); height: 1px; margin: 0 auto; background: linear-gradient(90deg, rgba(247,214,140,0), rgba(247,214,140,.95), rgba(247,214,140,0)); }
+  #xp-title::before { margin-bottom: .32em; } #xp-title::after { margin-top: .36em; }
   #xp-bottom { position: absolute; z-index: 2; left: 0; right: 0; bottom: max(7%, 42px); text-align: center; }
-  #xp-label { color: #fff; font-size: 17px; margin-bottom: 10px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  #xp-label { color: #fffaf0; font-size: 16px; letter-spacing: .08em; margin-bottom: 10px; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
   #xp-bar { width: min(62%, 320px); height: 10px; margin: 0 auto; border-radius: 6px; background: rgba(255,255,255,.28); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); overflow: hidden; }
   #xp-fill { width: 0%; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #e04a4a, #f7c948); transition: width .3s ease; }
   @keyframes xp-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
