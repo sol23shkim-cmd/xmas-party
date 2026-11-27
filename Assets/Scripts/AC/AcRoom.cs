@@ -858,7 +858,7 @@ public partial class AcRoom : MonoBehaviour
             pitch = 8f; targetYaw = decoYaw;
             focus -= Vector3.up * 0.9f;   // 아래 패널을 피해서 살짝 위쪽이 보이게
         }
-        if (PetGallery && phase == Phase.Play && !decorating && !treeOverview) { focus = me.transform.position + new Vector3(0, 0.25f, 1.8f); dist = 5.2f; pitch = 24f; targetYaw = 180f; }   // 펫 미리보기: 가까이
+        if (PetGallery && phase == Phase.Play && !decorating && !treeOverview) { focus = me.transform.position + new Vector3(0, 0.5f, 1.3f); dist = 7.0f; pitch = 24f; targetYaw = 180f; }   // 펫 미리보기: 가까이
         // 스케이트를 타면 조금 멀리서 (빨리 다니니까 넓게 보이게)
         bool special = building || snowFocusId != null || treeOverview || decorating || GreenBusy;
         skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && (me.skating || snowMode) ? 1.45f : 1f, dt * 0.9f);   // 스케이트·눈싸움: 넓게

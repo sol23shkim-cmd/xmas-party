@@ -697,8 +697,8 @@ public partial class AcRoom
                 gallerySanta = AcCharacter.Create(me.look, world); gallerySanta.SetSanta(true);
                 gallerySled = AcCharacter.Create(me.look, world); gallerySled.SetSanta(true); gallerySled.SetSkates(true);
             }
-            gallerySanta.transform.SetPositionAndRotation(me.transform.position + new Vector3(1.9f, 0, 0.6f), Quaternion.Euler(0, -20f, 0));
-            gallerySled.transform.SetPositionAndRotation(me.transform.position + new Vector3(-2.3f, 0, 0.4f), Quaternion.Euler(0, 35f, 0));
+            gallerySanta.transform.SetPositionAndRotation(me.transform.position + new Vector3(1.5f, 0, 0.3f), Quaternion.Euler(0, -15f, 0));
+            gallerySled.transform.SetPositionAndRotation(me.transform.position + new Vector3(-1.8f, 0, 0.1f), Quaternion.Euler(0, 30f, 0));
             for (int i = 0; i < galleryPets.Count; i++)
             {
                 var slot = new Vector2((i % 4 - 1.5f) * 0.8f, 1.0f + (2 - i / 4) * 0.75f);   // 내 앞(카메라 쪽)에 4마리씩 세 줄
