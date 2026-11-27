@@ -1,13 +1,14 @@
-<!-- 로딩 화면: 눈 내리는 크리스마스 마을 영상 + 제목 + 진행 막대 (AcWebBuild가 index.html의 <body> 바로 뒤에 넣음) -->
+<!-- 로딩 화면: 지금 거실에 꾸며진 트리 사진(게임이 찍어 올림) + 제목 + 진행 막대. 사진이 없으면 눈 내리는 마을 영상 (AcWebBuild가 <body> 바로 뒤에 넣음) -->
 <style>
   @font-face { font-family: "GowunLoad"; src: url("gowun-load-b.woff") format("woff"); font-weight: 700; font-display: block; }
   @font-face { font-family: "GowunLoad"; src: url("gowun-load.woff") format("woff"); font-weight: 400; font-display: block; }
   #unity-loading-container { display: none !important; }
-  #xp-load { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #3b4a5a url("loading.jpg") center / cover no-repeat; transition: opacity .7s ease; font-family: "GowunLoad", "Nanum Myeongjo", "AppleMyungjo", serif; }
-  #xp-snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-  #xp-load.still { animation: xp-zoom 14s ease-in-out infinite alternate; background-size: auto 112%; }
-  @keyframes xp-zoom { from { background-size: auto 104%; } to { background-size: auto 116%; } }
-  #xp-load video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 62%; }
+  #xp-load { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: radial-gradient(ellipse at 50% 70%, #3a4f6b 0%, #1b2536 70%, #121925 100%); transition: opacity .7s ease; font-family: "GowunLoad", "Nanum Myeongjo", "AppleMyungjo", serif; }
+  #xp-snow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  #xp-shot { position: absolute; inset: -3%; background: center 60% / cover no-repeat; opacity: 0; transition: opacity 1.2s ease; animation: xp-drift 18s ease-in-out infinite alternate; }
+  #xp-shot.on { opacity: 1; }
+  @keyframes xp-drift { from { transform: scale(1.0); } to { transform: scale(1.07) translateY(-1.2%); } }
+  #xp-load video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 62%; display: none; }
   #xp-load::before, #xp-load::after { content: ""; position: absolute; left: 0; right: 0; pointer-events: none; z-index: 1; }
   #xp-load::before { top: 0; height: 42%; background: linear-gradient(to bottom, rgba(20,28,44,.55), rgba(20,28,44,0)); }
   #xp-load::after { bottom: 0; height: 26%; background: linear-gradient(to top, rgba(20,28,44,.6), rgba(20,28,44,0)); }
@@ -22,57 +23,64 @@
   @keyframes xp-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 </style>
 <div id="xp-load">
-  <video src="loading.mp4?v=2" poster="loading.jpg" autoplay muted loop playsinline webkit-playsinline preload="auto"></video>
+  <div id="xp-shot"></div>
+  <video muted loop playsinline webkit-playsinline preload="none"></video>
   <canvas id="xp-snow"></canvas>
   <div id="xp-title">크리스마스 파티</div>
   <div id="xp-bottom"><div id="xp-label">불러오는 중</div><div id="xp-bar"><div id="xp-fill"></div></div></div>
 </div>
 <script>
   (function () {
-    var el = document.getElementById("xp-load"), fill = document.getElementById("xp-fill"), label = document.getElementById("xp-label"), v = el.querySelector("video");
-    var p0 = 0, done = false;
-    // 영상 재생: 자동 재생이 막히거나 늦으면 여러 번 다시 시도. 끝내 안 되면 그림을 천천히 확대 + 눈 내리기로 움직이게
-    var playing = false, readyCbs = [];
+    var DB = "https://xmas-plaza-default-rtdb.asia-southeast1.firebasedatabase.app/rooms/xmas/orn/x~shot~tree/img.json";
+    var el = document.getElementById("xp-load"), fill = document.getElementById("xp-fill"), label = document.getElementById("xp-label"), v = el.querySelector("video"), shot = document.getElementById("xp-shot");
+    var p0 = 0, done = false, bgReady = false, readyCbs = [];
+    function fireReady() { bgReady = true; var c = readyCbs; readyCbs = []; c.forEach(function (f) { try { f(); } catch (e) {} }); }
+    // 게임 파일은 배경(트리 사진 또는 영상)이 뜬 다음에 받기 시작. 늦어도 2.5초 뒤에는 시작
+    window.xpReady = function (cb) { if (bgReady) cb(); else { readyCbs.push(cb); setTimeout(fireReady, 2500); } };
+    // 1) 트리 사진
+    var fallbackTimer = setTimeout(useVideo, 3000), usedVideo = false;
+    fetch(DB, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (b64) {
+      if (!b64 || typeof b64 !== "string" || b64.length < 1000 || usedVideo) { if (!usedVideo) useVideo(); return; }
+      var img = new Image();
+      img.onload = function () { clearTimeout(fallbackTimer); if (usedVideo) return; shot.style.backgroundImage = "url(" + img.src + ")"; shot.classList.add("on"); fireReady(); };
+      img.onerror = function () { useVideo(); };
+      img.src = "data:image/jpeg;base64," + b64;
+    }).catch(function () { useVideo(); });
+    // 2) 사진이 아직 없으면: 눈 내리는 마을 영상
     function tryPlay() { try { v.muted = true; v.defaultMuted = true; v.setAttribute("muted", ""); var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
-    function fireReady() { var c = readyCbs; readyCbs = []; c.forEach(function (f) { try { f(); } catch (e) {} }); }
-    v.addEventListener("playing", function () { playing = true; stopSnow(); fireReady(); });
-    ["loadedmetadata", "canplay", "canplaythrough"].forEach(function (ev) { v.addEventListener(ev, tryPlay); });
-    ["touchstart", "pointerdown", "click"].forEach(function (ev) { document.addEventListener(ev, tryPlay, { passive: true }); });
-    document.addEventListener("visibilitychange", function () { if (!document.hidden) tryPlay(); });
-    tryPlay();
-    // 게임 파일은 영상이 먼저 나오기 시작한 뒤에 받기 시작 (영상이 먼저 받아지도록). 늦어도 2.5초 뒤에는 시작
-    window.xpReady = function (cb) { if (playing) cb(); else { readyCbs.push(cb); setTimeout(fireReady, 2500); } };
-    // 대신 움직이는 그림: 눈 내리기
-    var snowOn = false, cv = document.getElementById("xp-snow"), cx = cv.getContext("2d"), flakes = [];
-    function startSnow() {
-      if (playing || snowOn) return; snowOn = true; el.classList.add("still"); cv.style.display = "block";
-      for (var i = 0; i < 90; i++) flakes.push({ x: Math.random(), y: Math.random(), r: 1 + Math.random() * 3, s: 0.04 + Math.random() * 0.08, w: Math.random() * 6 });
-      var last = performance.now();
-      (function step(t) {
-        if (!snowOn) return;
-        var dt = Math.min(0.05, (t - last) / 1000); last = t;
-        var W = cv.width = cv.clientWidth, H = cv.height = cv.clientHeight;
-        cx.clearRect(0, 0, W, H); cx.fillStyle = "rgba(255,255,255,0.9)";
-        flakes.forEach(function (f) { f.y += f.s * dt * (1 + f.r * 0.3); f.w += dt; if (f.y > 1.02) { f.y = -0.02; f.x = Math.random(); }
-          cx.beginPath(); cx.arc((f.x + Math.sin(f.w) * 0.01) * W, f.y * H, f.r, 0, 6.283); cx.fill(); });
-        requestAnimationFrame(step);
-      })(last);
+    function useVideo() {
+      if (usedVideo || shot.classList.contains("on")) return; usedVideo = true; clearTimeout(fallbackTimer);
+      v.style.display = "block"; v.poster = "loading.jpg"; v.preload = "auto"; v.src = "loading.mp4?v=2";
+      v.addEventListener("playing", fireReady);
+      ["loadedmetadata", "canplay"].forEach(function (ev) { v.addEventListener(ev, tryPlay); });
+      ["touchstart", "pointerdown"].forEach(function (ev) { document.addEventListener(ev, tryPlay, { passive: true }); });
+      tryPlay();
     }
-    function stopSnow() { if (!snowOn) return; snowOn = false; cv.style.display = "none"; el.classList.remove("still"); }
-    setTimeout(function () { if (!playing) startSnow(); }, 2000);
-    // 한 화면으로 끝까지: 웹 파일 받기(0~60%) → 게임 안에서 모델 받기·집 짓기(60~100%) → 게임이 다 되면 사라짐
+    // 눈 내리기 (사진 위에 살살)
+    var cv = document.getElementById("xp-snow"), cx = cv.getContext("2d"), flakes = [];
+    for (var i = 0; i < 80; i++) flakes.push({ x: Math.random(), y: Math.random(), r: 0.8 + Math.random() * 2.6, s: 0.03 + Math.random() * 0.07, w: Math.random() * 6 });
+    var last = performance.now();
+    (function step(t) {
+      if (done) return;
+      var dt = Math.min(0.05, (t - last) / 1000); last = t;
+      if (!usedVideo) {
+        var W = cv.width = cv.clientWidth, H = cv.height = cv.clientHeight;
+        cx.clearRect(0, 0, W, H); cx.fillStyle = "rgba(255,255,255,0.85)";
+        flakes.forEach(function (f) { f.y += f.s * dt * (1 + f.r * 0.3); f.w += dt * 0.8; if (f.y > 1.02) { f.y = -0.02; f.x = Math.random(); }
+          cx.beginPath(); cx.arc((f.x + Math.sin(f.w) * 0.012) * W, f.y * H, f.r, 0, 6.283); cx.fill(); });
+      } else if (cv.width) { cv.width = 0; }
+      requestAnimationFrame(step);
+    })(last);
+    // 진행: 웹 파일 받기(0~60%) → 게임 안에서 모델 받기·집 짓기(60~100%) → 게임이 다 되면 사라짐
     function show(pct, text) {
       if (done) return;
       pct = Math.max(p0, Math.min(99, Math.round(pct))); p0 = pct;
       fill.style.width = pct + "%";
       label.textContent = text != null ? text : "불러오는 중 " + pct + "%";
     }
-    window.xpProgress = function (p) { show(p * 60, p >= 1 ? "준비 중" : null); };   // 웹 파일
-    window.xpDone = function () {   // 웹 파일 끝: 게임이 알려줄 때까지 계속 보여 줌 (혹시 소식이 없으면 30초 뒤 닫음)
-      show(60, "준비 중");
-      setTimeout(function () { window.xpFinish(); }, 30000);
-    };
-    window.xpStage = function (p, msg) {   // 게임 안에서: p 0~1 (모델 받기), 2 = 집 짓는 중, -1 = 끝
+    window.xpProgress = function (p) { show(p * 60, p >= 1 ? "준비 중" : null); };
+    window.xpDone = function () { show(60, "준비 중"); setTimeout(function () { window.xpFinish(); }, 30000); };
+    window.xpStage = function (p) {
       if (p < 0) { window.xpFinish(); return; }
       if (p >= 2) show(97, "집 짓는 중");
       else show(60 + p * 36, null);

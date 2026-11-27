@@ -181,7 +181,7 @@ public partial class AcRoom
             if (pianoStep < song.Length && song[pianoStep] == note)
             {
                 pianoStep++;
-                if (pianoStep >= song.Length) { Toast($"'{PianoSongs[pianoSong].name}' 끝까지 연주했어요!"); Sfx("record", 0.5f); Emote("cheer"); pianoStep = 0; }
+                if (pianoStep >= song.Length) { QuestProgress("piano", 1); Toast($"'{PianoSongs[pianoSong].name}' 끝까지 연주했어요!"); Sfx("record", 0.5f); Emote("cheer"); pianoStep = 0; }
             }
         }
     }
@@ -453,6 +453,7 @@ public partial class AcRoom
                 if (mine == QzSet()[qi].correct)
                 {
                     Sfx("correct", 0.7f); quizScore = MyQuizTotal() + 1;
+                    QuestProgress("quiz", 1);
                     net?.Put("quiz/" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"score\":" + quizScore + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
                 }
                 else Sfx("wrong", 0.6f);

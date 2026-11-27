@@ -50,6 +50,7 @@ public class AcCharacter : MonoBehaviour
 
     // 내 캐릭터 숨기기 (가까이 보는 화면에서 카메라가 몸 안으로 들어가 속이 비쳐 보이는 것 방지)
     bool hidden;
+    public bool Hidden => hidden;
     public void SetHidden(bool h)
     {
         if (h == hidden) return; hidden = h;

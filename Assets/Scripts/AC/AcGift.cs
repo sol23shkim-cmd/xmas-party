@@ -1163,6 +1163,7 @@ public partial class AcRoom
                       ",\"to\":" + AcJson.Esc(NameKey(r.net.name)) + ",\"toName\":" + AcJson.Esc(r.net.name) + ",\"ct\":" + Math.Floor(NowMs).ToString("0") +
                       ",\"opened\":false,\"d\":" + AcJson.Esc(JsonUtility.ToJson(g)) + "}";
         net.Put("gifts/" + id, json);
+        QuestProgress("gift", 1);
         Held.g.Clear(); SaveHeld();
         Emote("gift", r.net.id); FaceTo(r.c.transform.position);
         Sfx("candy_collect", 0.5f, 1.1f);

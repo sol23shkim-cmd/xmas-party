@@ -157,7 +157,7 @@ public partial class AcRoom
     void TeleportTo(Vector3 p)
     {
         var q = NearestWalkable(p);
-        if (InHouse(q) && AreaAt(q) == "트리 거실") q = NearestWalkable(TreePos + new Vector3(0, 0, TreeR + 2.6f));   // 트리 거실: 트리 바로 앞(남쪽)에 서서 트리가 화면에 보이게
+        if (InHouse(q) && AreaAt(q) == "트리 거실") q = NearestWalkable(TreePos + new Vector3(0, 0, TreeR + 2.0f));   // 트리 거실: 트리 바로 앞(남쪽)에 서서 트리가 화면에 보이게
         decorating = false; treeOverview = false; followId = null; walkTarget = null; showMap = false;
         if (building) StopBuilding();
         if (InHouse(q) && me.skating) { me.SetSkates(false); skateVel = Vector3.zero; }

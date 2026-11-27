@@ -670,6 +670,7 @@ public partial class AcRoom
         {
             txt = txt.Trim(); if (txt == "") return; if (txt.Length > 40) txt = txt.Substring(0, 40);
             double t = Math.Floor(NowMs);
+            QuestSnowman(id);
             net?.Put("snowc/" + id + "~" + t.ToString("0") + "~" + myKey, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"text\":" + AcJson.Esc(txt) + ",\"t\":" + t.ToString("0") + "}");
             Sfx("candy_collect", 0.4f, 1.2f); Toast("감상평을 남겼어요!");
         });

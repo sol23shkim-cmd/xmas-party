@@ -304,6 +304,7 @@ public partial class AcRoom
         km = KMode.Result;
         int stars = Kc.Stars(KS, ks.nPlayers, ks.score);
         kResultStars = stars; kResultAt = Time.unscaledTime;
+        if (stars > 0) QuestProgress("kitchen", 1);
         if (stars > 0)
         {
             if (ks.stage >= KUnlocked && ks.stage + 1 < Kc.Stages.Length) PlayerPrefs.SetInt("kitchen_lv", ks.stage + 1);

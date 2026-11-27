@@ -140,6 +140,7 @@ public partial class AcRoom
             GUILayout.EndHorizontal();
         }
         if (!IsMobile) GUILayout.Label("<size=11>위아래 항목 고르기 / 좌우 바꾸기</size>", sSmall);
+        PetCustomControls();
         if (ch) { me.Rebuild(l); PlayerPrefs.SetString("ac_look", l.Encode()); PlayerPrefs.Save(); }
     }
 

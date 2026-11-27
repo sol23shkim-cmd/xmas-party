@@ -15,6 +15,7 @@ public class AcNet
     public string emote = ""; public double emoteT;     // 인사·하트 등
     public string chat = ""; public double chatT;       // 말풍선
     public bool decorating, left, empty, skate;
+    public string pet = ""; public int qp;           // 데리고 다니는 펫, 퀘스트 포인트(이름표 꾸밈) (11-27)
     public string act = "";                          // 짧은 사건들 (피아노 음, 눈덩이, 퀴즈 답) "번호|종류|내용;..."
     public long seq; public double t;
 }

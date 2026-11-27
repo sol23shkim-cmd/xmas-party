@@ -200,6 +200,7 @@ public partial class AcRoom : MonoBehaviour
         {
             name = uiName.Trim(), look = me.look.Encode(), x = me.transform.position.x, z = me.transform.position.z, ry = yaw, speed = me.speed,
             emote = myEmote, emoteT = myEmoteT, chat = myChat, chatT = myChatT, decorating = decorating, skate = me.skating, act = ActString(),
+            pet = myPet != null && myPet.root && myPet.root.gameObject.activeSelf ? myPetId : "", qp = questPoints,
         };
     }
 
@@ -610,7 +611,10 @@ public partial class AcRoom : MonoBehaviour
         if (decorating && !chatting && !askOpen && !treeOverview) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
         if (building) BuildingUpdate();
         GreenUpdate(dt);
+        TreeShotUpdate();
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
+        QuestUpdate(dt);
+        PetsUpdate(dt);
         UpdateCloseupQuality();
         GiftUpdate(dt);
         KitchenUpdate(dt);
@@ -1008,6 +1012,7 @@ public partial class AcRoom : MonoBehaviour
 
     void AddOrn(string type, Color c, Vector3 pos, float ry)
     {
+        QuestProgress("orn", 1);
         var lp = (pos - TreePos) / TreeScale;
         var o = new Orn { id = myId + "_" + DateTime.UtcNow.Ticks.ToString("x"), type = type, color = ColorUtility.ToHtmlStringRGB(c), owner = myId,
                           x = lp.x, y = lp.y, z = lp.z, ry = ry, v = 2, t = (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds };
@@ -1170,6 +1175,7 @@ public partial class AcRoom : MonoBehaviour
             ActionButtons();
             ContextButtons();
             GiftHUD();
+            QuestHUD();
             SnowFightHUD();
             PillowHUD();
         }
@@ -1188,6 +1194,7 @@ public partial class AcRoom : MonoBehaviour
         if (chatting) ChatBox();
         if (showCustom) CustomWindow();
         MapWindow();
+        QuestWindow();
         AskWindow();
         QuitWindow();
         if (net != null && net.Status != "") GUI.Label(new Rect(SW - 330, IsMobile ? 60 : 50, 320, 24), net.Status, sSmall);
@@ -1219,20 +1226,42 @@ public partial class AcRoom : MonoBehaviour
             sTagMe = new GUIStyle(sTag) { normal = { background = red, textColor = Color.white } };
             sBubble = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontSize = 15, normal = { background = sBox.normal.background, textColor = new Color(0.3f, 0.22f, 0.16f) }, padding = new RectOffset(10, 10, 6, 6) };
         }
-        Tag(me.transform.position, uiName, true, myChat, myChatT, myEmote, myEmoteT);
-        foreach (var r in remotes.Values) if (r.net != null) Tag(r.c.transform.position, r.net.name, false, r.net.chat, r.net.chatT, r.net.emote, r.net.emoteT);
+        Tag(me.transform.position, uiName, true, myChat, myChatT, myEmote, myEmoteT, questPoints);
+        foreach (var r in remotes.Values) if (r.net != null) Tag(r.c.transform.position, r.net.name, false, r.net.chat, r.net.chatT, r.net.emote, r.net.emoteT, r.net.qp);
     }
 
     static readonly Dictionary<string, string> EmoteText = new Dictionary<string, string>
         { { "wave", "안녕!" }, { "heart", "♥" }, { "cheer", "메리 크리스마스!" }, { "highfive", "하이파이브!" }, { "gift", "선물이에요!" } };
 
-    void Tag(Vector3 pos, string name, bool isMe, string chat, double chatT, string emote, double emoteT)
+    GUIStyle sTagFancy, sTagFancyMe;
+    void Tag(Vector3 pos, string name, bool isMe, string chat, double chatT, string emote, double emoteT, int qp = 0)
     {
         var sp = cam.WorldToScreenPoint(pos + new Vector3(0, 1.55f, 0));
         if (sp.z < 0) return;
         float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK;
-        var size = sTag.CalcSize(new GUIContent(name));
-        GUI.Label(new Rect(x - size.x / 2 - 8, y - 12, size.x + 16, 22), name, isMe ? sTagMe : sTag);
+        if (qp >= 3)
+        {   // 퀘스트 포인트 3 이상: 금빛 테두리에 별이 반짝이는 이름표
+            if (sTagFancy == null)
+            {
+                var gold = new Texture2D(1, 2) { wrapMode = TextureWrapMode.Clamp }; gold.SetPixel(0, 0, new Color(0.98f, 0.78f, 0.3f)); gold.SetPixel(0, 1, new Color(1f, 0.93f, 0.62f)); gold.Apply();
+                var ruby = new Texture2D(1, 2) { wrapMode = TextureWrapMode.Clamp }; ruby.SetPixel(0, 0, new Color(0.7f, 0.12f, 0.2f)); ruby.SetPixel(0, 1, new Color(0.9f, 0.3f, 0.35f)); ruby.Apply();
+                sTagFancy = new GUIStyle(sTag) { normal = { background = gold, textColor = new Color(0.5f, 0.2f, 0.12f) } };
+                sTagFancyMe = new GUIStyle(sTag) { normal = { background = ruby, textColor = new Color(1f, 0.95f, 0.8f) } };
+            }
+            var fs = sTagFancy.CalcSize(new GUIContent(name));
+            var fr = new Rect(x - fs.x / 2 - 20, y - 14, fs.x + 40, 26);
+            AcUiTheme.DrawGlow(fr, 0.35f + 0.25f * Mathf.Sin(Time.time * 2.5f + x * 0.01f));
+            AcUiTheme.Fill(new Rect(fr.x - 2, fr.y - 2, fr.width + 4, fr.height + 4), new Color(1f, 0.85f, 0.4f), 0);
+            GUI.Label(fr, name, isMe ? sTagFancyMe : sTagFancy);
+            float tw = Mathf.Sin(Time.time * 3f + x * 0.02f) * 0.5f + 0.5f;
+            AcUiTheme.Star(new Rect(fr.x + 4, fr.y + 6, 13, 13), Color.Lerp(new Color(1f, 0.95f, 0.7f), Color.white, tw));
+            AcUiTheme.Star(new Rect(fr.xMax - 17, fr.y + 6, 13, 13), Color.Lerp(Color.white, new Color(1f, 0.95f, 0.7f), tw));
+        }
+        else
+        {
+            var size = sTag.CalcSize(new GUIContent(name));
+            GUI.Label(new Rect(x - size.x / 2 - 8, y - 12, size.x + 16, 22), name, isMe ? sTagMe : sTag);
+        }
         double now = AcSync.UnixMs;
         string bubble = null;
         if (!string.IsNullOrEmpty(chat) && now - chatT < 5000) bubble = chat;

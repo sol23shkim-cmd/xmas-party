@@ -979,6 +979,7 @@ public partial class AcRoom
         cgLastBest = MyBest();
         cgNewBest = cgScore > cgLastBest;
         // 판마다 따로 저장 (같은 사람이 명예의 전당에 여러 번 오를 수 있음)
+        QuestProgress("cookie", cgScore, true);
         if (cgScore > 0 && net != null)
             net.Put("scores/" + myKey + "~" + AcSync.UnixMs.ToString("0"), "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"best\":" + cgScore + ",\"look\":" + AcJson.Esc(me.look.Encode()) + ",\"t\":" + AcSync.UnixMs.ToString("0") + "}");
     }

@@ -115,7 +115,7 @@ public partial class AcRoom
 
     // ===== 상황별 버튼 =====
     float TreeDist => Vector2.Distance(new Vector2(me.transform.position.x, me.transform.position.z), new Vector2(TreePos.x, TreePos.z));
-    bool NearTree => phase == Phase.Play && !Outside && TreeDist < TreeR + 3.2f;
+    bool NearTree => phase == Phase.Play && !Outside && TreeDist < TreeR + 2.4f && AreaAt(me.transform.position) == "트리 거실";   // 트리 바로 앞, 거실 안에서만 (옆방 피아노 앞에서 안 뜨게)
     Vector3 firePos;
     bool NearFireplace => phase == Phase.Play && !Outside && Flat(me.transform.position, firePos) < 3.2f;
     bool InBakery => phase == Phase.Play && !Outside && AreaAt(me.transform.position) == "쿠키 공방";

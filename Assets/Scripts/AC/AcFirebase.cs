@@ -158,6 +158,8 @@ public class AcFirebase : MonoBehaviour
         if (p[0] == "ck" && p.Length == 2) return "orn/x~ck~" + p[1];          // 주방 게임 판·상태
         if (p[0] == "cks" && p.Length == 2) return "orn/x~cks~" + p[1];        // 주방 게임 기록
         if (p[0] == "snowc" && p.Length == 2) return "orn/x~snowc~" + p[1];    // 눈사람 감상평 (11-26)
+        if (p[0] == "shot" && p.Length == 2) return "orn/x~shot~" + p[1];      // 로딩 화면용 트리 사진 (11-27)
+        if (p[0] == "quest" && p.Length == 2) return "orn/x~quest~" + p[1];    // 일일 퀘스트·펫 (11-27)
         return path;
     }
 
@@ -167,7 +169,7 @@ public class AcFirebase : MonoBehaviour
         string prefix = p[0] == "snow" ? "x~snow~" : p[0] == "letters" ? "x~letter~" : p[0] == "msg" && p.Length == 2 ? "x~msg~" + p[1] + "~"
                       : p[0] == "members" ? "x~member~" : p[0] == "scores" ? "x~score~" : p[0] == "quiz" ? "x~quiz~" : p[0] == "sbf" ? "x~sbf~" : p[0] == "qzs" ? "x~qzs~" : p[0] == "candy" ? "x~candy~"
                       : p[0] == "plants" ? "x~plant~" : p[0] == "pw" ? "x~pw~" : p[0] == "gifts" ? "x~gift~"
-                      : p[0] == "ck" ? "x~ck~" : p[0] == "cks" ? "x~cks~" : p[0] == "snowc" ? "x~snowc~" : null;
+                      : p[0] == "ck" ? "x~ck~" : p[0] == "cks" ? "x~cks~" : p[0] == "snowc" ? "x~snowc~" : p[0] == "shot" ? "x~shot~" : p[0] == "quest" ? "x~quest~" : null;
         if (prefix != null)
         {
             var orn = Node("orn");
@@ -182,6 +184,30 @@ public class AcFirebase : MonoBehaviour
             if (!(cur is Dictionary<string, object> d) || !d.TryGetValue(part, out cur)) return null;
         }
         return cur as Dictionary<string, object>;
+    }
+
+    // 트리 장식(orn 중 x~로 시작하지 않는 것)이 바뀌었는지 알아보는 짧은 지문
+    public string OrnHash()
+    {
+        var orn = Node("orn"); if (orn == null) return "0";
+        unchecked
+        {
+            long h = 17; int n = 0;
+            var keys = new List<string>(); foreach (var k in orn.Keys) if (!k.StartsWith("x~", StringComparison.Ordinal)) keys.Add(k);
+            keys.Sort(StringComparer.Ordinal);
+            foreach (var k in keys) { h = h * 31 + Str(k); h = h * 31 + Obj(orn[k]); n++; }
+            return n + "-" + h.ToString("x");
+        }
+        long Str(string s) { unchecked { long x = 7; foreach (var ch in s) x = x * 131 + ch; return x; } }
+        long Obj(object o)
+        {
+            unchecked
+            {
+                if (o is Dictionary<string, object> d) { var ks = new List<string>(d.Keys); ks.Sort(StringComparer.Ordinal); long x = 3; foreach (var k in ks) x = x * 37 + Str(k) * 11 + Obj(d[k]); return x; }
+                if (o is List<object> l) { long x = 5; foreach (var e in l) x = x * 41 + Obj(e); return x; }
+                return o == null ? 0 : Str(Convert.ToString(o, System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
     }
 
     public void Put(string path, string json)

@@ -448,6 +448,7 @@ public partial class AcRoom
         cdStars = !win ? 0 : (cdScore >= CdStar3 || leftRatio >= 0.3f) ? 3 : (cdScore >= CdStar2 || leftRatio >= 0.12f) ? 2 : 1;
         cdNewBest = cdScore > cdPrevBest;
         if (win && PlayerPrefs.GetInt("candy_lv", 1) < cdLevel + 1) { PlayerPrefs.SetInt("candy_lv", Mathf.Min(cdLevel + 1, CdMaxLevel())); PlayerPrefs.Save(); }
+        QuestProgress("candy", cdScore, true);
         if (!cdSaved && net != null && cdScore > 0)
         {
             cdSaved = true;

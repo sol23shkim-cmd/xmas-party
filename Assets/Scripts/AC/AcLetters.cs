@@ -148,6 +148,7 @@ public partial class AcRoom
         string json = "{\"from\":" + AcJson.Esc(myKey) + ",\"fromName\":" + AcJson.Esc(uiName.Trim()) + ",\"to\":" + AcJson.Esc(toId) + ",\"toName\":" + AcJson.Esc(toName) +
                       ",\"title\":" + AcJson.Esc(Short(title, 40)) + ",\"body\":" + AcJson.Esc(body.Length > 1500 ? body.Substring(0, 1500) : body) + ",\"ct\":" + AcSync.UnixMs.ToString("0") + "}";
         net.Put("letters/" + id, json);
+        QuestProgress("letter", 1);
         writeTitle = ""; writeBody = "";
         letterTab = toId == "all" ? 1 : 2;
         nextLetterPoll = 0;

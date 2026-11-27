@@ -1,6 +1,7 @@
 // AcGreenhouse.cs - 겨울 온실 화분 키우기 (11-26)
 // 빈 화분 12개. 식물 5가지(포인세티아·아기 전나무·아마릴리스·크리스마스 선인장·호랑가시나무) 중 골라 심고 화분 색도 고름.
 // 물은 4시간마다 한 번씩: 그 4시간 동안 주인이 물을 주면 +4단계, 다른 사람이 주면 한 사람당 +1단계. 최대 100단계.
+// 물을 안 줘도 심은 뒤 8시간마다 저절로 +1단계 (11-27).
 // 다 자라면 '다 자랐어요!' + 반짝임, 주인은 눈사람처럼 장식을 붙여 꾸밀 수 있음.
 // 저장: orn/x~plant~p<번호> = {slot, owner, name, kind, pot, ct, d(장식 json)}
 //       orn/x~pw~p<번호>~<심은 시각>~<4시간 칸 번호>~<물 준 사람> = {name, t}
@@ -24,6 +25,7 @@ public partial class AcRoom
         "뾰족한 잎 사이로 빨간 열매가 열려요" };
     const int PlantMax = 100;
     const double WaterWinMs = 4 * 3600 * 1000.0;
+    const double PassiveGrowMs = 8 * 3600 * 1000.0;   // 저절로 자라기: 8시간마다 1단계
     const float PotTop = 0.29f;
     // 온실 안 화분 자리 (방 가운데 기준, 미터). 가운데 돌길과 옆방 문 앞은 비워 둠
     static readonly Vector2[] SlotLocal = {
@@ -359,6 +361,7 @@ public partial class AcRoom
                 }
             int stage = 0;
             foreach (var kv in byWin) stage += (kv.Value.owner ? 4 : 0) + kv.Value.others;
+            if (ct > 0 && NowMs > ct) stage += (int)Math.Floor((NowMs - ct) / PassiveGrowMs);   // 물을 안 줘도 심은 뒤 8시간마다 +1
             stage = Mathf.Clamp(stage, 0, PlantMax);
             if (s.stage >= 0 && stage > s.stage && s.kind == kind && Math.Abs(s.ct - ct) < 1) { s.pop = 1f; FxBurst("star", s.pos + Vector3.up * (PotTop + s.height * 0.6f), 10, 1.6f, 0.05f, FxGold, 1.0f, 1f); Sfx("grow", 0.55f); }
             string key = kind + "|" + stage + "|" + pot + "|" + ((long)ct);
@@ -555,6 +558,7 @@ public partial class AcRoom
         if (waterT > 1.0f && waterT - dt <= 1.0f && net != null)
         {
             string key = "p" + s.i + "~" + ((long)s.ct).ToString() + "~" + CurWin + "~" + myKey;
+            QuestProgress("water", 1);
             net.Put("pw/" + key, "{\"name\":" + AcJson.Esc(uiName.Trim()) + ",\"t\":" + Math.Floor(NowMs).ToString("0") + "}");
             s.iWatered = true; nextPlantPoll = 0;
             int add = s.owner == myKey ? 4 : 1;
