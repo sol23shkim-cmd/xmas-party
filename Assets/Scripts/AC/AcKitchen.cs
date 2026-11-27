@@ -331,11 +331,48 @@ public partial class AcRoom
     bool CanChopHere() => kTarget >= 0 && Kc.At(KS, kTarget) == 'X' && Kc.Chopped(Kc.ItemAt(ks, kTarget)) != null;
     // 도마 판: 판 위에서 손가락이 움직인 길이를 모아서, 일정 길이마다 한 번 썰림 (짧게 문질러도, 길게 한 번 끌어도 됨)
     const float SwipeLen = 30f;
-    int kPadTouch = -1; Vector2 kPadStart; bool kPadMouse; float kPadPath;
+    // 판을 누른 손가락은 매 프레임(Update) 직접 읽음: 화면 그리기(IMGUI) 이벤트에 기대지 않아 휴대폰에서도 놓치지 않음.
+    // 누르기 시작한 순간의 도마 칸을 기억해서, 끄는 동안 캐릭터가 살짝 돌아 바라보는 칸이 바뀌어도 계속 썰림
+    int kPadTouch = -2; Vector2 kPadStart; float kPadPath; int kChopTile = -1;
+    readonly HashSet<int> kPadSeen = new HashSet<int>(), kPadNow = new HashSet<int>();
+    bool ChopOk(int tile) => tile >= 0 && Kc.At(KS, tile) == 'X' && Kc.Chopped(Kc.ItemAt(ks, tile)) != null;
+    bool PadActive => kPadTouch != -2 && ChopOk(kChopTile);
     void PadDrag(Vector2 ui)
     {
         kPadPath += (ui - kPadStart).magnitude; kPadStart = ui;
-        while (kPadPath >= SwipeLen) { kPadPath -= SwipeLen; if (CanChopHere()) KDo('c', kTarget); else { kPadPath = 0; break; } }
+        while (kPadPath >= SwipeLen) { kPadPath -= SwipeLen; if (ChopOk(kChopTile)) KDo('c', kChopTile); else { kPadPath = 0; break; } }
+    }
+    static Vector2 ScreenToUi(Vector2 px, float k) => new Vector2(px.x / k, (Screen.height - px.y) / k);
+    void PadPoll()
+    {
+        bool padOn = kPadRect.width > 0;
+        kPadNow.Clear();
+        bool anyTouch = false, kept = false;
+#if ENABLE_INPUT_SYSTEM
+        var ts = Touchscreen.current;
+        if (ts != null)
+            foreach (var t in ts.touches)
+            {
+                if (!t.press.isPressed) continue;
+                anyTouch = true;
+                int id = t.touchId.ReadValue(); kPadNow.Add(id);
+                var ui = ScreenToUi(t.position.ReadValue(), UiK);
+                if (id == kPadTouch) { kept = true; PadDrag(ui); }
+                else if (kPadTouch < 0 && padOn && !kPadSeen.Contains(id) && kPadRect.Contains(ui) && CanChopHere())
+                { kPadTouch = id; kChopTile = kTarget; kPadStart = ui; kPadPath = 0; kept = true; kTouchAt = Time.unscaledTime; }
+            }
+#endif
+        kPadSeen.Clear(); foreach (var id in kPadNow) kPadSeen.Add(id);
+        if (!anyTouch)
+        {   // 마우스(PC): 판에서 누르기 시작해 끌기
+            if (ptrPressed)
+            {
+                var ui = ScreenToUi(ptrPos, UiK);
+                if (kPadTouch == -100) { kept = true; PadDrag(ui); }
+                else if (kPadTouch < 0 && ptrDown && padOn && kPadRect.Contains(ScreenToUi(ptrStart, UiK)) && CanChopHere()) { kPadTouch = -100; kChopTile = kTarget; kPadStart = ui; kPadPath = 0; kept = true; }
+            }
+        }
+        if (!kept) kPadTouch = -2;
     }
     void KitchenMove(float dt)
     {
@@ -368,6 +405,7 @@ public partial class AcRoom
         // PC: 스페이스 잡기/놓기, E 썰기 (한 번 누르면 다 썰릴 때까지 알아서)
         if (Key("space") || Key("j")) { if (kTarget >= 0) KDo('g', kTarget); }
         if ((Key("e") || Key("k")) && CanChopHere()) KDo('c', kTarget);
+        PadPoll();
     }
 
     int FindTarget()
@@ -1098,7 +1136,8 @@ public partial class AcRoom
         bool narrow = SW < 640;
         float bs = narrow ? 104 : 92;
         kBtnRect = new Rect(SW - bs - 20, SH - bs - 26, bs, bs);
-        bool chopHere = CanChopHere();
+        bool chopHere = CanChopHere() || PadActive;   // 끄는 중이면 판을 계속 보여 줌
+        int chopTile = PadActive ? kChopTile : kTarget;
         float pw = narrow ? 200 : 210, ph = narrow ? 110 : 100;   // 썰기 판: 잡기 버튼 위, 넓게
         kPadRect = chopHere ? new Rect(SW - 14 - pw, kBtnRect.y - ph - 14, pw, ph) : new Rect(-999, -999, 0, 0);
         string label = KActionLabel();
@@ -1117,8 +1156,8 @@ public partial class AcRoom
         if (GUI.Button(kBtnRect, "", GUIStyle.none) && Time.unscaledTime - kTouchAt > 1.5f) { kBtnMouse = true; kBtnMouseAt = Time.unscaledTime; if (kTarget >= 0) KDo('g', kTarget); }
         if (chopHere)
         {
-            bool spread = Kc.IsSpread(Kc.ItemAt(ks, kTarget));
-            var t = Kc.TileAt(ks, kTarget, false);
+            bool spread = Kc.IsSpread(Kc.ItemAt(ks, chopTile));
+            var t = Kc.TileAt(ks, chopTile, false);
             int done = t != null ? Mathf.RoundToInt(t.p) : 0;
             AcUiTheme.Fill(new Rect(kPadRect.x + 1, kPadRect.y + 4, kPadRect.width, kPadRect.height), new Color(0.3f, 0.2f, 0.2f, 0.2f), 3);
             AcUiTheme.Fill(kPadRect, new Color(1f, 0.97f, 0.88f, 0.97f), 3);
@@ -1136,13 +1175,7 @@ public partial class AcRoom
             AcUiTheme.Circle(new Rect(hx - 8, kPadRect.yMax - 28, 16, 16), hc);
             GUI.Label(new Rect(kPadRect.x, kPadRect.yMax - 24, kPadRect.width, 22), "<size=12>" + (IsMobile ? "이 판 위를 드래그" : "드래그 또는 E 키") + "</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
             R(kPadRect);
-            var e = Event.current;
-            if (Time.unscaledTime - kTouchAt > 1.5f)
-            {
-                if (e.type == EventType.MouseDown && kPadRect.Contains(e.mousePosition)) { kPadMouse = true; kPadStart = e.mousePosition; kPadPath = 0; e.Use(); }
-                if (e.type == EventType.MouseDrag && kPadMouse) { PadDrag(e.mousePosition); e.Use(); }
-                if (e.type == EventType.MouseUp) kPadMouse = false;
-            }
+            if (kPadTouch != -2) AcUiTheme.Ring(kPadRect, new Color(1f, 0.6f, 0.15f), 1);   // 손가락이 판 위에 있음
         }
         // 고정 조작 막대 (휴대폰): 받침은 늘 같은 자리, 손잡이만 움직임
         if (IsMobile)
@@ -1186,7 +1219,7 @@ public partial class AcRoom
 #if ENABLE_INPUT_SYSTEM
         var ts = Touchscreen.current;
         if (ts == null) return;
-        bool stickAlive = false, padAlive = false;
+        bool stickAlive = false;
         kNowTouch.Clear();
         foreach (var t in ts.touches)
         {
@@ -1204,13 +1237,11 @@ public partial class AcRoom
                 kTouchAt = Time.unscaledTime;
                 var bc = kBtnRect.center; float br = kBtnRect.width * 0.62f;   // 동그란 버튼 + 둘레 조금 너그럽게
                 if ((ui - bc).magnitude < br) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
-                if (kPadRect.Contains(ui)) { kPadTouch = id; kPadStart = ui; kPadPath = 0; continue; }
+                if (kPadRect.Contains(ui)) continue;   // 판은 PadPoll이 맡음
                 if (KJoyZone(ui) && kStickTouch < 0) kStickTouch = id;
             }
             if (id == kStickTouch) { stickAlive = true; kStick = KJoyVec(ui); }
-            if (id == kPadTouch) { padAlive = true; PadDrag(ui); }
         }
-        if (!padAlive) kPadTouch = -1;
         kKnownTouch.Clear(); foreach (var id in kNowTouch) kKnownTouch.Add(id);
         if (!stickAlive && kStickTouch >= 0) { kStickTouch = -1; kStick = Vector2.zero; kStickOn = false; }
         if (stickAlive) kStickOn = true;
