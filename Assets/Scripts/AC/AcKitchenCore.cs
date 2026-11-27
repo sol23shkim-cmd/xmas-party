@@ -175,12 +175,18 @@ public static class Kc
     {
         if (st.over || i < 0 || i >= W * H) return "";
         char c = At(s, i);
-        if (Walkable(c)) return "";
         var hand = Hand(st, pid); string h = hand.it ?? ""; string on = ItemAt(st, i);
+        if (Walkable(c))
+        {   // 바닥에 떨어진 것 (던진 것): 줍기·그릇에 담기
+            if (h == "" && on != "") { hand.it = on; SetItem(st, i, ""); return "pick"; }
+            if (IsContainer(h) && on != "") { var a = Add(h, on); if (a != null) { hand.it = a; SetItem(st, i, ""); return "add"; } }
+            return "";
+        }
         if (IsDispenser(c))
         {
             string d = Dispense(c);
             if (h == "") { hand.it = d; return "pick"; }
+            if (h == d) { hand.it = ""; return "putback"; }   // 같은 재료·빈 그릇은 상자에 도로 넣기
             if (IsContainer(h) && !IsContainer(d)) { var a = Add(h, d); if (a != null) { hand.it = a; return "add"; } return "bad"; }
             if (!IsContainer(h) && IsContainer(d)) { var a = Add(d, h); if (a != null) { hand.it = a; return "add"; } return "bad"; }
             return "bad";
@@ -225,6 +231,22 @@ public static class Kc
                 }
         }
     }
+
+    // 던지기: i = 떨어질 칸 (던진 사람 화면에서 앞으로 두 칸, 가는 길에 조리대가 있으면 그 칸)
+    public static string Throw(CkState st, Stage s, string pid, int i)
+    {
+        if (st.over || i < 0 || i >= W * H) return "";
+        var hand = Hand(st, pid); if (string.IsNullOrEmpty(hand.it)) return "";
+        if (Walkable(At(s, i)))
+        {
+            if (ItemAt(st, i) != "") return "bad";
+            SetItem(st, i, hand.it); hand.it = ""; return "throw";
+        }
+        var e = Interact(st, s, pid, i);
+        return e == "place" ? "throw" : e;
+    }
+    // 행동 하나 (방장·손님 공통): c 썰기, t 던지기, 그 밖은 잡기/놓기
+    public static string Act(CkState st, Stage s, string pid, char a, int i) => a == 'c' ? Chop(st, s, i) : a == 't' ? Throw(st, s, pid, i) : Interact(st, s, pid, i);
 
     // 도마 문지르기 한 번
     public static string Chop(CkState st, Stage s, int i)

@@ -166,7 +166,7 @@ public partial class AcRoom
                     if (ack == null) { ack = new CkAck { id = a.pid }; ks.acks.Add(ack); }
                     if (a.seq <= ack.seq) continue;
                     ack.seq = a.seq;
-                    string e = a.a == 'c' ? Kc.Chop(ks, KS, a.tile) : Kc.Interact(ks, KS, a.pid, a.tile);
+                    string e = Kc.Act(ks, KS, a.pid, a.a, a.tile);
                     if (e.StartsWith("serve", StringComparison.Ordinal)) evs.Add(e);
                 }
                 kInbox.Clear();
@@ -209,7 +209,7 @@ public partial class AcRoom
         int acked = snap.acks.FirstOrDefault(a => a.id == myId)?.seq ?? 0;
         kPending.RemoveAll(p => p.seq <= acked);
         ks = JsonUtility.FromJson<CkState>(JsonUtility.ToJson(snap));
-        foreach (var p in kPending) { if (p.a == 'c') Kc.Chop(ks, KS, p.tile); else Kc.Interact(ks, KS, myId, p.tile); }
+        foreach (var p in kPending) Kc.Act(ks, KS, myId, p.a, p.tile);
         // 방장이 도망가면서 나를 다음 방장으로 정함: 이 상태부터 내가 이어서 판정·주문을 맡음
         if (!kHost && snap.host == myId)
         {
@@ -244,11 +244,37 @@ public partial class AcRoom
         Toast("주방에서 도망쳤어요!");
     }
 
+    // 던지기: 바라보는 방향(네 방향 중 가까운 쪽)으로 두 칸. 가는 길에 조리대가 있으면 그 위에, 아니면 두 칸 앞 바닥에
+    Rect kThrowRect; float kThrowAt = -10f;
+    readonly Dictionary<int, (Vector3 from, float at)> kFlyFrom = new Dictionary<int, (Vector3, float)>();
+    void KThrow()
+    {
+        var hnd = ks.hands.FirstOrDefault(hh => hh.id == myId); if (hnd == null || hnd.it == "") return;
+        if (km == KMode.Count || km == KMode.Result) return;
+        kThrowAt = Time.unscaledTime;
+        var f = Quaternion.Euler(0, yaw, 0) * Vector3.forward;
+        int dx = 0, dz = 0;
+        if (Mathf.Abs(f.x) > Mathf.Abs(f.z)) dx = f.x > 0 ? 1 : -1; else dz = f.z > 0 ? -1 : 1;   // 칸 번호는 z가 위로 갈수록 작아짐
+        var c = KCell(me.transform.position);
+        int land = -1;
+        for (int k = 1; k <= 2; k++)
+        {
+            int x = c.x + dx * k, z = c.y + dz * k;
+            if (x < 0 || z < 0 || x >= Kc.W || z >= Kc.H) break;
+            land = Kc.Idx(x, z);
+            if (!Kc.Walkable(KAt(x, z))) break;
+        }
+        if (land < 0 || (Kc.Walkable(Kc.At(KS, land)) && Kc.ItemAt(ks, land) != "")) { KitchenEvent("bad", -1); return; }
+        kFlyFrom[land] = (me.transform.position + Vector3.up * 0.9f + f * 0.4f, Time.time);
+        me.PlayEmote("throw");
+        KDo('t', land);
+    }
+
     // 내 행동: 바로 내 화면에 + 방장에게 보냄
     void KDo(char a, int tile)
     {
         if (km == KMode.Count || km == KMode.Result) return;
-        string e = a == 'c' ? Kc.Chop(ks, KS, tile) : Kc.Interact(ks, KS, myId, tile);
+        string e = Kc.Act(ks, KS, myId, a, tile);
         if (e == "") return;
         KitchenEvent(e, tile);
         if (km == KMode.Play && !kHost)
@@ -267,6 +293,8 @@ public partial class AcRoom
         {
             case "pick": Sfx("jelly", 0.3f, 1.1f); break;
             case "place": Sfx("click", 0.35f, 0.9f); break;
+            case "putback": Sfx("click", 0.35f, 1.15f); break;
+            case "throw": Sfx("throw", 0.45f, 1.1f); break;
             case "add": Sfx("coin", 0.3f, 1.2f); FxBurst("star", tp, 4, 0.8f, 0.05f, FxGold, 0.6f, 1f); break;
             case "cook": Sfx("throw", 0.35f, 0.8f); break;
             case "trash": Sfx("splat", 0.3f, 1.2f); break;
@@ -405,6 +433,7 @@ public partial class AcRoom
         // PC: 스페이스 잡기/놓기, E 썰기 (한 번 누르면 다 썰릴 때까지 알아서)
         if (Key("space") || Key("j")) { if (kTarget >= 0) KDo('g', kTarget); }
         if ((Key("e") || Key("k")) && CanChopHere()) KDo('c', kTarget);
+        if (Key("q") || Key("l")) KThrow();
         PadPoll();
     }
 
@@ -418,7 +447,8 @@ public partial class AcRoom
             {
                 if (dx == 0 && dz == 0) continue;
                 int x = cell.x + dx, z = cell.y + dz;
-                if (x < 0 || z < 0 || x >= Kc.W || z >= Kc.H || Kc.Walkable(KAt(x, z))) continue;
+                if (x < 0 || z < 0 || x >= Kc.W || z >= Kc.H) continue;
+                if (Kc.Walkable(KAt(x, z)) && Kc.ItemAt(ks, Kc.Idx(x, z)) == "") continue;   // 바닥은 떨어진 물건이 있을 때만
                 var d = KPos(x, z) - pos; d.y = 0;
                 float dist = d.magnitude; if (dist > 1.85f) continue;   // 한 칸 반쯤까지 (손가락 조작이 너그럽게)
                 float s = Vector3.Dot(f, d / dist) - dist * 0.25f;
@@ -592,10 +622,19 @@ public partial class AcRoom
     static readonly Color CtrTop = new Color(0.98f, 0.96f, 0.93f), CtrSide = new Color(0.82f, 0.25f, 0.27f), CtrSide2 = new Color(0.2f, 0.52f, 0.33f);
     GameObject BuildStation(char c, int x, int z)
     {
-        var p = KPos(x, z); var b = new AcPB();
+        var p = KPos(x, z); var b = new AcPB { detail = 1.5f };
         float T = Kc.Tile;
         Color side = (x + z) % 2 == 0 ? CtrSide : CtrSide2;
-        void Counter(Color top, Color sd) { b.Box(p + new Vector3(0, CounterH / 2 - 0.03f, 0), new Vector3(T - 0.04f, CounterH - 0.06f, T - 0.04f), sd); b.Box(p + new Vector3(0, CounterH - 0.03f, 0), new Vector3(T, 0.06f, T), top); }
+        // 조리대: 상판 모서리를 둥글게 말고, 아래에 어두운 걸레받이 (각진 상자 느낌을 줄임)
+        void Counter(Color top, Color sd)
+        {
+            b.Box(p + new Vector3(0, CounterH / 2 - 0.03f, 0), new Vector3(T - 0.1f, CounterH - 0.06f, T - 0.1f), sd);
+            b.Box(p + new Vector3(0, 0.05f, 0), new Vector3(T - 0.14f, 0.1f, T - 0.14f), sd * 0.72f);
+            b.Box(p + new Vector3(0, CounterH - 0.03f, 0), new Vector3(T - 0.08f, 0.06f, T - 0.08f), top);
+            float e = T / 2 - 0.04f, hy = CounterH - 0.03f;
+            var cs = new[] { new Vector3(-e, hy, -e), new Vector3(e, hy, -e), new Vector3(e, hy, e), new Vector3(-e, hy, e) };
+            for (int k = 0; k < 4; k++) { b.Tube(new[] { p + cs[k], p + cs[(k + 1) % 4] }, new[] { 0.032f, 0.032f }, top, 10, null, false, false); b.Sphere(p + cs[k], 0.032f, top, 6, 10); }
+        }
         GameObject extra = null;
         switch (c)
         {
@@ -618,17 +657,27 @@ public partial class AcRoom
                 b.Torus(p + new Vector3(0, CounterH + 0.24f, 0), Vector3.up, 0.27f, 0.02f, new Color(0.8f, 0.82f, 0.86f), 20, 5);
                 b.Disk(p + new Vector3(0, CounterH + 0.03f, 0), Vector3.up, 0.26f, new Color(0.5f, 0.52f, 0.55f), 18, false);
                 b.Cylinder(p + new Vector3(0.27f, CounterH + 0.2f, 0), p + new Vector3(0.55f, CounterH + 0.22f, 0), 0.025f, 0.025f, new Color(0.25f, 0.2f, 0.18f), 6);
+                for (int k = -1; k <= 1; k += 2) b.Cylinder(p + new Vector3(k * 0.25f, CounterH * 0.72f, -T / 2 + 0.04f), p + new Vector3(k * 0.25f, CounterH * 0.72f, -T / 2 - 0.02f), 0.05f, 0.05f, new Color(0.85f, 0.85f, 0.88f), 12);   // 손잡이(불 조절)
+                {   // 파란 불꽃 고리: 멀리서도 '화구'로 보이게
+                    var fb = new AcPB { detail = 1.4f };
+                    for (int k = 0; k < 10; k++) { float a = k / 10f * Mathf.PI * 2f; var fp = p + new Vector3(Mathf.Cos(a) * 0.3f, CounterH + 0.04f, Mathf.Sin(a) * 0.3f); fb.Ellipsoid(fp, new Vector3(0.035f, 0.07f, 0.035f), new Color(0.35f, 0.65f, 1f), 6, 8); }
+                    ProcObj("flame", fb.M("flame"), kStatic, 0.9f, false);
+                }
                 break;
             case 'O':
                 {
-                    b.Box(p + new Vector3(0, CounterH / 2, 0), new Vector3(T - 0.04f, CounterH, T - 0.04f), new Color(0.85f, 0.3f, 0.3f));
-                    b.Box(p + new Vector3(0, CounterH + 0.01f, 0), new Vector3(T, 0.05f, T), new Color(0.3f, 0.3f, 0.34f));
-                    b.Cylinder(p + new Vector3(0.2f, CounterH, 0.25f), p + new Vector3(0.2f, CounterH + 0.55f, 0.25f), 0.08f, 0.08f, new Color(0.5f, 0.5f, 0.55f), 8);   // 굴뚝
-                    // 앞 유리 (구울 때 빛남) — 카메라 쪽(-z)
-                    var gb = new AcPB(); gb.Box(p + new Vector3(0, CounterH * 0.5f, -T / 2 + 0.01f), new Vector3(T * 0.6f, CounterH * 0.4f, 0.03f), new Color(0.25f, 0.2f, 0.2f));
-                    var glass = ProcObj("ovenGlass", gb.M("og"), kStatic, 0f, false);
+                    // 벽돌 화덕: 아래 받침 + 위에 둥근 돔(앞에 아치 입구, 구울 때 주황빛) — 화구(냄비)와 한눈에 구분
+                    Color brick = new Color(0.78f, 0.4f, 0.28f), mortar = new Color(0.93f, 0.84f, 0.72f), stone = new Color(0.86f, 0.82f, 0.75f);
+                    b.Box(p + new Vector3(0, CounterH / 2 - 0.03f, 0), new Vector3(T - 0.1f, CounterH - 0.06f, T - 0.1f), stone);
+                    b.Box(p + new Vector3(0, CounterH - 0.03f, 0), new Vector3(T - 0.04f, 0.06f, T - 0.04f), new Color(0.72f, 0.68f, 0.62f));
+                    b.Ellipsoid(p + new Vector3(0, CounterH, 0.03f), new Vector3(T * 0.43f, 0.5f, T * 0.43f), brick, 14, 22, null,
+                        u => (Mathf.Repeat(u.y * 7f, 1f) < 0.12f || Mathf.Repeat(Mathf.Atan2(u.z, u.x) * 3.2f + (Mathf.Floor(u.y * 7f) % 2) * 0.5f, 1f) < 0.07f) && u.y > 0.02f ? mortar : brick);
+                    b.Ellipsoid(p + new Vector3(0, CounterH + 0.12f, -T * 0.37f), new Vector3(0.24f, 0.2f, 0.06f), new Color(0.2f, 0.12f, 0.1f), 10, 14);   // 아치 입구 테두리
+                    b.Cylinder(p + new Vector3(0.12f, CounterH + 0.3f, 0.2f), p + new Vector3(0.12f, CounterH + 0.72f, 0.2f), 0.07f, 0.07f, brick, 10);   // 굴뚝
+                    b.Torus(p + new Vector3(0.12f, CounterH + 0.72f, 0.2f), Vector3.up, 0.075f, 0.02f, mortar, 14, 5);
+                    var glass = ProcObj("ovenGlass", OvenGlassMesh(false, true), kStatic, 0f, false);
+                    glass.transform.position = p;
                     kOvenGlass[Kc.Idx(x, z)] = glass.GetComponent<Renderer>();
-                    b.Box(p + new Vector3(0, CounterH * 0.78f, -T / 2 + 0.01f), new Vector3(T * 0.5f, 0.04f, 0.05f), new Color(0.9f, 0.85f, 0.7f));
                     break;
                 }
             case 'R':
@@ -776,7 +825,7 @@ public partial class AcRoom
 
     static Mesh BuildKItemMesh(string it)
     {
-        var b = new AcPB();
+        var b = new AcPB { detail = 1.7f };   // 매끈하게
         const float K = 1.75f;   // 화면에서 잘 보이게 실제보다 크게
         if (Kc.IsContainer(it))
         {
@@ -825,8 +874,9 @@ public partial class AcRoom
                 if (go)
                 {
                     go.transform.SetParent(kDyn, false);
-                    float y = c == 'H' ? CounterH + 0.06f : c == 'X' ? CounterH + 0.04f : CounterH;
+                    float y = Kc.Walkable(c) ? 0.03f : c == 'H' ? CounterH + 0.06f : c == 'X' ? CounterH + 0.04f : CounterH;
                     go.transform.position = KPos(t.i) + new Vector3(0, y, 0);
+                    if (kFlyFrom.TryGetValue(t.i, out var ff) && Time.time - ff.at < 0.6f) { var fl = go.AddComponent<KFly>(); fl.from = ff.from; fl.to = go.transform.position; }   // 던진 것: 날아와 떨어짐
                     if (c == 'H' && t.it == "milk.h") go.transform.localScale = Vector3.one * 1.15f;
                 }
                 kTileObjs[t.i] = (go, key);
@@ -885,7 +935,7 @@ public partial class AcRoom
     Mesh kGlassOn, kGlassBurn, kGlassOff;
     Mesh OvenGlassMesh(bool burnt, bool off = false)
     {
-        Mesh Make(Color c) { var b = new AcPB(); float T = Kc.Tile; b.Box(new Vector3(0, CounterH * 0.5f, -T / 2 + 0.01f), new Vector3(T * 0.6f, CounterH * 0.4f, 0.03f), c); return b.M("og"); }
+        Mesh Make(Color c) { var b = new AcPB { detail = 1.4f }; float T = Kc.Tile; b.Ellipsoid(new Vector3(0, CounterH + 0.11f, -T * 0.39f), new Vector3(0.19f, 0.15f, 0.05f), c, 10, 14); return b.M("og"); }
         if (off) return kGlassOff ? kGlassOff : (kGlassOff = Make(new Color(0.25f, 0.2f, 0.2f)));
         if (burnt) return kGlassBurn ? kGlassBurn : (kGlassBurn = Make(new Color(0.3f, 0.25f, 0.25f)));
         return kGlassOn ? kGlassOn : (kGlassOn = Make(new Color(1f, 0.6f, 0.2f)));
@@ -1094,9 +1144,9 @@ public partial class AcRoom
         {
             bool ask = Time.unscaledTime - kFleeAsk < 2.5f;
             var fr = new Rect(tr.xMax + 6, hy, 84, 36);
-            if (GUI.Button(R(fr), "<size=14><b>" + (ask ? "한 번 더!" : "도망가기") + "</b></size>", ask ? sBtnBig : sBtn))
+            if (GUI.Button(R(fr), "<size=14><b>" + (ask ? "ㅌㅌ!" : "도망가기") + "</b></size>", ask ? sBtnBig : sBtn))
             { if (ask) { kFleeAsk = -10f; KitchenFlee(); return; } kFleeAsk = Time.unscaledTime; }
-            if (ask) GUI.Label(new Rect(fr.x - 20, fr.yMax + 2, fr.width + 40, 18), "<size=11>누르면 나만 나가요</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
+            if (ask) GUI.Label(new Rect(fr.x - 20, fr.yMax + 2, fr.width + 40, 18), "<size=11>또 누르면 진짜 도망가요</size>", new GUIStyle(sSmall) { alignment = TextAnchor.MiddleCenter });
         }
         float sw2 = Mathf.Min(220, SW - 10 - (tr.xMax + 6 + 84) - 8);
         var sr = new Rect(SW - 10 - sw2, hy, sw2, 36);
@@ -1154,6 +1204,24 @@ public partial class AcRoom
         GUI.Label(new Rect(br.x, br.y + (can ? 0 : 0), br.width, br.height), "<size=" + (narrow ? 20 : 18) + "><b>" + (can ? "<color=#ffffff>" + label + "</color>" : "<color=#8a84a0>" + (hand != null && hand.it != "" ? "놓을 곳\n찾기" : "잡기") + "</color>") + "</b></size>", mid);
         R(kBtnRect);
         if (GUI.Button(kBtnRect, "", GUIStyle.none) && Time.unscaledTime - kTouchAt > 1.5f) { kBtnMouse = true; kBtnMouseAt = Time.unscaledTime; if (kTarget >= 0) KDo('g', kTarget); }
+        // 던지기 버튼: 무언가 들고 있을 때만, 잡기 버튼 왼쪽에 작게
+        {
+            var hnd = ks.hands.FirstOrDefault(hh => hh.id == myId);
+            bool canThrow = hnd != null && hnd.it != "" && (km == KMode.Play || km == KMode.Lobby);
+            float ts2 = narrow ? 70 : 62;
+            kThrowRect = canThrow ? new Rect(kBtnRect.x - ts2 - 14, kBtnRect.yMax - ts2, ts2, ts2) : new Rect(-999, -999, 0, 0);
+            if (canThrow)
+            {
+                bool hot = Time.unscaledTime - kThrowAt < 0.15f;
+                var tr = hot ? new Rect(kThrowRect.x + 3, kThrowRect.y + 3, kThrowRect.width - 6, kThrowRect.height - 6) : kThrowRect;
+                AcUiTheme.Circle(new Rect(tr.x + 2, tr.y + 4, tr.width, tr.height), new Color(0.3f, 0.15f, 0.2f, 0.22f));
+                AcUiTheme.Circle(tr, new Color(0.35f, 0.62f, 0.95f));
+                AcUiTheme.CircleRing(tr, new Color(0.85f, 0.93f, 1f));
+                GUI.Label(tr, "<size=" + (narrow ? 16 : 15) + "><b><color=#ffffff>던지기</color></b></size>", mid);
+                R(kThrowRect);
+                if (GUI.Button(kThrowRect, "", GUIStyle.none) && Time.unscaledTime - kTouchAt > 1.5f) KThrow();
+            }
+        }
         if (chopHere)
         {
             bool spread = Kc.IsSpread(Kc.ItemAt(ks, chopTile));
@@ -1204,7 +1272,7 @@ public partial class AcRoom
         char c = Kc.At(KS, kTarget); var hand = ks.hands.FirstOrDefault(hh => hh.id == myId); string h = hand?.it ?? ""; string on = Kc.ItemAt(ks, kTarget);
         if (c == 'R') return h != "" ? "버리기" : "";
         if (c == 'V') return h != "" ? "내기" : "";
-        if (Kc.IsDispenser(c)) return h == "" ? "꺼내기" : "담기";
+        if (Kc.IsDispenser(c)) return h == "" ? "꺼내기" : h == Kc.Dispense(c) ? "넣기" : "담기";
         if (c == 'H' || c == 'O') return h == "" ? (on != "" ? "꺼내기" : "") : (on == "" ? (c == 'O' ? "굽기" : "데우기") : "담기");
         if (h == "" && on != "") return "집기";
         if (h != "" && on == "") return "놓기";
@@ -1237,6 +1305,7 @@ public partial class AcRoom
                 kTouchAt = Time.unscaledTime;
                 var bc = kBtnRect.center; float br = kBtnRect.width * 0.62f;   // 동그란 버튼 + 둘레 조금 너그럽게
                 if ((ui - bc).magnitude < br) { if (kBtnSeen != id) { kBtnSeen = id; if (kTarget >= 0) KDo('g', kTarget); } continue; }
+                if (kThrowRect.width > 0 && (ui - kThrowRect.center).magnitude < kThrowRect.width * 0.62f) { KThrow(); continue; }
                 if (kPadRect.Contains(ui)) continue;   // 판은 PadPoll이 맡음
                 if (KJoyZone(ui) && kStickTouch < 0) kStickTouch = id;
             }
@@ -1363,4 +1432,20 @@ public partial class AcRoom
         }
     }
     static float dtStarSnd(int k) => 0.3f + k * 0.35f;
+}
+
+// 던진 물건이 포물선을 그리며 날아가 떨어지는 짧은 움직임
+public class KFly : MonoBehaviour
+{
+    public Vector3 from, to; float t;
+    void Start() { transform.position = from; }
+    void Update()
+    {
+        t += Time.deltaTime / 0.35f;
+        float k = Mathf.Clamp01(t);
+        var p = Vector3.Lerp(from, to, k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * 0.9f;
+        transform.position = p;
+        transform.Rotate(0, 0, 0);
+        if (k >= 1f) { transform.position = to; Destroy(this); }
+    }
 }

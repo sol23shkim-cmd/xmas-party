@@ -40,13 +40,13 @@ public partial class AcRoom
     bool closeQ, closeBaseSet; float baseRenderScale = 1f, baseShadowDist = 45f; int baseMsaa = 1;
     void UpdateCloseupQuality()
     {
-        bool want = giftMode != GiftMode.None || plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null;
+        bool want = giftMode != GiftMode.None || plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null || kitchenOpen;   // 주방 게임도 매끈하게
         if (want == closeQ) return;
         var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
         if (urp == null) return;
         if (!closeBaseSet || !closeQ) { baseRenderScale = urp.renderScale; baseShadowDist = urp.shadowDistance; baseMsaa = urp.msaaSampleCount; closeBaseSet = true; }
         closeQ = want;
-        if (want) { urp.renderScale = 1f; urp.shadowDistance = 9f; urp.msaaSampleCount = 4; }
+        if (want) { urp.renderScale = 1f; urp.shadowDistance = kitchenOpen ? 40f : 9f; urp.msaaSampleCount = 4; }   // 주방은 카메라가 멀어서 그림자 거리를 넉넉히
         else { urp.renderScale = baseRenderScale; urp.shadowDistance = baseShadowDist; urp.msaaSampleCount = baseMsaa; }
     }
 
