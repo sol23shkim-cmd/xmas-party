@@ -468,10 +468,13 @@ public partial class AcRoom
         if (snowBuf == null || snowBuf.Length < max) snowBuf = new ParticleSystem.Particle[max];
         int n = ps.GetParticles(snowBuf);
         bool changed = false;
+        // 실내에 있을 때 카메라는 집 바깥(앞마당 하늘)에 떠 있어서, 카메라 바로 앞 눈송이가 '방 안에 내리는 커다란 눈'처럼 보임 → 카메라 둘레 9m 안 눈도 지움
+        bool indoor = phase == Phase.Play && me != null && !Outside && !treeOverview;
+        Vector3 cp = cam ? cam.transform.position : Vector3.zero;
         for (int k = 0; k < n; k++)
         {
             var p = snowBuf[k].position;
-            if (p.y < 14f && InHouse(p)) { snowBuf[k].remainingLifetime = 0f; changed = true; }   // 집 지붕 높이 위쪽(14m 이상)은 그대로 둬서 멀리서 볼 때 하늘엔 눈이 보이게
+            if ((p.y < 14f && InHouse(p)) || (indoor && (p - cp).sqrMagnitude < 81f)) { snowBuf[k].remainingLifetime = 0f; changed = true; }   // 집 지붕 높이 위쪽(14m 이상)은 그대로 둬서 멀리서 볼 때 하늘엔 눈이 보이게
         }
         if (changed) ps.SetParticles(snowBuf, n);
     }
