@@ -1,4 +1,4 @@
-// AcCandyImport.cs - 캔디 팡 그림(Resources/Candy) 가져오기 설정: 압축 없이 깨끗하게, 투명 테두리 번짐 없이
+// AcCandyImport.cs - 캔디팡 그림(Resources/Candy) 가져오기 설정: 압축 없이 깨끗하게, 투명 테두리 번짐 없이
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;

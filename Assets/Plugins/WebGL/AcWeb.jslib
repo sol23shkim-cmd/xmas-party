@@ -1,5 +1,20 @@
 // AcWeb.jslib — 웹(휴대폰 브라우저)에서만 쓰는 기능: Firebase 실시간 스트림, 글 입력창, 기기 확인
 mergeInto(LibraryManager.library, {
+  // 앱으로 받기 (게임 안 버튼): 0 = 이미 앱으로 열림, 1 = 바로 설치 창 가능, 2 = 아이폰(공유→홈 화면에 추가), 3 = 그 밖의 브라우저(메뉴→홈 화면에 추가), 4 = 카카오톡 안
+  AcWeb_InstallState: function () {
+    try {
+      var sa = (window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches)) || navigator.standalone === true;
+      if (sa) return 0;
+      if (window.xpInstallEvt) return 1;
+      var ua = navigator.userAgent;
+      if (/KAKAOTALK/i.test(ua)) return 4;
+      if (/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document)) return 2;
+      return 3;
+    } catch (e) { return 3; }
+  },
+  AcWeb_Install: function () {
+    try { var ev = window.xpInstallEvt; if (ev) { ev.prompt(); window.xpInstallEvt = null; } } catch (e) {}
+  },
   // 사진 저장: 휴대폰은 공유 창(사진첩에 저장·카톡 보내기), 안 되면 파일로 내려받기 (11-28)
   AcWeb_SaveImage: function (b64Ptr, namePtr) {
     var b64 = UTF8ToString(b64Ptr), name = UTF8ToString(namePtr);

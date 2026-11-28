@@ -1,4 +1,4 @@
-# make_sprites.py - '크리스마스 캔디 팡' 그림 만들기 (SDF 모양 + 입체 조명, 3배로 그려 줄여서 매끈하게)
+# make_sprites.py - '크리스마스 캔디팡' 그림 만들기 (SDF 모양 + 입체 조명, 3배로 그려 줄여서 매끈하게)
 # 실행: python3 make_sprites.py  → Assets/Resources/Candy/*.png  (미리보기: Tools/candy/preview.png)
 import os, math
 import numpy as np
@@ -348,7 +348,7 @@ def title():
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     f1 = ImageFont.truetype(font_path, 92, index=1)   # KR
     f2 = ImageFont.truetype(font_path, 150, index=1)
-    lines = [('크리스마스', f1, 18), ('캔디 팡!', f2, 105)]
+    lines = [('크리스마스', f1, 18), ('캔디팡!', f2, 105)]
     for text, f, y in lines:
         tw = f.getbbox(text)[2]
         x = (W - tw) // 2
@@ -362,7 +362,7 @@ def title():
         g = np.zeros((H, W, 4), np.uint8)
         for yy in range(H):
             t = np.clip((yy - top) / max(1, (bot - top)), 0, 1)
-            c = np.array([255, 236, 120]) * (1 - t) + np.array([255, 120, 70]) * t if text == '캔디 팡!' else np.array([255, 255, 255]) * (1 - t) + np.array([255, 200, 210]) * t
+            c = np.array([255, 236, 120]) * (1 - t) + np.array([255, 120, 70]) * t if text == '캔디팡!' else np.array([255, 255, 255]) * (1 - t) + np.array([255, 200, 210]) * t
             g[yy, :, :3] = c; g[yy, :, 3] = 255
         grad = Image.fromarray(g, 'RGBA')
         layer.paste(grad, (0, 0), mask)

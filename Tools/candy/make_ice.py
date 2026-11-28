@@ -1,4 +1,4 @@
-# make_ice.py - 캔디 팡 '얼음 덮개'(ice.png)와 별 반짝이(star.png) 그림
+# make_ice.py - 캔디팡 '얼음 덮개'(ice.png)와 별 반짝이(star.png) 그림
 # 실행: python3 make_ice.py → Assets/Resources/Candy/ice.png, star.png
 import os, math
 import numpy as np

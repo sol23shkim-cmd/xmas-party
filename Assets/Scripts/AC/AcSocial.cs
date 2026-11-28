@@ -139,12 +139,15 @@ public partial class AcRoom
         string label = null; Action act = null;
         bool piano = NearPiano(out bool musicRoom);
         bool inLibrary = !Outside && AreaAt(me.transform.position) == "서재";
-        if (InStudy) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
-        else if (NearTree) { label = "트리 꾸미기"; act = StartDecorating; }
+        bool study = InStudy, tree = NearTree;
+        // 둘 다 가까우면 더 가까운 쪽을 큰 버튼으로, 다른 쪽은 옆의 작은 버튼으로 (11-28)
+        bool treeFirst = tree && (!study || TreeDist - TreeR < Flat(me.transform.position, firePos) - 0.6f);
+        if (treeFirst) { label = "트리 꾸미기"; act = StartDecorating; }
+        else if (study) { label = UnreadLetters > 0 ? $"편지함 ({UnreadLetters})" : "편지함"; act = OpenLetters; }
         else if (Outside && !snowMode) { label = "눈사람 만들기"; act = StartBuilding; }
         else if (Outside) { label = "눈싸움 그만"; act = ToggleSnowFight; }
         else if (InBakery) { label = "쿠키 달리기 게임"; act = OpenCookieGame; }
-        else if (InPlayroom) { label = "캔디 팡 게임"; act = OpenCandy; }
+        else if (InPlayroom) { label = "캔디팡 게임"; act = OpenCandy; }
         else if (InKitchenRoom) { label = "크리스마스 주방 게임"; act = OpenKitchen; }
         else if (piano) { label = "피아노 치기"; act = OpenPiano; }
         else if (inLibrary) { label = "크리스마스 퀴즈"; act = OpenQuiz; }
@@ -168,7 +171,9 @@ public partial class AcRoom
             if (!snowMode && label != "눈싸움 그만") extra.Add(("눈싸움", ToggleSnowFight, IsMobile ? 112 : 100));
             if (snowMode && label != "눈싸움 그만") extra.Add(("눈싸움 그만", ToggleSnowFight, IsMobile ? 112 : 100));
         }
-        if (NearTree && !InStudy) extra.Add(("트리 전경", () => { treeOverview = true; decoYaw = 180f; decoZoom = 1f; }, IsMobile ? 112 : 100));
+        if (tree) extra.Add(("트리 전경", () => { treeOverview = true; decoYaw = 180f; decoZoom = 1f; }, IsMobile ? 112 : 100));
+        if (tree && study && treeFirst) extra.Add(("편지함", OpenLetters, IsMobile ? 100 : 90));
+        if (tree && study && !treeFirst) extra.Add(("트리 꾸미기", StartDecorating, IsMobile ? 120 : 108));
         if (inLibrary && label != "크리스마스 퀴즈") extra.Add(("크리스마스 퀴즈", OpenQuiz, IsMobile ? 150 : 136));
         if (piano && label != "피아노 치기") extra.Add(("피아노 치기", OpenPiano, IsMobile ? 112 : 100));
         foreach (var ge in gextra) extra.Add(ge);

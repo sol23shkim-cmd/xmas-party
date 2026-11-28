@@ -297,9 +297,7 @@ public partial class AcRoom : MonoBehaviour
     void BuildRoom()
     {
         var room = new GameObject("Room").transform; room.SetParent(world, false);
-        for (int ix = 0; ix < NX; ix++)
-            for (int iz = 0; iz < NZ; iz++)
-                Put("floor_planks", new Vector3(-HalfX + SEG * (ix + 0.5f), 0, -HalfZ + SEG * (iz + 0.5f)), (ix + iz) % 2 * 90, S, null, room);
+        PlankFloor(new Rect(-HalfX, -HalfZ, 2 * HalfX, 2 * HalfZ), room, "hall");   // 11-28: 판자 무늬를 면으로 그린 매끈한 마루
         // 뒷벽·전구 줄은 AcHouse에서 (벽 잘라 보기와 같이 다룸)
     }
 
@@ -313,22 +311,8 @@ public partial class AcRoom : MonoBehaviour
     void BuildOutdoors()
     {
         var o = new GameObject("Outdoors").transform; o.SetParent(world, false);
-        // 눈 바닥: 넓고 평평한 눈판 + 집과 겹치지 않는 곳에만 울퉁불퉁한 눈 (집 바닥을 뚫고 올라오지 않게)
-        {
-            var plane = new GameObject("SnowBase"); plane.transform.SetParent(o, false);
-            float bw = WorldX1 - WorldX0 + 60, bd = WorldZ1 - WorldZ0 + 60;
-            var bm = BoxMesh(new Vector3(bw, 0.2f, bd), new Color(0.94f, 0.95f, 1f), new Color(0.85f, 0.88f, 0.96f));
-            plane.AddComponent<MeshFilter>().sharedMesh = bm;
-            var pr = plane.AddComponent<MeshRenderer>(); pr.sharedMaterial = AcmLoader.Mat;
-            plane.transform.position = new Vector3((WorldX0 + WorldX1) / 2, -0.16f, (WorldZ0 + WorldZ1) / 2);
-        }
-        for (float x = WorldX0 - 4; x <= WorldX1 + 4; x += 8f)
-            for (float z = WorldZ0 - 4; z <= WorldZ1 + 4; z += 8f)
-            {
-                bool touches = false;
-                for (int sx = -2; sx <= 2 && !touches; sx++) for (int sz = -2; sz <= 2 && !touches; sz++) if (InHouseStatic(x + sx * 2.4f, z + sz * 2.4f)) touches = true;
-                if (!touches) Put("ground_snow", new Vector3(x, -0.06f, z), Random.Range(0, 4) * 90, 2f, null, o);
-            }
+        // 눈 바닥: 한 장으로 이어진 부드러운 눈 언덕 (11-28: 예전 눈 조각 타일 사이 이음선이 보여서 바꿈)
+        SnowTerrain(o);
 
         // 바깥 띠에 나무 (집에서 9m 넘게 떨어진 곳 — 가까운 마당은 눈사람 만들 자리로 비워 둠)
         string[] trees = { "pine_snowy", "pine_tall", "pine_small", "bare_tree", "birch", "palm_cedar", "round_tree" };
@@ -421,7 +405,7 @@ public partial class AcRoom : MonoBehaviour
         Put("teddy_bear", TreePos + new Vector3(-0.8f, 0, 2.2f) * TreeK, -15, 1.3f, null, f);
         Put("toy_train", TreePos + new Vector3(2.4f, 0, 0.2f) * TreeK, -60, 1.3f, null, f);
         Put("present_sack", TreePos + new Vector3(2.2f, 0, -1.4f) * TreeK, -40, 1.2f, null, f);
-        Put("rug_round", TreePos + new Vector3(0, 0.005f, 0), 0, 1.6f * TreeK, null, f);
+        RugRound(TreePos + new Vector3(0, 0.005f, 0), 1.6f * TreeK, "DB5250", f);
 
         // 벽난로 구역 (왼쪽 뒤)
         float fx = -HalfX + SEG * 0.5f + 0.4f, fz = -HalfZ + 0.55f;
@@ -437,7 +421,7 @@ public partial class AcRoom : MonoBehaviour
         Put("picture_frame", new Vector3(fx, 2.5f, -HalfZ + 0.12f), 0, 1.3f, null, f);
         PointLight(new Vector3(fx, 0.7f, fz + 1.0f), new Color(1f, 0.6f, 0.3f), 6f, 2.5f);
         Put("nutcracker", new Vector3(fx + 1.75f, 0, fz + 0.3f), -10, 1.2f, null, f);
-        Put("rug_rect", new Vector3(fx + 0.3f, 0.004f, fz + 3.2f), 0, 1.2f, null, f);
+        RugRect(new Vector3(fx + 0.3f, 0.004f, fz + 3.2f), 0, 1.2f, "598C6B", f);
         Put("sofa", new Vector3(fx + 0.3f, 0, fz + 4.6f), 180, 1.15f, null, f);
         Put("coffee_table", new Vector3(fx + 0.3f, 0, fz + 2.9f), 0, 1.1f, null, f);
         Put("cookie_plate", new Vector3(fx + 0.1f, 0.42f * 1.1f, fz + 2.9f), 0, 1.2f, null, f);
@@ -645,6 +629,7 @@ public partial class AcRoom : MonoBehaviour
         SnowCull();
         TreeShotUpdate();
         OverviewPhoto();
+        UpdateFgProps();
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
         QuestUpdate(dt);
         PetsUpdate(dt);
@@ -860,7 +845,14 @@ public partial class AcRoom : MonoBehaviour
             pitch = 8f; targetYaw = decoYaw;
             focus -= Vector3.up * 0.9f;   // 아래 패널을 피해서 살짝 위쪽이 보이게
         }
-        if (PetGallery && phase == Phase.Play && !decorating && !treeOverview) { focus = me.transform.position + new Vector3(0, 0.5f, 1.3f); dist = 7.0f; pitch = 24f; targetYaw = 180f; }   // 펫 미리보기: 가까이
+        if (showCustom && phase == Phase.Play && !decorating && !treeOverview)
+        {   // 캐릭터 꾸미기: 가까이 크게 (가로 화면은 오른쪽 창을 피해 캐릭터를 왼쪽에, 세로 화면은 아래 창을 피해 위쪽에) (11-28)
+            bool portraitC = Screen.height > Screen.width;
+            var rgt = cam.transform.right; rgt.y = 0; rgt.Normalize();
+            focus = me.transform.position + (portraitC ? new Vector3(0, -0.25f, 0) : Vector3.up * 0.55f + rgt * 0.95f);
+            dist = portraitC ? 5.2f : 4.0f; pitch = 12f; targetYaw = 180f;
+        }
+                if (PetGallery && phase == Phase.Play && !decorating && !treeOverview) { focus = me.transform.position + new Vector3(0, 0.5f, 1.3f); dist = 7.0f; pitch = 24f; targetYaw = 180f; }   // 펫 미리보기: 가까이
         // 스케이트를 타면 조금 멀리서 (빨리 다니니까 넓게 보이게)
         bool special = building || snowFocusId != null || treeOverview || decorating || GreenBusy;
         skateZoom = Mathf.MoveTowards(skateZoom, !special && me != null && (me.skating || snowMode) ? 1.45f : 1f, dt * 0.9f);   // 스케이트·눈싸움: 넓게

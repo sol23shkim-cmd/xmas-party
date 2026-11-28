@@ -16,7 +16,7 @@ public partial class AcRoom
         new QuestDef("skate", "스케이트 타고 집 {0}바퀴 돌기", 2, true),
         new QuestDef("snowc", "눈사람 {0}개에 감상평 남기기", 2),
         new QuestDef("cookie", "쿠키 달리기 {0}점 넘기기", 3000, true),
-        new QuestDef("candy", "캔디 팡 {0}점 넘기기", 8000, true),
+        new QuestDef("candy", "캔디팡 {0}점 넘기기", 8000, true),
         new QuestDef("kitchen", "주방 게임에서 별 1개 이상 받기", 1),
         new QuestDef("quiz", "크리스마스 퀴즈 {0}문제 맞히기", 3, true),
         new QuestDef("orn", "트리에 장식 {0}개 달기", 3),
@@ -46,6 +46,14 @@ public partial class AcRoom
     bool questLoaded, questDirty; float questSaveAt, questMergeAt; bool questOpen;
     float skateAcc, skateLastAng = float.NaN;
 
+    // 크리스마스 주간: 한국 시간 12월 20일 ~ 26일
+    static bool ChristmasWeek { get { var k = System.DateTime.UtcNow.AddHours(9); return k.Month == 12 && k.Day >= 20 && k.Day <= 26; } }
+    static string QuestResetText()
+    {
+        double left = (TodayKst + 1) * 86400000.0 - (AcSync.UnixMs + 9 * 3600000.0);
+        int mins = Mathf.Max(1, (int)Math.Ceiling(left / 60000.0));
+        return mins >= 60 ? $"{mins / 60}시간 {mins % 60}분" : $"{mins}분";
+    }
     static int TodayKst => (int)Math.Floor((AcSync.UnixMs + 9 * 3600000.0) / 86400000.0);
     bool AllPets => myKey == AllPetsName;
     const int PetPts = 5;   // 펫 시스템이 열리는 포인트 (루돌프)
@@ -109,12 +117,13 @@ public partial class AcRoom
     void QuestCheckAward(bool announce)
     {
         if (questToday.Count == 0 || questAwardDay == questDay || !questToday.All(questDone.Contains)) return;
-        questAwardDay = questDay; questPoints++; questDirty = true; questSaveAt = 0;
+        int gain = ChristmasWeek ? 2 : 1;   // 크리스마스 주간(12/20~12/26)엔 2점
+        questAwardDay = questDay; questPoints += gain; questDirty = true; questSaveAt = 0;
         if (announce)
         {
             Sfx("candy_win", 0.6f); FxBurst("star", me.transform.position + Vector3.up * 1.6f, 30, 2.4f, 0.07f, FxGold, 1.5f, 1f);
-            string extra = questPoints == 3 ? "  이름표가 반짝반짝해졌어요!" : "";
-            Toast($"오늘의 퀘스트 모두 완료! 포인트 +1 (모두 {questPoints}){extra}");
+            string extra = questPoints >= 3 && questPoints - gain < 3 ? "  이름표가 반짝반짝해졌어요!" : "";
+            Toast($"오늘의 퀘스트 모두 완료! 포인트 +{gain}{(gain > 1 ? " (크리스마스 주간 두 배!)" : "")} (모두 {questPoints}){extra}");
         }
         GrantPets(announce);
     }
@@ -229,6 +238,7 @@ public partial class AcRoom
         var r = new Rect(SW / 2 - w / 2, Mathf.Max(60, SH / 2 - h / 2 - 40), w, h);
         GUI.Box(R(r), "", sBox);
         GUI.Label(new Rect(r.x + 18, r.y + 12, w - 120, 30), "<size=19><b>오늘의 퀘스트</b></size>", sLabel);
+        GUI.Label(new Rect(r.x + 160, r.y + 18, w - 250, 22), $"<size=12>새 퀘스트까지 {QuestResetText()}</size>", sSmall);
         if (GUI.Button(new Rect(r.xMax - 82, r.y + 12, 66, 30), "닫기", sBtn)) questOpen = false;
         float y = r.y + 52;
         foreach (var id in questToday)
@@ -249,7 +259,7 @@ public partial class AcRoom
         }
         // 포인트와 다음 보상
         GUI.Label(new Rect(r.x + 18, y + 4, w - 36, 24), $"<size=15><b>퀘스트 포인트 {questPoints}</b></size>", sLabel);
-        string next = (questAwardDay == questDay ? "오늘 포인트 받았어요! " : "3개 모두 하면 +1 · ") + (questPoints < 3 ? $"{3 - questPoints}포인트 더 모으면 반짝이는 이름표"
+        string next = (questAwardDay == questDay ? "오늘 포인트 받았어요! " : (ChristmasWeek ? "3개 모두 하면 +2 (크리스마스 주간) · " : "3개 모두 하면 +1 · ")) + (questPoints < 3 ? $"{3 - questPoints}포인트 더 모으면 반짝이는 이름표"
                     : questPoints < PetPts ? $"{PetPts - questPoints}포인트 더 모으면 펫 '루돌프'가 따라다녀요"
                     : petsOwned.Count < PetIds.Length ? $"{3 - (questPoints - PetPts) % 3}포인트 더 모으면 새 펫 (지금 {MyPets.Count}마리)"
                     : "펫을 모두 모았어요!");

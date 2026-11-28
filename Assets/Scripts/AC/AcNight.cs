@@ -105,6 +105,27 @@ public partial class AcRoom
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")] static extern void AcWeb_SaveImage(string b64, string name);
 #endif
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] static extern int AcWeb_InstallState();
+    [DllImport("__Internal")] static extern void AcWeb_Install();
+    static int InstallState() => AcWeb_InstallState();
+#else
+    static int InstallState() => 0;
+    static void AcWeb_Install() { }
+#endif
+    // 앱으로 받기 (파티 끝 창·지도 창): 설치 창이 되면 바로, 아니면 방법 안내
+    bool AppInstallable => InstallState() != 0;
+    void AppInstall()
+    {
+        switch (InstallState())
+        {
+            case 1: AcWeb_Install(); break;
+            case 2: Toast("Safari 아래쪽 공유 버튼(□↑) → '홈 화면에 추가'를 누르면 주소창 없이 앱처럼 열려요"); break;
+            case 4: Toast("카카오톡 안에서는 설치가 안 돼요. 오른쪽 아래 ⋮ → '다른 브라우저로 열기' 후 다시 눌러 주세요"); break;
+            default: Toast("브라우저 메뉴(⋮ 또는 ≡) → '홈 화면에 추가' 또는 '앱 설치'를 누르면 앱처럼 열려요"); break;
+        }
+    }
+
     // 트리 전경 사진 저장: 버튼·글씨 없이 지금 보이는 화면 그대로 (낮·야경 모두)
     bool shotPending; float shotFlash;
     void OverviewPhoto()

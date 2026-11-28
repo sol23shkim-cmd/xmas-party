@@ -109,6 +109,7 @@ public partial class AcRoom
         float bw = 120, by = r.yMax - 52;
         if (GUI.Button(new Rect(r.center.x - bw - 6, by, bw, 38), "계속 놀기", sBtn)) quitAsk = false;
         if (GUI.Button(new Rect(r.center.x + 6, by, bw, 38), "<b>파티 끝</b>", sBtnBig)) { quitAsk = false; QuitGame(); }
+        if (AppInstallable && GUI.Button(new Rect(r.center.x - 70, r.yMax + 8, 140, 34), "앱으로 받기", sBtn)) AppInstall();
     }
 
     void QuitGame()

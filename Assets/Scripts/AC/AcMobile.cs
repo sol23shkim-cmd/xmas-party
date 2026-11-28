@@ -261,26 +261,35 @@ public partial class AcRoom
     }
 
     GUIStyle sBtnTalk, sBtnDeco;
-    // ===== 화면 버튼 (말하기/인사/하트/만세/꾸미기) =====
+    // ===== 화면 버튼 (말하기 / 감정 ▾ / 꾸미기) — 11-28: 인사·하트·만세를 '감정' 하나로 묶어 휴대폰 아래쪽을 덜 빽빽하게 =====
+    bool emoteMenu;
     void ActionButtons()
     {
-        float gap = 6, sep = 8, bw = Mathf.Min(IsMobile ? 70 : 62, (SW - 30 - sep) / 5f - gap), bh = IsMobile ? 46 : 36;
-        string[] labels = { "말하기", "인사", "하트", "만세", "꾸미기" };
+        float gap = 6, sep = 8, bw = IsMobile ? 82 : 70, bh = IsMobile ? 46 : 36;
+        string[] labels = { "말하기", emoteMenu ? "감정 닫기" : "감정", "꾸미기" };
         float x = SW - (bw + gap) * labels.Length - sep - 10, y = SH - bh - 12;
-        R(new Rect(x - 4, y - 4, (bw + gap) * labels.Length + sep + 2, bh + 8));   // 뒤 판 없이 버튼만 (터치 영역은 그대로 등록)
+        R(new Rect(x - 4, y - 4, (bw + gap) * labels.Length + sep + 2, bh + 8));
         if (sBtnTalk == null) { sBtnTalk = AcUiTheme.TintButton(sBtn, sBtn.fontSize, new Color(1f, 0.82f, 0.86f)); sBtnDeco = AcUiTheme.TintButton(sBtn, sBtn.fontSize, new Color(0.72f, 0.9f, 0.84f)); }
         for (int i = 0; i < labels.Length; i++)
         {
-            // 말·몸짓(앞 4개)은 연분홍, 꾸미기는 연민트에 조금 떨어뜨려 둠
-            if (GUI.Button(new Rect(x + i * (bw + gap) + (i == 4 ? sep : 0), y, bw, bh), labels[i], i == 4 ? sBtnDeco : sBtnTalk))
+            var r = new Rect(x + i * (bw + gap) + (i == 2 ? sep : 0), y, bw, bh);
+            if (GUI.Button(r, labels[i], i == 2 ? sBtnDeco : sBtnTalk))
             {
                 switch (i)
                 {
-                    case 0: OpenChat(); break;
-                    case 1: Emote("wave"); break;
-                    case 2: Emote("heart"); break;
-                    case 3: Emote("cheer"); break;
-                    case 4: showCustom = !showCustom; break;
+                    case 0: emoteMenu = false; OpenChat(); break;
+                    case 1: emoteMenu = !emoteMenu; break;
+                    case 2: emoteMenu = false; showCustom = !showCustom; break;
+                }
+            }
+            if (i == 1 && emoteMenu)
+            {
+                // 감정 버튼 위로 세 개가 펼쳐짐
+                string[] em = { "인사", "하트", "만세" }; string[] ek = { "wave", "heart", "cheer" };
+                for (int k = 0; k < 3; k++)
+                {
+                    var er = new Rect(r.x, r.y - (bh + 6) * (k + 1), bw, bh); R(er);
+                    if (GUI.Button(er, em[k], sBtnTalk)) { Emote(ek[k]); emoteMenu = false; }
                 }
             }
         }

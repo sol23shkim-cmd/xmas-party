@@ -1,4 +1,4 @@
-# candy.py - '크리스마스 캔디 팡' 효과음
+# candy.py - '크리스마스 캔디팡' 효과음
 # 실행: python3 candy.py → Assets/Resources/Audio/Sfx/candy_*.wav
 import os, wave
 import numpy as np

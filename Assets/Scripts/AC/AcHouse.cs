@@ -137,6 +137,11 @@ public partial class AcRoom
             float ry = alongX ? (side == 0 ? 0 : 180) : (side == 0 ? 90 : -90);
             var g = Put(model, pos + (side == 0 ? nrm : -nrm) * 0.06f, ry, S, TintAt(p.x, p.z), house);
             if (model == "wall_window_big") HidePart(g, "glass");
+            if (model == "wall_plain")
+            {
+                var tt = TintAt(p.x, p.z);
+                Wallpaper(g, InHouse(p) ? AreaAt(p) : "밖", tt != null && tt.TryGetValue("wall", out var wc) ? wc : new Color(0.97f, 0.9f, 0.8f));
+            }
             bool realDoor = kind == "door" && side == 0 && Mathf.Abs(pos.x - DoorPos.x) < 0.1f && Mathf.Abs(pos.z - DoorPos.z) < 0.1f;
             if (model == "wall_door")
             {
@@ -172,9 +177,11 @@ public partial class AcRoom
         {
             var d = a.def; var room = a.root.transform;
             var floorT = d.floorTint.a > 0 ? new Dictionary<string, Color> { { "floor", d.floorTint } } : null;
-            for (int ix = 0; ix < RoomSegs; ix++)
-                for (int iz = 0; iz < NZ; iz++)
-                    Put(d.floor, new Vector3(a.r.x + SEG * (ix + 0.5f), 0, a.r.y + SEG * (iz + 0.5f)), (ix + iz) % 2 * 90, S, floorT, room);
+            if (d.floor == "floor_planks") PlankFloor(a.r, room, d.name);
+            else
+                for (int ix = 0; ix < RoomSegs; ix++)
+                    for (int iz = 0; iz < NZ; iz++)
+                        Put(d.floor, new Vector3(a.r.x + SEG * (ix + 0.5f), 0, a.r.y + SEG * (iz + 0.5f)), (ix + iz) % 2 * 90, S, floorT, room);
             var c = new Vector3(a.r.center.x, 0, a.r.center.y);
             d.fill(c, room);
             PointLight(new Vector3(c.x, 4.5f, c.z), new Color(1f, 0.9f, 0.75f), 11f, 0.5f);
@@ -269,9 +276,11 @@ public partial class AcRoom
             if (best != null) best.decos.Add(go);
             else looseDecos.Add(go);
         }
+        putRoots.Clear(); foreach (var (_, go) in builtObjs) if (go) putRoots.Add(go);   // ClearPassages에서 탁자 위 소품 찾을 때 씀
         builtObjs.Clear();
     }
     readonly List<GameObject> looseDecos = new List<GameObject>();
+    readonly List<GameObject> putRoots = new List<GameObject>();
     readonly List<GameObject> frontPosts = new List<GameObject>();   // 출입구 기둥·등불 (트리를 볼 땐 숨김)
 
     // 잘라 보기: 나와 카메라 사이의 가로 벽은 낮게, 트리 전경 볼 때는 안쪽 벽과 벽 장식을 모두 숨김
@@ -368,8 +377,8 @@ public partial class AcRoom
         Put("cookie_plate", c + V(-1.0f, 1.17f, b), 0, 1.3f, null, t);
         Put("cocoa_mug", c + V(-3.4f, 1.17f, b), 0, 1.5f, null, t);
         Put("cocoa_mug", c + V(-3.1f, 1.17f, b + 0.1f), 50, 1.5f, T(("mug", "43A047")), t);
-        Put("rug_rect", c + V(0, 0.004f, 2.4f), 0, 1.3f, T(("fabric", "6E9C87")), t);
-        Put("dining_table", c + V(0, 0, 2.4f), 0, 1.2f, null, t);
+        RugRect(c + V(0, 0.004f, 2.4f), 0, 1.3f, "6E9C87", t);
+        ClothOverlay(Put("dining_table", c + V(0, 0, 2.4f), 0, 1.2f, null, t), new Color(0.88f, 0.3f, 0.3f));
         for (int i = -1; i <= 1; i += 2) { Put("chair", c + V(i * 0.7f, 0, 1.4f), 0, 1.15f, null, t); Put("chair", c + V(i * 0.7f, 0, 3.4f), 180, 1.15f, null, t); }
         Put("candle_set", c + V(0, 0.95f, 2.4f), 0, 1.1f, null, t);
         Put("gingerbread_man", c + V(5.0f, 0, 3.5f), -120, 1.1f, null, t);
@@ -387,7 +396,7 @@ public partial class AcRoom
         for (int r = 0; r < 2; r++)
         {
             var tc = c + V(-2.2f + r * 4.4f, 0, 1.6f);
-            Put("dining_table", tc, 90, 1.15f, T(("fabric", r == 0 ? "E53935" : "43A047")), t);
+            ClothOverlay(Put("dining_table", tc, 90, 1.15f, T(("fabric", r == 0 ? "E53935" : "43A047")), t), C(r == 0 ? "E53935" : "43A047"));
             Put("cookie_plate", tc + V(0, 0.92f, -0.4f), 0, 1.4f, null, t);
             Put("cookie_plate", tc + V(0, 0.92f, 0.5f), 40, 1.4f, null, t);
             Put("cocoa_mug", tc + V(0.3f, 0.92f, 0.1f), 20, 1.5f, null, t);
@@ -398,7 +407,7 @@ public partial class AcRoom
         Put("candy_cane_big", c + V(5.6f, 0, 4.5f), -90, 1.4f, null, t);
         Put("candy_cane_big", c + V(-5.6f, 0, 4.5f), 90, 1.4f, null, t);
         Put("wall_clock", c + V(1.8f, 0, b - 0.25f), 0, 1.2f, null, t);
-        Put("rug_round", c + V(0, 0.004f, 5.0f), 0, 1.3f, T(("rug", "E8B04B")), t);
+        RugRound(c + V(0, 0.004f, 5.0f), 1.3f, "E8B04B", t);
     }
 
     void FillLibrary(Vector3 c, Transform t)
@@ -407,7 +416,7 @@ public partial class AcRoom
         for (int i = 0; i < 5; i++) Put("bookshelf", c + V(-4.6f + i * 2.3f, 0, b - 0.25f), 0, 1.35f, i % 2 == 0 ? null : T(("wood", "8A5A3C")), t);
         Put("bookshelf", c + V(-OldHW + 0.45f, 0, -3.0f), 90, 1.35f, null, t);
         Put("bookshelf", c + V(-OldHW + 0.45f, 0, 3.0f), 90, 1.35f, null, t);
-        Put("rug_round", c + V(0, 0.004f, 1.5f), 0, 1.6f, T(("rug", "7A3E3A")), t);
+        RugRound(c + V(0, 0.004f, 1.5f), 1.6f, "7A3E3A", t);
         Put("armchair", c + V(-1.6f, 0, 1.0f), 30, 1.2f, T(("fabric", "8A3B34")), t);
         Put("armchair", c + V(1.6f, 0, 1.0f), -30, 1.2f, T(("fabric", "8A3B34")), t);
         Put("coffee_table", c + V(0, 0, 2.4f), 0, 1.0f, T(("wood", "6B4630")), t);
@@ -442,7 +451,7 @@ public partial class AcRoom
 
     void FillPlayroom(Vector3 c, Transform t)
     {
-        Put("rug_round", c + V(0, 0.004f, 0.5f), 0, 1.9f, T(("rug", "4FC3F7")), t);
+        RugRound(c + V(0, 0.004f, 0.5f), 1.9f, "4FC3F7", t);
         Put("toy_train", c + V(-1.6f, 0, 0.0f), 30, 1.8f, null, t);
         Put("toy_train", c + V(1.8f, 0, 1.6f), 200, 1.8f, T(("body", "1E88E5")), t);
         Put("teddy_bear", c + V(-0.4f, 0, 2.2f), -10, 1.7f, null, t);
@@ -470,7 +479,7 @@ public partial class AcRoom
         Put("nightstand_lamp", c + V(3.2f, 0, b), 0, 1.2f, null, t);
         Put("wardrobe", c + V(5.1f, 0, b + 0.1f), 0, 1.25f, null, t);
         Put("dresser", c + V(OldHW - 0.5f, 0, 2.0f), -90, 1.25f, null, t);
-        Put("rug_rect", c + V(-0.4f, 0.004f, 2.6f), 0, 1.4f, T(("fabric", "7D7BAE")), t);
+        RugRect(c + V(-0.4f, 0.004f, 2.6f), 0, 1.4f, "7D7BAE", t);
         Put("armchair", c + V(-4.6f, 0, 3.6f), 40, 1.15f, T(("fabric", "B39DDB")), t);
         Put("floor_lamp", c + V(-5.5f, 0, 2.2f), 0, 1.1f, null, t);
         Put("teddy_bear", c + V(1.6f, 0.62f, b + 0.4f), 0, 1.2f, null, t);
@@ -485,7 +494,7 @@ public partial class AcRoom
         Put("piano", c + V(-2.6f, 0, b - 0.1f), 0, 1.3f, null, t);
         Put("piano", c + V(2.0f, 0, b - 0.1f), 0, 1.3f, T(("wood", "F5F1E8")), t);
         Put("wall_clock", c + V(5.2f, 0, b - 0.25f), 0, 1.3f, null, t);
-        Put("rug_round", c + V(0, 0.004f, 2.0f), 0, 1.7f, T(("rug", "8C5A3C")), t);
+        RugRound(c + V(0, 0.004f, 2.0f), 1.7f, "8C5A3C", t);
         Put("sofa", c + V(0, 0, 4.6f), 180, 1.15f, T(("fabric", "B8463F")), t);
         Put("armchair", c + V(-3.2f, 0, 2.6f), 60, 1.15f, null, t);
         Put("armchair", c + V(3.2f, 0, 2.6f), -60, 1.15f, null, t);
@@ -506,7 +515,7 @@ public partial class AcRoom
         Put("gift_pile", c + V(4.3f, 0, -4.8f), -20, 1.5f, null, t);
         Put("present_sack", c + V(-5.0f, 0, -2.0f), 40, 1.4f, null, t);
         Put("present_sack", c + V(5.0f, 0, -1.6f), -40, 1.4f, null, t);
-        Put("dining_table", c + V(0, 0, 1.4f), 90, 1.2f, T(("fabric", "FDD835")), t);
+        ClothOverlay(Put("dining_table", c + V(0, 0, 1.4f), 90, 1.2f, T(("fabric", "FDD835")), t), C("FDD835"));
         Put("gift_flat", c + V(0, 0.95f, 1.0f), 10, 1.2f, null, t);
         Put("gift_box", c + V(0.1f, 0.95f, 2.0f), -20, 0.9f, T(("box", "8E24AA")), t);
         var cols = new[] { "E53935", "1E88E5", "43A047", "FDD835", "F06292", "26A69A" };

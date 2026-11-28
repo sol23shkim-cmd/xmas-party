@@ -29,8 +29,9 @@ public partial class AcRoom
         GUI.Box(panel, "", sBox);
         CgText(new Rect(panel.x + 14, panel.y + 8, 200, 28), "지도", 22, new Color(0.45f, 0.28f, 0.18f), TextAnchor.MiddleLeft, 0.01f, new Color(0, 0, 0, 0));
         var hint = new GUIStyle(CgStyle(14, TextAnchor.MiddleLeft)) { normal = { textColor = new Color(0.5f, 0.38f, 0.3f) } };
-        GUI.Label(new Rect(panel.x + 64, panel.y + 10, panel.width - 170, 26), "가고 싶은 곳을 누르면 바로 가요", hint);
+        GUI.Label(new Rect(panel.x + 64, panel.y + 10, panel.width - 300, 26), "가고 싶은 곳을 누르면 바로 가요", hint);
         if (GUI.Button(new Rect(panel.xMax - 82, panel.y + 6, 70, 30), "닫기", sBtn) || Key("esc")) { showMap = false; return; }
+        if (AppInstallable && GUI.Button(new Rect(panel.xMax - 82 - 118, panel.y + 6, 110, 30), "앱으로 받기", sBtn)) AppInstall();
         var mr = new Rect(panel.x + 10, panel.y + 42, pw, mh);
         // 화면과 같은 방향: 화면 왼쪽 = +x, 위쪽 = 뒤(-z)
         Rect WR(float x0, float x1, float z0, float z1)
@@ -69,7 +70,9 @@ public partial class AcRoom
         var tc = WP(TreePos.x, TreePos.z); float tr = TreeR * k;
         GUI.color = (new Color(0.22f, 0.55f, 0.3f)).linear; GUI.DrawTexture(new Rect(tc.x - tr, tc.y - tr, tr * 2, tr * 2), cgDisc); GUI.color = Color.white;
         // 방 이름 (테두리 글자, 좁으면 두 줄)
-        int fs = k * RoomW > 70 ? 16 : 13;
+        int fs = k * RoomW > 70 ? (IsMobile ? 19 : 16) : (IsMobile ? 16 : 13);   // 11-28: 휴대폰에서 방 이름을 더 크게
+        var people = new Dictionary<string, int>();   // 방마다 지금 있는 친구 수
+        foreach (var rm in remotes.Values) if (rm.c != null) { var an = InHouse(rm.c.transform.position) ? AreaAt(rm.c.transform.position) : ""; if (an != "") people[an] = (people.TryGetValue(an, out int pc) ? pc : 0) + 1; }
         foreach (var a in areasR)
         {
             var rr = WR(a.r.xMin, a.r.xMax, a.r.yMin, a.r.yMax);
@@ -78,8 +81,10 @@ public partial class AcRoom
             if (rr.width < nm.Length * fs * 0.95f && nm.Contains(" ")) nm = nm.Replace(" ", "\n");
             if (me2) { GUI.color = (new Color(0.9f, 0.3f, 0.3f, 0.25f)).linear; GUI.DrawTexture(rr, Texture2D.whiteTexture); GUI.color = Color.white; }
             MapLabel(rr, nm, fs, me2);
+            if (people.TryGetValue(a.name, out int pn) && pn > 0)
+                CgText(new Rect(rr.x, rr.y + 4, rr.width - 6, fs + 2), pn + "명", Mathf.Max(11, fs - 3), new Color(0.75f, 0.88f, 1f), TextAnchor.MiddleRight, 1.3f, new Color(0.1f, 0.15f, 0.35f));
             if (RoomActs.TryGetValue(a.name, out var act))   // 방에서 할 수 있는 것 (작은 글씨)
-                CgText(new Rect(rr.x - 10, rr.yMax - fs - 6, rr.width + 20, fs + 2), act, Mathf.Max(10, fs - 4), new Color(1f, 0.95f, 0.8f), TextAnchor.MiddleCenter, 1.2f, new Color(0.3f, 0.18f, 0.1f, 0.9f));
+                CgText(new Rect(rr.x - 10, rr.yMax - fs - 6, rr.width + 20, fs + 2), act, Mathf.Max(IsMobile ? 13 : 11, fs - 4), new Color(1f, 0.95f, 0.8f), TextAnchor.MiddleCenter, 1.2f, new Color(0.3f, 0.18f, 0.1f, 0.9f));
         }
         MapLabel(WR(-HalfX, HalfX, -HalfZ, -HalfZ + 4), "트리 거실", fs, here == "트리 거실");
         MapLabel(WR(-HalfX, HalfX, HouseZ0, -HalfZ), "안뜰", fs, false);
@@ -115,7 +120,7 @@ public partial class AcRoom
     static readonly System.Collections.Generic.Dictionary<string, string> RoomActs = new System.Collections.Generic.Dictionary<string, string>
     {
         { "침실", "베개 싸움" }, { "선물 포장실", "선물 만들기" }, { "쿠키 공방", "쿠키 달리기" }, { "겨울 온실", "화분 키우기" },
-        { "음악실", "피아노" }, { "놀이방", "캔디 팡" }, { "부엌", "주방 게임" }, { "서재", "퀴즈, 편지" },
+        { "음악실", "피아노" }, { "놀이방", "캔디팡" }, { "부엌", "주방 게임" }, { "서재", "퀴즈, 편지" },
     };
 
     // 받침에 따라 '으로' / '로' (받침 없음·ㄹ받침 → 로)

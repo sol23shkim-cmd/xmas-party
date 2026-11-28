@@ -269,7 +269,20 @@ public partial class AcRoom
         }
         if (remove.Count == 0) return;
         var keep = new List<Obb>();
-        foreach (var (go, o) in solidObjs) if (!remove.Contains(go)) keep.Add(o);
+        var removedBoxes = new List<Obb>();
+        foreach (var (go, o) in solidObjs) { if (!remove.Contains(go)) keep.Add(o); else removedBoxes.Add(o); }
+        // 치운 탁자 위에 올려 둔 소품(탁상 조명·컵 등)도 같이 치움: 공중에 떠 보이지 않게 (11-28)
+        foreach (var g in putRoots)
+        {
+            if (!g || remove.Contains(g)) continue;
+            var tp = g.transform.position;
+            if (tp.y < 0.25f || tp.y > 2.2f) continue;
+            foreach (var o in removedBoxes)
+            {
+                var l = o.inv * (tp - o.c);
+                if (Mathf.Abs(l.x) < o.h.x + 0.1f && Mathf.Abs(l.z) < o.h.y + 0.1f) { remove.Add(g); break; }
+            }
+        }
         foreach (var g in remove) Destroy(g);
         obstacles.Clear(); obstacles.AddRange(keep);
         // 바깥 소품 등 solidObjs에 없는 장애물은 원래 없음 (모두 Put으로 만들어짐)

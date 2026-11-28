@@ -380,7 +380,15 @@ public partial class AcRoom
             if (key != s.builtKey) { s.builtKey = key; BuildPlant(s); }
             if (s.decoJson != s.decoBuilt) { s.decoBuilt = s.decoJson; BuildPlantDeco(s, ParseDeco(s.decoJson)); }
         }
+        // 들어와서 처음 한 번: 물 줄 수 있는 내 화분 알림 (11-28)
+        if (!plantHintDone && phase == Phase.Play && node != null && me != null && !string.IsNullOrEmpty(myKey) && Time.unscaledTime > plantHintAt)
+        {
+            plantHintDone = true;
+            int mine = 0; foreach (var s in slots) if (s.planted && s.owner == myKey && !s.iWatered && s.stage < PlantMax) mine++;
+            if (mine > 0) Toast($"겨울 온실: 물 줄 수 있는 내 화분이 {mine}개 있어요!");
+        }
     }
+    bool plantHintDone; float plantHintAt = 6f;
 
     static PlantDecoSet ParseDeco(string j)
     {
@@ -728,7 +736,7 @@ public partial class AcRoom
             if (sp.z < 0) continue;
             float x = sp.x / UiK, y = (Screen.height - sp.y) / UiK;
             string t;
-            if (!s.planted) t = "<size=12>빈 화분</size>";
+            if (!s.planted) { if (d.sqrMagnitude > 9f) continue; t = "<size=12>빈 화분</size>"; }   // 빈 화분 이름표는 바로 옆에서만 (12개가 한꺼번에 떠서 어수선했음)
             else if (s.stage >= PlantMax) t = $"<size=12>{s.name}  <color=#c0392b>다 자랐어요!</color></size>";
             else t = $"<size=12>{s.name}  {Mathf.Max(0, s.stage)}/{PlantMax}{(s.iWatered ? "" : "  <color=#1f6fb8>물!</color>")}</size>";
             var size = sTag.CalcSize(new GUIContent(t));

@@ -1,4 +1,4 @@
-// AcCandy.cs - 놀이방 미니게임 '크리스마스 캔디 팡' (같은 모양 3개 맞추기)
+// AcCandy.cs - 놀이방 미니게임 '크리스마스 캔디팡' (같은 모양 3개 맞추기)
 //  · 8x8 판, 여섯 가지 사탕(페퍼민트·트리·별·눈꽃 보석·선물 상자·진저브레드) + 눈덩이 블록(1~2번 맞아야 깨짐)
 //  · 4개 한 줄 → 줄무늬(가로/세로 한 줄), ㄱ·T자 → 포장 사탕(주변 폭발), 5개 한 줄 → 반짝 방울(같은 색 모두)
 //  · 특수끼리 바꾸면 조합 효과, 목표(모양별 개수)를 정해진 횟수 안에 모으기. 다 모으면 남은 횟수가 줄무늬로 변해 터지는 보너스
@@ -500,7 +500,7 @@ public partial class AcRoom
     string cdErr = "";
     void CandyUpdate(float dt)
     {
-        // 안전장치: 캔디 팡이 닫혀 있는데 장면이 안 그려지는 상태면 되돌림
+        // 안전장치: 캔디팡이 닫혀 있는데 장면이 안 그려지는 상태면 되돌림
         if (!candyOpen && cam && cam.cullingMask == 0) cam.cullingMask = cdCamMask != -1 && cdCamMask != 0 ? cdCamMask : ~(1 << IconLayer);
         try { CandyUpdate0(dt); } catch (Exception ex) { cdErr = ex.GetType().Name + ":" + ex.Message; Debug.LogException(ex); }
     }
