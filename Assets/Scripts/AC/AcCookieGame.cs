@@ -918,7 +918,7 @@ public partial class AcRoom
         cgJelly += v;
         if (cgFeverT <= 0) cgFever = Mathf.Min(100, cgFever + (t.kind == 3 ? 6 : t.kind == 0 ? 0.45f : 1.5f));
         if (t.kind == 3) { Sfx("star", 0.5f); Burst(0, t.p, 18, 5); }
-        else { if (Time.time >= cgPickSfxT) { cgPickSfxT = Time.time + 0.12f; Sfx(t.kind == 0 ? "jelly" : "coin", t.kind == 0 ? 0.42f : 0.46f, 0.96f + (float)cgRnd.NextDouble() * 0.08f); /* 11-28: 통통한 소리, 들리게 */ } Burst(t.kind == 2 ? 0 : (cgRnd.Next(2) + 1), t.p, 4, 2.5f); }
+        else { if (Time.time >= cgPickSfxT) { cgPickSfxT = Time.time + 0.12f; Sfx(t.kind == 0 ? "jelly" : "coin", t.kind == 0 ? 0.84f : 0.46f, 0.96f + (float)cgRnd.NextDouble() * 0.08f); /* 11-28: 통통한 소리, 들리게 */ } Burst(t.kind == 2 ? 0 : (cgRnd.Next(2) + 1), t.p, 4, 2.5f); }
         if (t.kind > 0) cgPops.Add((CgO + t.p, "+" + v, t.kind == 3 ? new Color(1f, 0.85f, 0.2f) : Color.white, 0));
         if (cgFever >= 100 && cgFeverT <= 0) StartFever();
     }
