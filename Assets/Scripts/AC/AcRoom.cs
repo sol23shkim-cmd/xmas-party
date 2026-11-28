@@ -444,7 +444,7 @@ public partial class AcRoom : MonoBehaviour
 
         // 식탁 (오른쪽 앞)
         Vector3 dt = new Vector3(HalfX - 3.6f, 0, 2.2f);
-        Put("dining_table", dt, 90, 1.15f, null, f);
+        ClothOverlay(Put("dining_table", dt, 90, 1.15f, null, f), new Color(0.88f, 0.3f, 0.3f));
         for (int i = 0; i < 2; i++)
         {
             Put("chair", dt + new Vector3(-0.85f, 0, -0.55f + i * 1.1f), 90, 1.15f, null, f);
