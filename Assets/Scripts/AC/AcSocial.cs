@@ -135,7 +135,7 @@ public partial class AcRoom
 
     void ContextButtons()
     {
-        if (phase != Phase.Play || showCustom) return;
+        if (phase != Phase.Play || showCustom || emoteMenu) return;   // 감정 메뉴가 열려 있으면 기능 버튼은 잠시 숨김 (11-28)
         string label = null; Action act = null;
         bool piano = NearPiano(out bool musicRoom);
         bool inLibrary = !Outside && AreaAt(me.transform.position) == "서재";
