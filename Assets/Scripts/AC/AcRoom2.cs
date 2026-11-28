@@ -411,7 +411,7 @@ public partial class AcRoom
     {
         var flake = SnowFlakeMesh();
         var mat = new Material(AcmLoader.Mat) { name = "Snow" }; snowMat = mat;
-        var kill = SnowKillBoxes();
+        snowSystems.Clear();
         mat.SetFloat("_Emit", 0.55f); mat.SetFloat("_HasTint", 0);
         float wx = 2 * HouseHalf + 2 * YardW + 8, sy = 20f, houseD = HalfZ - HouseZ0;
         // (중심, 크기, 개수/초) — 높은 곳(20m)에서 내려서 트리 전경을 볼 때도 위에서부터 내림
@@ -448,41 +448,32 @@ public partial class AcRoom
             var r = go.GetComponent<ParticleSystemRenderer>();
             r.renderMode = ParticleSystemRenderMode.Mesh; r.mesh = flake; r.sharedMaterial = mat;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
-            var trg = ps.trigger; trg.enabled = true;   // 집 안으로 날려 들어온 눈은 바로 사라짐 (실내엔 눈 안 내림)
-            trg.inside = ParticleSystemOverlapAction.Kill; trg.enter = ParticleSystemOverlapAction.Kill; trg.outside = ParticleSystemOverlapAction.Ignore;
-            for (int i = 0; i < kill.Count; i++) trg.SetCollider(i, kill[i]);
+            snowSystems.Add(ps);
             go.SetActive(true);
             ps.Play();
         }
     }
 
     Material snowMat;
-    // 집(거실 + 방들) 위를 덮는 보이지 않는 상자: 눈이 들어오면 지움. 레이캐스트에 안 걸리게 Ignore Raycast 층
-    List<Component> SnowKillBoxes()
+    // 집 안으로 날려 들어온 눈 지우기: 프레임마다 눈 무리 하나씩 돌아가며, 집(거실·방) 위에 있는 눈송이를 없앰
+    // (파티클 트리거는 웹에서 일부 방에만 먹어서 직접 검사로 바꿈, 11-28)
+    readonly List<ParticleSystem> snowSystems = new List<ParticleSystem>();
+    ParticleSystem.Particle[] snowBuf; int snowCullIdx;
+    void SnowCull()
     {
-        var list = new List<Component>();
-        var root = new GameObject("SnowKill"); root.transform.SetParent(world, false); root.layer = 2;
-        void Box(float x0, float z0, float x1, float z1)
+        if (snowSystems.Count == 0) return;
+        snowCullIdx = (snowCullIdx + 1) % snowSystems.Count;
+        var ps = snowSystems[snowCullIdx]; if (!ps) return;
+        int max = ps.main.maxParticles;
+        if (snowBuf == null || snowBuf.Length < max) snowBuf = new ParticleSystem.Particle[max];
+        int n = ps.GetParticles(snowBuf);
+        bool changed = false;
+        for (int k = 0; k < n; k++)
         {
-            var g = new GameObject("k"); g.layer = 2; g.transform.SetParent(root.transform, false);
-            g.transform.position = new Vector3((x0 + x1) / 2, 10.5f, (z0 + z1) / 2);
-            var bc = g.AddComponent<BoxCollider>(); bc.isTrigger = true; bc.size = new Vector3(x1 - x0 + 0.3f, 23f, z1 - z0 + 0.3f);
-            list.Add(bc);
+            var p = snowBuf[k].position;
+            if (p.y < 14f && InHouse(p)) { snowBuf[k].remainingLifetime = 0f; changed = true; }   // 집 지붕 높이 위쪽(14m 이상)은 그대로 둬서 멀리서 볼 때 하늘엔 눈이 보이게
         }
-        // 파티클 트리거는 콜라이더를 몇 개(6개 안팎)까지만 봐서, 방들을 왼쪽·오른쪽 큰 상자 둘로 묶음 (거실 포함 3개)
-        Box(-HalfX, -HalfZ, HalfX, HalfZ);
-        foreach (int side in new[] { -1, 1 })
-        {
-            bool any = false; float x0 = 0, z0 = 0, x1 = 0, z1 = 0;
-            foreach (var a in areasR)
-            {
-                if ((a.r.center.x < 0 ? -1 : 1) != side) continue;
-                if (!any) { x0 = a.r.xMin; z0 = a.r.yMin; x1 = a.r.xMax; z1 = a.r.yMax; any = true; }
-                else { x0 = Mathf.Min(x0, a.r.xMin); z0 = Mathf.Min(z0, a.r.yMin); x1 = Mathf.Max(x1, a.r.xMax); z1 = Mathf.Max(z1, a.r.yMax); }
-            }
-            if (any) Box(x0, z0, x1, z1);
-        }
-        return list;
+        if (changed) ps.SetParticles(snowBuf, n);
     }
 
     static Mesh SnowFlakeMesh()

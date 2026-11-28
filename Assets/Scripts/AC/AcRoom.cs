@@ -642,6 +642,7 @@ public partial class AcRoom : MonoBehaviour
         if (decorating && !chatting && !askOpen && !treeOverview) Decorate(); else { if (ghost) ghost.SetActive(false); if (focusRing) FocusAt(Vector3.zero, false); pointerFocus = null; }
         if (building) BuildingUpdate();
         GreenUpdate(dt);
+        SnowCull();
         TreeShotUpdate();
         OverviewPhoto();
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
