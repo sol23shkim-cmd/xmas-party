@@ -15,6 +15,25 @@
   window.addEventListener("appinstalled", function () { window.xpInstallEvt = null; if (window.xpInstallHide) window.xpInstallHide(); });
   if ("serviceWorker" in navigator) window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
 </script>
+<script>
+  // 창을 내리거나 다른 앱·탭으로 가면 소리 멈춤, 돌아오면 다시 (11-28)
+  (function () {
+    var ctxs = [];
+    ["AudioContext", "webkitAudioContext"].forEach(function (n) {
+      var C = window[n]; if (!C) return;
+      var W = function () { var c = new (Function.prototype.bind.apply(C, [null].concat([].slice.call(arguments))))(); ctxs.push(c); return c; };
+      W.prototype = C.prototype; window[n] = W;
+    });
+    function apply() {
+      var hide = document.hidden;
+      ctxs.forEach(function (c) { try { if (hide) { if (c.state === "running") c.suspend(); } else if (c.state === "suspended") c.resume(); } catch (e) {} });
+    }
+    document.addEventListener("visibilitychange", apply);
+    window.addEventListener("pagehide", function () { ctxs.forEach(function (c) { try { c.suspend(); } catch (e) {} }); });
+    window.addEventListener("pageshow", apply);
+  })();
+</script>
+
 
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
