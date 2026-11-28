@@ -153,6 +153,7 @@ public partial class AcRoom
         if (label == null && InGiftRoom) { label = "선물 포장하기"; act = OpenWrap; }
         if (label == null) return;
         float w = IsMobile ? 170 : 150, h = IsMobile ? 52 : 42;
+        w = Mathf.Max(w, sBtnBig.CalcSize(new GUIContent("<b>" + label + "</b>")).x + 36f);   // 긴 이름(크리스마스 주방 게임 등)이 잘리지 않게
         float y = SH - (IsMobile ? 46 : 36) - 12 - 16 - h - 10;
         var r = new Rect(SW / 2 - w / 2, y, w, h);
         float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 3f);

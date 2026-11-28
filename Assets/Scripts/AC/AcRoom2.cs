@@ -469,8 +469,19 @@ public partial class AcRoom
             var bc = g.AddComponent<BoxCollider>(); bc.isTrigger = true; bc.size = new Vector3(x1 - x0 + 0.3f, 23f, z1 - z0 + 0.3f);
             list.Add(bc);
         }
+        // 파티클 트리거는 콜라이더를 몇 개(6개 안팎)까지만 봐서, 방들을 왼쪽·오른쪽 큰 상자 둘로 묶음 (거실 포함 3개)
         Box(-HalfX, -HalfZ, HalfX, HalfZ);
-        foreach (var a in areasR) Box(a.r.xMin, a.r.yMin, a.r.xMax, a.r.yMax);
+        foreach (int side in new[] { -1, 1 })
+        {
+            bool any = false; float x0 = 0, z0 = 0, x1 = 0, z1 = 0;
+            foreach (var a in areasR)
+            {
+                if ((a.r.center.x < 0 ? -1 : 1) != side) continue;
+                if (!any) { x0 = a.r.xMin; z0 = a.r.yMin; x1 = a.r.xMax; z1 = a.r.yMax; any = true; }
+                else { x0 = Mathf.Min(x0, a.r.xMin); z0 = Mathf.Min(z0, a.r.yMin); x1 = Mathf.Max(x1, a.r.xMax); z1 = Mathf.Max(z1, a.r.yMax); }
+            }
+            if (any) Box(x0, z0, x1, z1);
+        }
         return list;
     }
 
