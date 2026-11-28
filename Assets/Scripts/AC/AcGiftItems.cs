@@ -41,127 +41,98 @@ public partial class AcRoom
         switch (id)
         {
             case "p_kitty":
-                {
-                    Color fur = new Color(1f, 0.82f, 0.6f), furD = new Color(0.96f, 0.66f, 0.4f), furW = new Color(1f, 0.96f, 0.92f);
-                    System.Func<Vector3, Color> sh = u => Color.Lerp(fur, furW, Mathf.Clamp01(u.z * 0.8f - u.y * 0.3f));
-                    var b = new AcPB();
-                    b.Ellipsoid(new Vector3(0, 0.105f, 0), new Vector3(0.095f, 0.1f, 0.088f), fur, 18, 24, null, sh);
-                    b.Ellipsoid(new Vector3(0, 0.095f, 0.058f), new Vector3(0.058f, 0.068f, 0.034f), furW, 12, 16);
-                    foreach (float sg in new[] { -1f, 1f })
-                    {
-                        b.Ellipsoid(new Vector3(sg * 0.048f, 0.02f, 0.045f), new Vector3(0.032f, 0.022f, 0.042f), furW, 10, 12);
-                        b.Ellipsoid(new Vector3(sg * 0.04f, 0.075f, 0.078f), new Vector3(0.024f, 0.03f, 0.024f), furW, 10, 12);
-                        for (int k = 0; k < 3; k++) b.Sphere(new Vector3(sg * 0.048f + (k - 1) * 0.011f, 0.012f, 0.083f), 0.006f, pink, 4, 5);   // 발바닥
-                        b.Ellipsoid(new Vector3(sg * 0.07f, 0.16f, -0.02f), new Vector3(0.03f, 0.02f, 0.03f), furD, 8, 10);   // 줄무늬 무늬
-                    }
-                    Part("body", b, Vector3.zero);
-                    // 리본 + 방울 (목)
-                    var rb = new AcPB();
-                    Color red = new Color(0.9f, 0.18f, 0.25f);
-                    rb.Torus(new Vector3(0, 0.197f, 0.005f), Vector3.up, 0.072f, 0.01f, red, 24, 6);
-                    foreach (float sg in new[] { -1f, 1f }) rb.Ellipsoid(new Vector3(sg * 0.03f, 0.205f, 0.075f), new Vector3(0.028f, 0.018f, 0.01f), red, 8, 10, Quaternion.Euler(0, 0, sg * 18f));
-                    rb.Sphere(new Vector3(0, 0.205f, 0.08f), 0.011f, new Color(0.8f, 0.12f, 0.2f), 6, 8);
-                    rb.Sphere(new Vector3(0, 0.183f, 0.083f), 0.014f, gold, 8, 10);
-                    Gloss(Part("bow", rb, Vector3.zero), 0.6f);
-                    // 머리 (기울이는 동작용으로 따로)
-                    var head = Node("head", new Vector3(0, 0.2f, 0));
-                    var hb = new AcPB();
-                    hb.Ellipsoid(new Vector3(0, 0.08f, 0), new Vector3(0.125f, 0.105f, 0.11f), fur, 20, 28, null, sh);
-                    hb.Ellipsoid(new Vector3(0, 0.05f, 0.08f), new Vector3(0.058f, 0.036f, 0.032f), furW, 12, 14);
-                    hb.Ellipsoid(new Vector3(0, 0.155f, 0.06f), new Vector3(0.03f, 0.015f, 0.02f), furD, 6, 8);
-                    foreach (float sg in new[] { -1f, 1f })
-                    {
-                        hb.Cylinder(new Vector3(sg * 0.068f, 0.155f, -0.005f), new Vector3(sg * 0.098f, 0.225f, -0.01f), 0.044f, 0.005f, fur, 14);
-                        hb.Cylinder(new Vector3(sg * 0.07f, 0.16f, 0.01f), new Vector3(sg * 0.094f, 0.212f, 0.004f), 0.028f, 0.003f, pink, 12);
-                        hb.Ellipsoid(new Vector3(sg * 0.082f, 0.052f, 0.086f), new Vector3(0.022f, 0.012f, 0.008f), pink, 8, 10);   // 볼터치
-                        for (int k = 0; k < 2; k++) hb.Tube(new[] { new Vector3(sg * 0.05f, 0.052f - k * 0.01f, 0.104f), new Vector3(sg * 0.13f, 0.062f - k * 0.022f, 0.085f) }, new[] { 0.0016f, 0.0012f }, new Color(0.55f, 0.45f, 0.4f), 4);   // 수염
-                    }
-                    Eyes(hb, 0.048f, 0.088f, 0.097f, 1f);
-                    hb.Ellipsoid(new Vector3(0, 0.068f, 0.112f), new Vector3(0.011f, 0.008f, 0.007f), pink, 6, 8);
-                    Smile(hb, new Vector3(0, 0.057f, 0.112f), 1f, new Color(0.45f, 0.3f, 0.3f));
-                    Part("headmesh", hb, Vector3.zero, 0f, head);
-                    // 꼬리 (살랑살랑)
-                    var tail = Node("tail", new Vector3(0, 0.06f, -0.08f));
-                    var tb = new AcPB();
-                    var tp = new[] { Vector3.zero, new Vector3(0.01f, 0.05f, -0.035f), new Vector3(0.035f, 0.12f, -0.045f), new Vector3(0.05f, 0.165f, -0.02f) };
-                    tb.Tube(tp, new[] { 0.02f, 0.019f, 0.017f, 0.015f }, fur, 12);
-                    tb.Sphere(tp[3], 0.016f, furW, 8, 10);
-                    Part("tailmesh", tb, Vector3.zero, 0f, tail);
-                    return true;
-                }
             case "p_puppy":
-                {
-                    Color fur = new Color(0.94f, 0.76f, 0.52f), furD = new Color(0.72f, 0.5f, 0.32f), furW = new Color(1f, 0.97f, 0.93f);
-                    System.Func<Vector3, Color> sh = u => Color.Lerp(fur, furW, Mathf.Clamp01(u.z * 0.8f - u.y * 0.3f));
+                {   // 11-28 다시: 병아리·펭귄처럼 둥글둥글한 덩어리 + 점 눈 (다른 인형들과 같은 결)
+                    bool cat = id == "p_kitty";
+                    Color fur = cat ? new Color(1f, 0.78f, 0.5f) : new Color(0.97f, 0.88f, 0.72f);
+                    Color ear = cat ? fur : new Color(0.72f, 0.5f, 0.34f);
+                    Color muz = new Color(1f, 0.97f, 0.93f);
                     var b = new AcPB();
-                    b.Ellipsoid(new Vector3(0, 0.1f, 0), new Vector3(0.092f, 0.095f, 0.09f), fur, 18, 24, null, sh);
-                    b.Ellipsoid(new Vector3(0, 0.09f, 0.06f), new Vector3(0.056f, 0.066f, 0.034f), furW, 12, 16);
+                    b.Sphere(new Vector3(0, 0.1f, 0), 0.1f, fur, 10, 14);                       // 몸
+                    b.Ellipsoid(new Vector3(0, 0.095f, 0.055f), new Vector3(0.06f, 0.065f, 0.05f), muz, 8, 12);   // 배
                     foreach (float sg in new[] { -1f, 1f })
                     {
-                        b.Ellipsoid(new Vector3(sg * 0.048f, 0.02f, 0.048f), new Vector3(0.033f, 0.023f, 0.044f), furW, 10, 12);
-                        b.Ellipsoid(new Vector3(sg * 0.042f, 0.07f, 0.08f), new Vector3(0.025f, 0.03f, 0.025f), furW, 10, 12);
+                        b.Sphere(new Vector3(sg * 0.045f, 0.03f, 0.075f), 0.032f, fur, 6, 8);    // 앞발
+                        b.Sphere(new Vector3(sg * 0.065f, 0.02f, 0.02f), 0.035f, fur, 6, 8);     // 뒷발
                     }
-                    b.Ellipsoid(new Vector3(-0.05f, 0.13f, -0.04f), new Vector3(0.04f, 0.035f, 0.04f), furD, 8, 10);   // 등 무늬
                     Part("body", b, Vector3.zero);
-                    var cb = new AcPB();
-                    cb.Torus(new Vector3(0, 0.19f, 0.003f), Vector3.up, 0.07f, 0.011f, new Color(0.25f, 0.55f, 0.95f), 24, 6);
-                    cb.Cylinder(new Vector3(0, 0.172f, 0.078f), new Vector3(0, 0.172f, 0.084f), 0.017f, 0.017f, gold, 14);
-                    cb.Star(new Vector3(0, 0.172f, 0.086f), Vector3.forward, Vector3.up, 0.01f, 0.005f, 0.002f, new Color(1f, 0.95f, 0.7f));
-                    Gloss(Part("collar", cb, Vector3.zero), 0.7f);
-                    var head = Node("head", new Vector3(0, 0.195f, 0));
+                    var deco = new AcPB();
+                    if (cat)
+                    {   // 귀 옆 빨간 리본
+                        Color red = new Color(0.92f, 0.22f, 0.28f);
+                        var c0 = new Vector3(0.07f, 0.355f, 0.03f);
+                        deco.Ellipsoid(c0 + new Vector3(-0.022f, 0, 0), new Vector3(0.024f, 0.017f, 0.012f), red, 6, 8, Quaternion.Euler(0, 0, 20));
+                        deco.Ellipsoid(c0 + new Vector3(0.022f, 0, 0), new Vector3(0.024f, 0.017f, 0.012f), red, 6, 8, Quaternion.Euler(0, 0, -20));
+                        deco.Sphere(c0, 0.011f, red * 0.9f, 5, 6);
+                    }
+                    else
+                    {   // 파란 목도리
+                        Color blue = new Color(0.3f, 0.6f, 0.95f);
+                        deco.Torus(new Vector3(0, 0.178f, 0.003f), Vector3.up, 0.07f, 0.017f, blue, 18, 7);
+                        deco.Ellipsoid(new Vector3(0.045f, 0.145f, 0.075f), new Vector3(0.02f, 0.035f, 0.011f), blue, 5, 7, Quaternion.Euler(0, 0, -12));
+                    }
+                    var head = Node("head", new Vector3(0, 0.19f, 0));
                     var hb = new AcPB();
-                    hb.Ellipsoid(new Vector3(0, 0.08f, 0), new Vector3(0.12f, 0.105f, 0.108f), fur, 20, 28, null, sh);
-                    hb.Ellipsoid(new Vector3(0, 0.048f, 0.082f), new Vector3(0.062f, 0.042f, 0.036f), furW, 12, 14);
-                    hb.Ellipsoid(new Vector3(0.045f, 0.11f, 0.07f), new Vector3(0.04f, 0.035f, 0.03f), furD, 8, 10);   // 한쪽 눈 얼룩
+                    hb.Sphere(new Vector3(0, 0.075f, 0), 0.095f, fur, 12, 16);
+                    hb.Ellipsoid(new Vector3(0, 0.045f, 0.07f), new Vector3(0.045f, 0.032f, 0.03f), muz, 8, 10);     // 주둥이
                     foreach (float sg in new[] { -1f, 1f })
                     {
-                        hb.Ellipsoid(new Vector3(sg * 0.112f, 0.07f, -0.005f), new Vector3(0.034f, 0.075f, 0.026f), furD, 10, 12, Quaternion.Euler(0, 0, sg * 22f));   // 늘어진 귀
-                        hb.Ellipsoid(new Vector3(sg * 0.08f, 0.045f, 0.085f), new Vector3(0.022f, 0.012f, 0.008f), pink, 8, 10);
+                        if (cat)
+                        {
+                            hb.Cylinder(new Vector3(sg * 0.055f, 0.14f, 0), new Vector3(sg * 0.075f, 0.19f, -0.005f), 0.034f, 0.008f, ear, 10);
+                            hb.Cylinder(new Vector3(sg * 0.056f, 0.145f, 0.012f), new Vector3(sg * 0.072f, 0.18f, 0.006f), 0.02f, 0.005f, new Color(1f, 0.7f, 0.72f), 8);
+                        }
+                        else hb.Ellipsoid(new Vector3(sg * 0.088f, 0.08f, -0.005f), new Vector3(0.028f, 0.058f, 0.03f), ear, 8, 10, Quaternion.Euler(0, 0, sg * 18f));
                     }
-                    Eyes(hb, 0.046f, 0.09f, 0.096f, 1f);
-                    hb.Ellipsoid(new Vector3(0, 0.068f, 0.118f), new Vector3(0.021f, 0.016f, 0.014f), eyeC, 8, 10);   // 코
-                    hb.Sphere(new Vector3(-0.006f, 0.074f, 0.13f), 0.005f, Color.white, 4, 5);
-                    Smile(hb, new Vector3(0, 0.048f, 0.117f), 1f, new Color(0.35f, 0.22f, 0.2f));
-                    hb.Ellipsoid(new Vector3(0, 0.033f, 0.112f), new Vector3(0.012f, 0.014f, 0.006f), new Color(1f, 0.5f, 0.55f), 6, 8);   // 혀
+                    if (!cat) hb.Ellipsoid(new Vector3(-0.04f, 0.13f, 0.045f), new Vector3(0.035f, 0.03f, 0.03f), ear, 6, 8);   // 이마 얼룩
+                    // 점 눈 + 볼터치 + 웃는 입 (다른 인형들과 같은 얼굴)
+                    var fc = new Vector3(0, 0.075f, 0.094f); float fs = 0.085f;
+                    foreach (float sg in new[] { -1f, 1f })
+                    {
+                        hb.Sphere(fc + new Vector3(sg * 0.4f * fs, 0.12f * fs, -0.01f), 0.1f * fs, eyeC, 5, 7);
+                        hb.Sphere(fc + new Vector3(sg * 0.4f * fs + 0.03f * fs, 0.16f * fs, 0.05f * fs - 0.01f), 0.03f * fs, Color.white, 3, 4);
+                        { float bx = sg * 0.6f * fs, by = 0.065f; hb.Ellipsoid(new Vector3(bx, by, Mathf.Sqrt(0.095f * 0.095f - bx * bx - (by - 0.075f) * (by - 0.075f)) - 0.001f), new Vector3(0.012f, 0.007f, 0.004f), pink, 4, 6); }
+                    }
+                    hb.Ellipsoid(new Vector3(0, 0.058f, 0.1f), new Vector3(0.012f, 0.009f, 0.008f), cat ? new Color(1f, 0.55f, 0.6f) : eyeC, 5, 6);   // 코
+                    Smile(hb, new Vector3(0, 0.044f, 0.1f), 0.8f, eyeC);
                     Part("headmesh", hb, Vector3.zero, 0f, head);
-                    var tail = Node("tail", new Vector3(0, 0.1f, -0.085f));
+                    Part("deco", deco, cat ? new Vector3(0, -0.19f, 0) : Vector3.zero, 0f, cat ? head : null);
+                    var tail = Node("tail", new Vector3(0, 0.06f, -0.09f));
                     var tb = new AcPB();
-                    tb.Tube(new[] { Vector3.zero, new Vector3(0, 0.035f, -0.03f), new Vector3(0, 0.07f, -0.035f) }, new[] { 0.016f, 0.014f, 0.01f }, fur, 10);
-                    tb.Sphere(new Vector3(0, 0.07f, -0.035f), 0.011f, furW, 6, 8);
+                    if (cat) { var tp = new[] { Vector3.zero, new Vector3(0.015f, 0.045f, -0.03f), new Vector3(0.04f, 0.1f, -0.03f), new Vector3(0.05f, 0.13f, -0.005f) }; tb.Tube(tp, new[] { 0.022f, 0.021f, 0.02f, 0.019f }, fur, 10); tb.Sphere(tp[3], 0.019f, fur, 6, 8); }
+                    else tb.Sphere(new Vector3(0, 0.02f, -0.01f), 0.03f, fur, 6, 8);
                     Part("tailmesh", tb, Vector3.zero, 0f, tail);
                     return true;
                 }
             case "p_snowman":
-                {
-                    Color snow = new Color(0.98f, 0.98f, 1f), snowS = new Color(0.85f, 0.89f, 0.97f), coal = new Color(0.12f, 0.11f, 0.13f);
-                    System.Func<Vector3, Color> sh = u => Color.Lerp(snowS, snow, Mathf.Clamp01(0.55f + u.y * 0.5f + u.z * 0.2f));
+                {   // 2단 동글 눈사람 (점 눈, 짧은 장갑 팔, 털모자·목도리)
+                    Color snow = new Color(0.98f, 0.985f, 1f);
                     var b = new AcPB();
-                    b.Ellipsoid(new Vector3(0, 0.1f, 0), new Vector3(0.105f, 0.1f, 0.1f), snow, 20, 26, null, sh);
-                    for (int k = 0; k < 3; k++) b.Sphere(new Vector3(0, 0.07f + k * 0.035f, 0.098f - Mathf.Abs(k - 1) * 0.006f), 0.01f, coal, 6, 8);   // 단추
-                    foreach (float sg in new[] { -1f, 1f })
-                    {   // 나뭇가지 팔 + 빨간 벙어리장갑
-                        var a0 = new Vector3(sg * 0.09f, 0.14f, 0); var a1 = new Vector3(sg * 0.15f, 0.18f, 0.01f); var a2 = new Vector3(sg * 0.19f, 0.22f, 0.02f);
-                        b.Tube(new[] { a0, a1, a2 }, new[] { 0.007f, 0.006f, 0.005f }, new Color(0.45f, 0.3f, 0.2f), 6);
-                        b.Ellipsoid(a2 + new Vector3(sg * 0.01f, 0.012f, 0), new Vector3(0.018f, 0.022f, 0.014f), new Color(0.9f, 0.2f, 0.25f), 8, 10);
-                    }
+                    b.Sphere(new Vector3(0, 0.1f, 0), 0.105f, snow, 12, 16);
+                    for (int k = 0; k < 2; k++) b.Sphere(new Vector3(0, 0.085f + k * 0.04f, 0.1f - k * 0.006f), 0.011f, new Color(0.25f, 0.2f, 0.22f), 5, 6);
+                    Color mit = new Color(0.92f, 0.22f, 0.28f);
+                    foreach (float sg in new[] { -1f, 1f }) b.Ellipsoid(new Vector3(sg * 0.105f, 0.12f, 0.01f), new Vector3(0.028f, 0.035f, 0.028f), mit, 6, 8, Quaternion.Euler(0, 0, sg * 30f));
                     Part("body", b, Vector3.zero);
-                    // 목도리
-                    var sc = new AcPB(); Color scarf = new Color(0.92f, 0.22f, 0.3f), scarf2 = new Color(1f, 0.95f, 0.9f);
-                    sc.Torus(new Vector3(0, 0.19f, 0), Vector3.up, 0.06f, 0.018f, scarf, 26, 8);
-                    sc.Box(new Vector3(0.035f, 0.15f, 0.06f), new Vector3(0.03f, 0.07f, 0.012f), scarf, Quaternion.Euler(0, 0, 12f));
-                    sc.Box(new Vector3(0.039f, 0.118f, 0.061f), new Vector3(0.031f, 0.008f, 0.013f), scarf2, Quaternion.Euler(0, 0, 12f));
+                    var sc = new AcPB(); Color scarf = new Color(0.25f, 0.6f, 0.4f);
+                    sc.Torus(new Vector3(0, 0.198f, 0.003f), Vector3.up, 0.06f, 0.018f, scarf, 18, 7);
+                    sc.Ellipsoid(new Vector3(0.04f, 0.165f, 0.07f), new Vector3(0.02f, 0.036f, 0.011f), scarf, 5, 7, Quaternion.Euler(0, 0, -12));
                     Part("scarf", sc, Vector3.zero);
                     var head = Node("head", new Vector3(0, 0.2f, 0));
                     var hb = new AcPB();
-                    hb.Ellipsoid(new Vector3(0, 0.07f, 0), new Vector3(0.078f, 0.074f, 0.075f), snow, 20, 26, null, sh);
-                    Eyes(hb, 0.03f, 0.085f, 0.068f, 0.8f);
-                    hb.Cylinder(new Vector3(0, 0.068f, 0.07f), new Vector3(0, 0.062f, 0.125f), 0.012f, 0.002f, new Color(1f, 0.55f, 0.15f), 10);   // 당근 코
-                    foreach (float sg in new[] { -1f, 1f }) hb.Ellipsoid(new Vector3(sg * 0.05f, 0.055f, 0.062f), new Vector3(0.016f, 0.009f, 0.006f), pink, 6, 8);
-                    for (int k = 0; k < 5; k++) { float a = Mathf.Lerp(-0.6f, 0.6f, k / 4f); hb.Sphere(new Vector3(Mathf.Sin(a) * 0.03f, 0.042f - Mathf.Cos(a) * 0.008f + 0.008f, 0.07f), 0.0045f, coal, 4, 5); }
-                    // 털모자 (빨강 + 흰 테 + 방울)
-                    hb.Ellipsoid(new Vector3(0, 0.122f, -0.004f), new Vector3(0.07f, 0.05f, 0.068f), new Color(0.2f, 0.55f, 0.85f), 12, 16);
-                    hb.Torus(new Vector3(0, 0.112f, -0.004f), Vector3.up, 0.068f, 0.012f, Color.white, 24, 6);
-                    hb.Sphere(new Vector3(0, 0.178f, -0.01f), 0.02f, Color.white, 8, 10);
+                    hb.Sphere(new Vector3(0, 0.07f, 0), 0.078f, snow, 12, 16);
+                    var fc = new Vector3(0, 0.068f, 0.076f); float fs = 0.075f;
+                    foreach (float sg in new[] { -1f, 1f })
+                    {
+                        hb.Sphere(fc + new Vector3(sg * 0.42f * fs, 0.15f * fs, -0.006f), 0.1f * fs, eyeC, 5, 7);
+                        hb.Sphere(fc + new Vector3(sg * 0.42f * fs + 0.03f * fs, 0.19f * fs, 0.05f * fs - 0.006f), 0.03f * fs, Color.white, 3, 4);
+                        { float bx = sg * 0.6f * fs, by = 0.058f; hb.Ellipsoid(new Vector3(bx, by, Mathf.Sqrt(0.078f * 0.078f - bx * bx - (by - 0.07f) * (by - 0.07f)) - 0.001f), new Vector3(0.011f, 0.0065f, 0.004f), pink, 4, 6); }
+                    }
+                    hb.Cylinder(new Vector3(0, 0.064f, 0.074f), new Vector3(0, 0.06f, 0.105f), 0.011f, 0.003f, new Color(1f, 0.55f, 0.18f), 8);   // 짧은 당근 코
+                    Smile(hb, new Vector3(0, 0.045f, 0.074f), 0.75f, eyeC);
+                    Color hat = new Color(0.92f, 0.22f, 0.28f);
+                    hb.Ellipsoid(new Vector3(0, 0.122f, -0.003f), new Vector3(0.068f, 0.048f, 0.066f), hat, 10, 14);
+                    hb.Torus(new Vector3(0, 0.112f, -0.003f), Vector3.up, 0.066f, 0.013f, Color.white, 18, 6);
+                    hb.Sphere(new Vector3(0, 0.177f, -0.008f), 0.02f, Color.white, 6, 8);
                     Part("headmesh", hb, Vector3.zero, 0f, head);
                     return true;
                 }
