@@ -14,7 +14,7 @@ public partial class AcRoom
     {
         var b = new AcPB { detail = 1f };
         var rng = new System.Random(name.GetHashCode());
-        float pw = 0.32f, seam = 0.014f, y = 0.0f;
+        float pw = 0.32f, seam = 0.014f, y = 0.003f;
         Color seamC = new Color(0.55f, 0.37f, 0.23f);
         int rows = Mathf.CeilToInt(r.height / pw);
         for (int i = 0; i < rows; i++)
@@ -49,7 +49,8 @@ public partial class AcRoom
             b.Quad(q0, q1, q2, q3);
         }
         // 바닥 아래 판 (벽을 낮췄을 때 바닥 두께가 보이게)
-        b.Box(new Vector3(r.center.x, -0.06f, r.center.y), new Vector3(r.width, 0.12f, r.height), new Color(0.6f, 0.42f, 0.27f));
+        // (윗면을 판자보다 3cm 아래에 둬서 같은 높이 면끼리 깜빡이며 무늬가 바뀌어 보이던 것(z-fighting)을 없앰)
+        b.Box(new Vector3(r.center.x, -0.09f, r.center.y), new Vector3(r.width, 0.12f, r.height), new Color(0.6f, 0.42f, 0.27f));
         var go = ProcObj("floor_" + name, b.M("floor_" + name), parent);
         go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
     }
