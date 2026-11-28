@@ -60,7 +60,7 @@ public partial class AcRoom
                     if (cat)
                     {   // 귀 옆 빨간 리본
                         Color red = new Color(0.92f, 0.22f, 0.28f);
-                        var c0 = new Vector3(0.07f, 0.355f, 0.03f);
+                        var c0 = new Vector3(0.078f, 0.318f, 0.035f);
                         deco.Ellipsoid(c0 + new Vector3(-0.022f, 0, 0), new Vector3(0.024f, 0.017f, 0.012f), red, 6, 8, Quaternion.Euler(0, 0, 20));
                         deco.Ellipsoid(c0 + new Vector3(0.022f, 0, 0), new Vector3(0.024f, 0.017f, 0.012f), red, 6, 8, Quaternion.Euler(0, 0, -20));
                         deco.Sphere(c0, 0.011f, red * 0.9f, 5, 6);
