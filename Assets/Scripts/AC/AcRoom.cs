@@ -630,6 +630,7 @@ public partial class AcRoom : MonoBehaviour
         TreeShotUpdate();
         OverviewPhoto();
         UpdateFgProps();
+        if (studyGlobe && studyGlobe.activeInHierarchy) GlobeFlakes(studyGlobe, Time.time, 0f);
         if (me) me.SetHidden(plantFocus >= 0 || plantPicker >= 0 || building || snowFocusId != null);
         QuestUpdate(dt);
         PetsUpdate(dt);

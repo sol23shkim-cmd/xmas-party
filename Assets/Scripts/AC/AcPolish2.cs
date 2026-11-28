@@ -175,22 +175,22 @@ public partial class AcRoom
     // ===== 눈밭: 한 장으로 이어진 부드러운 눈 언덕 (이음선 없음). 오목한 곳은 연한 하늘색, 볼록한 곳은 흰색 =====
     void SnowTerrain(Transform parent)
     {
-        float x0 = WorldX0 - 30f, x1 = WorldX1 + 30f, z0 = WorldZ0 - 30f, z1 = WorldZ1 + 30f, step = 2f;
+        float x0 = WorldX0 - 30f, x1 = WorldX1 + 30f, z0 = WorldZ0 - 30f, z1 = WorldZ1 + 30f, step = 1.5f;
         int nx = Mathf.CeilToInt((x1 - x0) / step) + 1, nz = Mathf.CeilToInt((z1 - z0) / step) + 1;
         var verts = new Vector3[nx * nz]; var cols = new Color[nx * nz]; var uv = new Vector2[nx * nz];
-        Color hi = new Color(0.97f, 0.975f, 1f), lo = new Color(0.82f, 0.87f, 0.97f);
+        Color hi = new Color(0.93f, 0.955f, 1f), lo = new Color(0.74f, 0.81f, 0.95f);   // 살짝 푸른 기를 넣어 따뜻한 햇빛에도 하얗게 날아가지 않게
         for (int j = 0; j < nz; j++)
             for (int i = 0; i < nx; i++)
             {
                 float x = x0 + i * step, z = z0 + j * step;
-                float n1 = Mathf.PerlinNoise(x * 0.07f + 13.1f, z * 0.07f + 7.7f), n2 = Mathf.PerlinNoise(x * 0.23f + 3.3f, z * 0.23f + 1.9f);
-                float n = n1 * 0.75f + n2 * 0.25f;
+                float n1 = Mathf.PerlinNoise(x * 0.07f + 13.1f, z * 0.07f + 7.7f), n2 = Mathf.PerlinNoise(x * 0.33f + 3.3f, z * 0.33f + 1.9f);
+                float n = n1 * 0.6f + n2 * 0.4f;
                 float d = DistToHouse(new Vector3(x, 0, z));
                 float fade = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - 0.6f) / 5f));   // 집 가까이는 평평하고 낮게 (바닥을 뚫지 않게)
                 float far = Mathf.Clamp01((Mathf.Max(x - WorldX1, WorldX0 - x, z - WorldZ1, WorldZ0 - z) + 2f) / 20f);   // 마당 밖은 더 크게 출렁
-                float h = -0.07f + (n - 0.5f) * 0.12f * fade + far * n1 * 0.9f;
+                float h = -0.05f + (n - 0.5f) * 0.09f * fade + far * n1 * 0.9f;
                 verts[j * nx + i] = new Vector3(x, h, z);
-                float shade = Mathf.Clamp01(0.55f + (n - 0.5f) * 1.6f);
+                float shade = Mathf.Clamp01(0.6f + (n - 0.5f) * 2.4f);
                 cols[j * nx + i] = Color.Lerp(lo, hi, shade);
                 uv[j * nx + i] = new Vector2(1f, 0f);
             }
@@ -220,7 +220,7 @@ public partial class AcRoom
         {
             if (!go) continue;
             string n = go.name;
-            if (n.StartsWith("wall") || n.StartsWith("floor") || n.Contains("rug") || n.Contains("string_lights") || n.Contains("tree_") || n.Contains("ground")) continue;
+            if (n.StartsWith("wall") || n == "floor_planks" || n == "floor_tiles" || n.StartsWith("floor_") && !n.Contains("lamp") || n.Contains("rug") || n.Contains("string_lights") || n.Contains("tree_") || n.Contains("ground")) continue;
             var rs = go.GetComponentsInChildren<Renderer>(true); if (rs.Length == 0) continue;
             var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
             if (b.size.y < 0.5f || b.size.x > 7f || b.size.z > 7f) continue;

@@ -281,6 +281,7 @@ public partial class AcRoom
     }
     readonly List<GameObject> looseDecos = new List<GameObject>();
     readonly List<GameObject> putRoots = new List<GameObject>();
+    GameObject studyGlobe;
     readonly List<GameObject> frontPosts = new List<GameObject>();   // 출입구 기둥·등불 (트리를 볼 땐 숨김)
 
     // 잘라 보기: 나와 카메라 사이의 가로 벽은 낮게, 트리 전경 볼 때는 안쪽 벽과 벽 장식을 모두 숨김
@@ -420,7 +421,7 @@ public partial class AcRoom
         Put("armchair", c + V(-1.6f, 0, 1.0f), 30, 1.2f, T(("fabric", "8A3B34")), t);
         Put("armchair", c + V(1.6f, 0, 1.0f), -30, 1.2f, T(("fabric", "8A3B34")), t);
         Put("coffee_table", c + V(0, 0, 2.4f), 0, 1.0f, T(("wood", "6B4630")), t);
-        Put("snow_globe", c + V(0.3f, 0.47f, 2.4f), 0, 1.3f, null, t);
+        { var sg = FitHolder(ProcItem("p_snowglobe"), 0.42f, "snow_globe_p"); sg.transform.SetParent(t, false); sg.transform.position = c + V(0.3f, 0.47f, 2.4f); studyGlobe = sg; }   // 유리 안 눈 마을 스노우볼 (선물과 같은 모양)
         Put("cocoa_mug", c + V(-0.4f, 0.47f, 2.3f), 0, 1.5f, null, t);
         Put("floor_lamp", c + V(-3.0f, 0, 0.2f), 0, 1.15f, null, t);
         Put("side_table", c + V(3.0f, 0, 0.4f), 0, 1.1f, null, t);

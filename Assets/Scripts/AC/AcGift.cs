@@ -837,6 +837,22 @@ public partial class AcRoom
     }
 
     static float Frac(float v) => v - Mathf.Floor(v);
+    // 스노우볼 유리 안 눈송이 (선물 화면·서재 탁자 위 스노우볼이 같이 씀)
+    static void GlobeFlakes(GameObject holder, float t, float shake)
+    {
+                    int k = 0;
+                    foreach (var c in holder.GetComponentsInChildren<Transform>())
+                    {
+                        if (c.name != "flake") continue;
+                        float h1 = Frac(Mathf.Sin(k * 12.9898f) * 43758.55f), h2 = Frac(Mathf.Sin(k * 78.233f) * 12543.31f), h3 = Frac(Mathf.Sin(k * 39.425f) * 24634.63f);
+                        float fall = Frac(t * (0.07f + 0.05f * h3) * (1f + shake * 2f) + h1);
+                        float yy = 0.31f - fall * 0.19f;                                  // 0.31 → 0.12 (땅 위)
+                        float lim = Mathf.Sqrt(Mathf.Max(0f, 0.105f * 0.105f - (yy - 0.205f) * (yy - 0.205f)));
+                        float a = h2 * Mathf.PI * 2f + t * (0.4f + h1) * (1f + shake * 4f), rr = Mathf.Sqrt(h3) * lim * 0.92f;
+                        c.localPosition = new Vector3(Mathf.Cos(a) * rr, yy, Mathf.Sin(a) * rr);
+                        k++;
+                    }
+    }
     static float BoingBase(string id) => id == "p_jack" ? 0.12f : id == "p_snakecan" ? 0.13f : 0.11f;   // 늘어나는 부분이 시작하는 높이
 
     // 내용물 움직이기 (holder: 맞춘 크기 물체, 원점 바닥 가운데)
@@ -854,18 +870,7 @@ public partial class AcRoom
                     y = 0.01f + 0.006f * Mathf.Sin(t * 1.6f); yaw += t * 22f;
                     float shake = Mathf.Max(0f, Mathf.Sin(t * 0.45f) - 0.85f) * 6.5f;   // 약 14초마다 살짝 흔듦
                     rz = shake * 7f * Mathf.Sin(t * 22f);
-                    int k = 0;
-                    foreach (var c in holder.GetComponentsInChildren<Transform>())
-                    {
-                        if (c.name != "flake") continue;
-                        float h1 = Frac(Mathf.Sin(k * 12.9898f) * 43758.55f), h2 = Frac(Mathf.Sin(k * 78.233f) * 12543.31f), h3 = Frac(Mathf.Sin(k * 39.425f) * 24634.63f);
-                        float fall = Frac(t * (0.07f + 0.05f * h3) * (1f + shake * 2f) + h1);
-                        float yy = 0.31f - fall * 0.19f;                                  // 0.31 → 0.12 (땅 위)
-                        float lim = Mathf.Sqrt(Mathf.Max(0f, 0.105f * 0.105f - (yy - 0.205f) * (yy - 0.205f)));
-                        float a = h2 * Mathf.PI * 2f + t * (0.4f + h1) * (1f + shake * 4f), rr = Mathf.Sqrt(h3) * lim * 0.92f;
-                        c.localPosition = new Vector3(Mathf.Cos(a) * rr, yy, Mathf.Sin(a) * rr);
-                        k++;
-                    }
+                    GlobeFlakes(holder, t, shake);
                     break;
                 }
             case "hop": { float p = Mathf.Repeat(t * 1.5f, 1f); y = 0.09f * 4 * p * (1 - p) * def.h / 0.4f; sy = p < 0.12f ? 1 - 0.15f * (1 - p / 0.12f) : 1; yaw += Mathf.Sin(t * 0.8f) * 25f; break; }
