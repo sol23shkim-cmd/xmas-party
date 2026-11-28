@@ -663,6 +663,38 @@ public class AcCharacter : MonoBehaviour
                         jump = 0.04f * kk;
                     }
                     break;
+                case "clap":      // 박수: 두 팔을 앞으로 모아 짝짝
+                    {
+                        float c = Mathf.Abs(Mathf.Sin(et * 13f));
+                        if (armL) armL.localRotation = Quaternion.Euler(-78f * k, 0, -(4f + 26f * c) * k);
+                        if (armR) armR.localRotation = Quaternion.Euler(-78f * k, 0, (4f + 26f * c) * k);
+                        jump = Mathf.Abs(Mathf.Sin(et * 6.5f)) * 0.03f * k;
+                    }
+                    break;
+                case "dance":     // 춤: 좌우로 몸 흔들며 팔 번갈아
+                    {
+                        float w = Mathf.Sin(et * 9f);
+                        eRot = Quaternion.Euler(0, w * 28f * k, -w * 12f * k);
+                        if (armL) armL.localRotation = Quaternion.Euler(-40f * k, 0, -(30f + 40f * Mathf.Max(0, w)) * k);
+                        if (armR) armR.localRotation = Quaternion.Euler(-40f * k, 0, (30f + 40f * Mathf.Max(0, -w)) * k);
+                        jump = Mathf.Abs(Mathf.Sin(et * 9f)) * 0.06f * k;
+                    }
+                    break;
+                case "bow":       // 꾸벅: 몸을 앞으로 숙여 인사
+                    eRot = Quaternion.Euler(38f * k, 0, 0);
+                    if (armL) armL.localRotation = Quaternion.Euler(-12f * k, 0, -6f);
+                    if (armR) armR.localRotation = Quaternion.Euler(-12f * k, 0, 6f);
+                    break;
+                case "jump":      // 껑충: 크게 한 번 뛰기
+                    {
+                        float u = Mathf.Clamp01(et / 0.75f);
+                        jump = Mathf.Sin(u * Mathf.PI) * 0.55f;
+                        float sq = et < 0.12f ? et / 0.12f : et > 0.75f && et < 0.9f ? 1f - (et - 0.75f) / 0.15f : 0f;   // 뛰기 전·착지 때 살짝 찌그러짐
+                        eScale = new Vector3(1 + sq * 0.12f, 1 - sq * 0.15f, 1 + sq * 0.12f);
+                        if (armL) armL.localRotation = Quaternion.Euler(0, 0, -100f * Mathf.Sin(u * Mathf.PI));
+                        if (armR) armR.localRotation = Quaternion.Euler(0, 0, 100f * Mathf.Sin(u * Mathf.PI));
+                    }
+                    break;
                 case "heart":     // 폴짝
                 case "gift":
                     jump = Mathf.Abs(Mathf.Sin(et * 7f)) * 0.15f * k;

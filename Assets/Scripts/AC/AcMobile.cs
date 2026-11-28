@@ -284,11 +284,14 @@ public partial class AcRoom
             }
             if (i == 1 && emoteMenu)
             {
-                // 감정 버튼 위로 세 개가 펼쳐짐
-                string[] em = { "인사", "하트", "만세" }; string[] ek = { "wave", "heart", "cheer" };
-                for (int k = 0; k < 3; k++)
+                // 감정 버튼 위로 2줄 x 4칸 펼쳐짐 (11-28: 박수·춤·꾸벅·껑충 추가)
+                string[] em = { "인사", "하트", "만세", "박수", "춤", "꾸벅", "껑충", "하이파이브" }; string[] ek = { "wave", "heart", "cheer", "clap", "dance", "bow", "jump", "highfive" };
+                float ew = IsMobile ? 92 : 80, eh = bh, cols = 2;
+                float ex0 = Mathf.Min(r.x, SW - 10 - cols * (ew + 6));
+                for (int k = 0; k < em.Length; k++)
                 {
-                    var er = new Rect(r.x, r.y - (bh + 6) * (k + 1), bw, bh); R(er);
+                    int row = k / (int)cols, col = k % (int)cols;
+                    var er = new Rect(ex0 + col * (ew + 6), r.y - (eh + 6) * (row + 1), ew, eh); R(er);
                     if (GUI.Button(er, em[k], sBtnTalk)) { Emote(ek[k]); emoteMenu = false; }
                 }
             }

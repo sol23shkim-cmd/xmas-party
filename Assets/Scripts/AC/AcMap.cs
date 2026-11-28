@@ -29,9 +29,8 @@ public partial class AcRoom
         GUI.Box(panel, "", sBox);
         CgText(new Rect(panel.x + 14, panel.y + 8, 200, 28), "지도", 22, new Color(0.45f, 0.28f, 0.18f), TextAnchor.MiddleLeft, 0.01f, new Color(0, 0, 0, 0));
         var hint = new GUIStyle(CgStyle(14, TextAnchor.MiddleLeft)) { normal = { textColor = new Color(0.5f, 0.38f, 0.3f) } };
-        GUI.Label(new Rect(panel.x + 64, panel.y + 10, panel.width - 300, 26), "가고 싶은 곳을 누르면 바로 가요", hint);
+        GUI.Label(new Rect(panel.x + 64, panel.y + 10, panel.width - 160, 26), "가고 싶은 곳을 누르면 바로 가요", hint);
         if (GUI.Button(new Rect(panel.xMax - 82, panel.y + 6, 70, 30), "닫기", sBtn) || Key("esc")) { showMap = false; return; }
-        if (AppInstallable && GUI.Button(new Rect(panel.xMax - 82 - 118, panel.y + 6, 110, 30), "앱으로 받기", sBtn)) AppInstall();
         var mr = new Rect(panel.x + 10, panel.y + 42, pw, mh);
         // 화면과 같은 방향: 화면 왼쪽 = +x, 위쪽 = 뒤(-z)
         Rect WR(float x0, float x1, float z0, float z1)
@@ -70,7 +69,9 @@ public partial class AcRoom
         var tc = WP(TreePos.x, TreePos.z); float tr = TreeR * k;
         GUI.color = (new Color(0.22f, 0.55f, 0.3f)).linear; GUI.DrawTexture(new Rect(tc.x - tr, tc.y - tr, tr * 2, tr * 2), cgDisc); GUI.color = Color.white;
         // 방 이름 (테두리 글자, 좁으면 두 줄)
-        int fs = k * RoomW > 70 ? (IsMobile ? 19 : 16) : (IsMobile ? 16 : 13);   // 11-28: 휴대폰에서 방 이름을 더 크게
+        // 글씨 크기는 방 칸의 실제 크기에 맞춤 (좁은 지도에서 이름·설명이 옆 방과 겹치지 않게, 11-28)
+        float roomPx = k * RoomW;
+        int fs = Mathf.Clamp(Mathf.RoundToInt(roomPx / 5.2f), 10, 19);
         var people = new Dictionary<string, int>();   // 방마다 지금 있는 친구 수
         foreach (var rm in remotes.Values) if (rm.c != null) { var an = InHouse(rm.c.transform.position) ? AreaAt(rm.c.transform.position) : ""; if (an != "") people[an] = (people.TryGetValue(an, out int pc) ? pc : 0) + 1; }
         foreach (var a in areasR)
@@ -78,20 +79,25 @@ public partial class AcRoom
             var rr = WR(a.r.xMin, a.r.xMax, a.r.yMin, a.r.yMax);
             bool me2 = a.name == here;
             string nm = a.name;
-            if (rr.width < nm.Length * fs * 0.95f && nm.Contains(" ")) nm = nm.Replace(" ", "\n");
+            int nfs = fs;
+            if (rr.width < nm.Length * fs * 1.05f && nm.Contains(" ")) nm = nm.Replace(" ", "\n");
+            int longest = 0; foreach (var ln in nm.Split('\n')) longest = Mathf.Max(longest, ln.Length);
+            nfs = Mathf.Clamp(Mathf.FloorToInt((rr.width - 8) / (longest * 1.12f)), 9, fs);
+            float nameH = nm.Split('\n').Length * (nfs + 3);
             if (me2) { GUI.color = (new Color(0.9f, 0.3f, 0.3f, 0.25f)).linear; GUI.DrawTexture(rr, Texture2D.whiteTexture); GUI.color = Color.white; }
-            MapLabel(rr, nm, fs, me2);
+            MapLabel(new Rect(rr.x, rr.y, rr.width, rr.height - (fs * 0.9f)), nm, nfs, me2);   // 이름은 설명 줄 위쪽 공간 가운데
             if (people.TryGetValue(a.name, out int pn) && pn > 0)
                 CgText(new Rect(rr.x, rr.y + 4, rr.width - 6, fs + 2), pn + "명", Mathf.Max(11, fs - 3), new Color(0.75f, 0.88f, 1f), TextAnchor.MiddleRight, 1.3f, new Color(0.1f, 0.15f, 0.35f));
             if (RoomActs.TryGetValue(a.name, out var act))   // 방에서 할 수 있는 것 (작은 글씨)
-                CgText(new Rect(rr.x - 10, rr.yMax - fs - 6, rr.width + 20, fs + 2), act, Mathf.Max(IsMobile ? 13 : 11, fs - 4), new Color(1f, 0.95f, 0.8f), TextAnchor.MiddleCenter, 1.2f, new Color(0.3f, 0.18f, 0.1f, 0.9f));
+                CgText(new Rect(rr.x + 2, rr.yMax - fs - 4, rr.width - 4, fs + 2), act, Mathf.Clamp(Mathf.FloorToInt((rr.width - 8) / (act.Length * 1.08f)), 8, Mathf.Max(9, fs - 4)), new Color(1f, 0.95f, 0.8f), TextAnchor.MiddleCenter, 1.2f, new Color(0.3f, 0.18f, 0.1f, 0.9f));
         }
         MapLabel(WR(-HalfX, HalfX, -HalfZ, -HalfZ + 4), "트리 거실", fs, here == "트리 거실");
         MapLabel(WR(-HalfX, HalfX, HouseZ0, -HalfZ), "안뜰", fs, false);
         MapLabel(WR(-HouseHalf, HouseHalf, MZ0, HouseZ0), "뒷마당", fs + 2, false);
         MapLabel(WR(-HouseHalf, HouseHalf, HalfZ, MZ1), "앞마당", fs + 2, false);
-        MapLabel(WR(HouseHalf, MX1, HouseZ0, HalfZ), "옆마당", fs, false);
-        MapLabel(WR(MX0, -HouseHalf, HouseZ0, HalfZ), "옆마당", fs, false);
+        int sfs = Mathf.Clamp(Mathf.FloorToInt(8f * k / 2.4f), 9, fs);   // 옆마당 칸이 좁아서 두 줄 + 칸에 맞는 크기
+        MapLabel(WR(HouseHalf, MX1, HouseZ0, HalfZ), "옆\n마당", sfs, false);
+        MapLabel(WR(MX0, -HouseHalf, HouseZ0, HalfZ), "옆\n마당", sfs, false);
         // 눈사람·친구·나
         foreach (var c in snowCircles) { var p = WP(c.x, c.y); GUI.DrawTexture(new Rect(p.x - 4, p.y - 4, 8, 8), cgDisc); }
         foreach (var r in remotes.Values)

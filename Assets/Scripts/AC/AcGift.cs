@@ -31,11 +31,13 @@ public partial class AcRoom
         new GiftItem("pet_panda", "아기 판다", 0, 0.42f, "dance"),
         new GiftItem("pet_fox", "아기 여우", 0, 0.42f, "dance"),
         new GiftItem("pet_dog", "아기 강아지", 0, 0.42f, "dance"),
+        new GiftItem("p_kitty", "아기 고양이 인형", 0, 0.4f, "kitty"),
+        new GiftItem("p_puppy", "아기 강아지 인형", 0, 0.4f, "puppy"),
         new GiftItem("p_penguin", "아기 펭귄", 0, 0.36f, "waddle"),
         new GiftItem("p_chick", "아기 병아리", 0, 0.24f, "hop"),
         new GiftItem("teddy_bear", "곰 인형", 0, 0.4f, "hop"),
         new GiftItem("reindeer_plush", "루돌프 인형", 0, 0.45f, "sway"),
-        new GiftItem("snowman_small", "꼬마 눈사람", 0, 0.42f, "sway"),
+        new GiftItem("snowman_small", "꼬마 눈사람", 0, 0.42f, "snowman"),
         new GiftItem("p_bouquet", "꽃다발", 1, 0.5f, "bloom"),
         new GiftItem("p_crown", "반짝 왕관", 1, 0.22f, "spin"),
         new GiftItem("p_ring", "보석 반지", 1, 0.2f, "spin"),
@@ -43,10 +45,10 @@ public partial class AcRoom
         new GiftItem("star_lantern", "별 램프", 1, 0.36f, "glow"),
         new GiftItem("wreath", "크리스마스 리스", 1, 0.42f, "spin"),
         new GiftItem("ice_sculpture", "얼음 별 조각", 1, 0.5f, "spin"),
-        new GiftItem("p_rainbow", "무지개", 1, 0.36f, "glow"),
-        new GiftItem("p_balloons", "하트 풍선", 1, 0.7f, "float"),
+        new GiftItem("p_rainbow", "무지개", 1, 0.36f, "rainbow"),
+        new GiftItem("p_balloons", "하트 풍선", 1, 0.7f, "inflate"),
         new GiftItem("p_minitree", "미니 트리", 1, 0.48f, "glow"),
-        new GiftItem("poinsettia", "포인세티아", 1, 0.36f, "sway"),
+        new GiftItem("poinsettia", "포인세티아", 1, 0.4f, "bloomp"),
         new GiftItem("p_starwand", "별 요술봉", 1, 0.5f, "spin"),
         new GiftItem("p_jack", "펀치 상자", 2, 0.55f, "boing"),
         new GiftItem("p_snakecan", "뱀 나오는 땅콩 캔", 2, 0.5f, "boing"),
@@ -368,7 +370,9 @@ public partial class AcRoom
             var c = AcCharacter.Create(l, null);
             g = c.gameObject;
         }
-        else if (id == "snow_globe") g = ProcItem("p_snowglobe");   // 유리 안에 눈 내리는 작은 마을 (11-27)
+        else if (id == "snow_globe") g = ProcItem("p_snowglobe");
+        else if (id == "snowman_small") g = ProcItem("p_snowman");     // 11-28: 2단 꼬마 눈사람
+        else if (id == "poinsettia") g = ProcItem("p_poinsettia");     // 11-28: 피어나는 포인세티아   // 유리 안에 눈 내리는 작은 마을 (11-27)
         else if (id.StartsWith("p_", StringComparison.Ordinal)) g = ProcItem(id);
         else g = AcmLoader.Exists(id) ? AcCatalog.Spawn(id, null, id == "gift_box" ? new Dictionary<string, Color> { { "box", new Color(0.3f, 0.6f, 0.95f) }, { "ribbon", new Color(1f, 0.85f, 0.3f) } } : null) : ProcItem("p_cupcake");
         var holder = FitHolder(g, def.h, "item_" + id);
@@ -380,11 +384,20 @@ public partial class AcRoom
     GameObject ProcItem(string id)
     {
         float keepDetail = AcPB.DefaultDetail; AcPB.DefaultDetail = 1.8f;   // 가까이서 크게 보므로 잘게 나눠 매끈하게
-        try { return ProcItemInner(id); } finally { AcPB.DefaultDetail = keepDetail; }
+        try
+        {
+            var r = ProcItemInner(id);
+            // 은은한 광택으로 더 고급스럽게 (새로 만든 물건은 부분마다 따로 정해 둠)
+            float g = id switch { "p_crown" => 0.85f, "p_ring" => 0.9f, "p_starwand" => 0.6f, "p_donut" => 0.55f, "p_cupcake" => 0.4f, "p_minitree" => 0.35f, "p_kitty" or "p_puppy" or "p_snowman" or "p_poinsettia" or "p_rainbow" or "p_balloons" => -1f, _ => 0.3f };
+            if (g > 0) foreach (var rr in r.GetComponentsInChildren<Renderer>()) { if (rr.name == "twinkle_star" || rr.name == "globe_glass") continue; var m = new MaterialPropertyBlock(); rr.GetPropertyBlock(m); m.SetFloat("_Gloss", g); rr.SetPropertyBlock(m); }
+            return r;
+        }
+        finally { AcPB.DefaultDetail = keepDetail; }
     }
     GameObject ProcItemInner(string id)
     {
         var root = new GameObject(id);
+        if (ProcItemExtra(id, root)) return root;
         AcPB b = new AcPB();
         void Part(string name, AcPB pb, Vector3 pos, float emit = 0) { var go = ProcObj(name, pb.M(name), root.transform, emit); go.transform.localPosition = pos; }
         Color white = new Color(0.98f, 0.98f, 0.97f), black = new Color(0.12f, 0.12f, 0.16f), orange = new Color(1f, 0.6f, 0.15f), pinkC = new Color(1f, 0.6f, 0.7f);
@@ -588,7 +601,7 @@ public partial class AcRoom
                     for (int t = 0; t < 3; t++) { float y0 = 0.1f + t * 0.1f, r = 0.15f - t * 0.04f; b.Cylinder(new Vector3(0, y0, 0), new Vector3(0, y0 + 0.16f, 0), r, 0.002f, new Color(0.15f, 0.5f, 0.28f), 14, true); }
                     Color[] oc = { new Color(0.95f, 0.2f, 0.25f), new Color(1f, 0.85f, 0.3f), new Color(0.35f, 0.65f, 1f), new Color(1f, 0.6f, 0.8f) };
                     for (int k = 0; k < 12; k++) { float y = 0.13f + (k % 4) * 0.075f, r = 0.13f - (k % 4) * 0.03f, a = k * 2.3f; b.Sphere(new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r), 0.014f, oc[k % 4], 4, 6); }
-                    b.Star(new Vector3(0, 0.44f, 0), Vector3.forward, Vector3.up, 0.045f, 0.02f, 0.012f, new Color(1f, 0.85f, 0.25f));
+                    { var sb = new AcPB { detail = 2f }; sb.Star(Vector3.zero, Vector3.forward, Vector3.up, 0.045f, 0.02f, 0.014f, new Color(1f, 0.85f, 0.25f)); Part("twinkle_star", sb, new Vector3(0, 0.44f, 0), 0.5f); }
                     Part("tree", b, Vector3.zero);
                     break;
                 }
@@ -596,7 +609,7 @@ public partial class AcRoom
                 {
                     b.Cylinder(Vector3.zero, new Vector3(0, 0.36f, 0), 0.008f, 0.008f, new Color(1f, 0.6f, 0.8f), 6);
                     for (int k = 0; k < 6; k++) b.Torus(new Vector3(0, 0.06f + k * 0.05f, 0), Vector3.up, 0.009f, 0.003f, Color.white, 8, 4);
-                    b.Star(new Vector3(0, 0.42f, 0), Vector3.forward, Vector3.up, 0.08f, 0.035f, 0.02f, new Color(1f, 0.85f, 0.25f));
+                    { var sb = new AcPB { detail = 2f }; sb.Star(Vector3.zero, Vector3.forward, Vector3.up, 0.08f, 0.035f, 0.024f, new Color(1f, 0.85f, 0.25f)); Part("twinkle_star", sb, new Vector3(0, 0.42f, 0), 0.5f); }   // 별은 따로: 스스로 반짝
                     var rib = new Color(0.55f, 0.75f, 1f);
                     b.Leaf(new Vector3(0, 0.35f, 0), new Vector3(0.4f, -1, 0.2f), Vector3.forward, 0.1f, 0.02f, rib, rib, 0.1f, 2, 5, 0.2f);
                     b.Leaf(new Vector3(0, 0.35f, 0), new Vector3(-0.4f, -1, 0.2f), Vector3.forward, 0.12f, 0.02f, new Color(1f, 0.6f, 0.8f), new Color(1f, 0.6f, 0.8f), 0.1f, 2, 5, 0.2f);
@@ -988,6 +1001,9 @@ public partial class AcRoom
                     y = 0.02f * Mathf.Abs(Mathf.Sin(t * 3f)); yaw += 25f * Mathf.Sin(t * 0.8f);
                     break;
                 }
+            case "kitty": case "puppy": case "snowman": case "bloomp": case "rainbow": case "inflate":
+                AnimExtra(holder, def.anim, t, ref y, ref yaw, ref rz);
+                break;
             case "dance":
                 {
                     yaw += 25f * Mathf.Sin(t * 0.6f);
@@ -1002,50 +1018,54 @@ public partial class AcRoom
         GiftFx(holder, def, t);
     }
 
-    // ===== 선물은 모두 특별하게 (11-28): 둘레를 도는 작은 별 3개 + 반짝 튀는 별빛 + 별·보석류는 은은하게 빛남 =====
-    static readonly HashSet<string> GlowItems = new HashSet<string> { "star_lantern", "p_starwand", "ice_sculpture", "p_minitree", "p_crown", "p_ring", "snow_globe", "p_rainbow" };
+    // ===== 선물 효과 (11-28 고침): 둘레 도는 별은 별 램프·별 요술봉에만, 별 모양 장식은 스스로 반짝, 반짝이는 별빛은 별·보석류에만 =====
+    static readonly HashSet<string> OrbitItems = new HashSet<string> { "star_lantern", "p_starwand" };
+    static readonly HashSet<string> SparkleItems = new HashSet<string> { "star_lantern", "p_starwand", "ice_sculpture", "p_minitree", "p_crown", "p_ring" };
     float giftFxNext;
     static Mesh orbitStarMesh;
     void GiftFx(GameObject holder, GiftItem def, float t)
     {
         if (!holder) return;
         float h = Mathf.Max(0.16f, def.h);
-        var orbit = holder.transform.Find("gift_orbit");
-        if (orbit == null)
+        // 별 모양 장식: 별 자체가 반짝 (톡 커졌다 작아지고 밝게 빛남)
+        foreach (var c in holder.GetComponentsInChildren<Transform>())
         {
-            orbit = new GameObject("gift_orbit").transform; orbit.SetParent(holder.transform, false);
-            if (orbitStarMesh == null) { var sb = new AcPB { detail = 1.4f }; sb.Star(Vector3.zero, Vector3.forward, Vector3.up, 0.5f, 0.22f, 0.12f, new Color(1f, 0.86f, 0.35f)); orbitStarMesh = sb.M("orbit_star"); }
-            for (int k = 0; k < 3; k++)
+            if (c.name != "twinkle_star") continue;
+            float ping = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(t * 2.2f)), 10f);
+            c.localScale = Vector3.one * (1f + 0.28f * ping);
+            c.localRotation = Quaternion.Euler(0, t * 60f, 0);
+            var r = c.GetComponent<Renderer>(); r.GetPropertyBlock(giftMpb); giftMpb.SetFloat("_Emit", 0.35f + 0.6f * ping + 0.1f * Mathf.Sin(t * 9f)); giftMpb.SetFloat("_Gloss", 0.8f); r.SetPropertyBlock(giftMpb);
+        }
+        if (OrbitItems.Contains(def.id))
+        {
+            var orbit = holder.transform.Find("gift_orbit");
+            if (orbit == null)
             {
-                var st = ProcObj("orbit_star", orbitStarMesh, orbit, 1f, false).transform;
-                st.localScale = Vector3.one * h * 0.11f;
+                orbit = new GameObject("gift_orbit").transform; orbit.SetParent(holder.transform, false);
+                if (orbitStarMesh == null) { var sb = new AcPB { detail = 1.4f }; sb.Star(Vector3.zero, Vector3.forward, Vector3.up, 0.5f, 0.22f, 0.12f, new Color(1f, 0.86f, 0.35f)); orbitStarMesh = sb.M("orbit_star"); }
+                for (int k = 0; k < 3; k++) ProcObj("orbit_star", orbitStarMesh, orbit, 1f, false);
             }
+            float R = Mathf.Max(0.16f, h * 0.62f);
+            for (int k = 0; k < orbit.childCount; k++)
+            {
+                float a = t * 1.1f + k * Mathf.PI * 2f / 3f;
+                var st = orbit.GetChild(k);
+                st.localPosition = new Vector3(Mathf.Cos(a) * R, h * (0.45f + 0.12f * Mathf.Sin(t * 2.1f + k * 2f)), Mathf.Sin(a) * R);
+                st.localRotation = Quaternion.Euler(0, -a * Mathf.Rad2Deg + t * 90f, 0);
+                st.localScale = Vector3.one * h * 0.14f * (0.75f + 0.25f * Mathf.Sin(t * 5f + k * 1.7f));
+            }
+            orbit.localRotation = Quaternion.Inverse(holder.transform.localRotation);
         }
-        float R = Mathf.Max(0.16f, h * 0.62f);
-        for (int k = 0; k < orbit.childCount; k++)
+        if (SparkleItems.Contains(def.id) && Time.time > giftFxNext)
         {
-            float a = t * 1.1f + k * Mathf.PI * 2f / 3f;
-            var st = orbit.GetChild(k);
-            st.localPosition = new Vector3(Mathf.Cos(a) * R, h * (0.45f + 0.12f * Mathf.Sin(t * 2.1f + k * 2f)), Mathf.Sin(a) * R);
-            st.localRotation = Quaternion.Euler(0, -a * Mathf.Rad2Deg + t * 90f, 0);
-            float tw = 0.75f + 0.25f * Mathf.Sin(t * 5f + k * 1.7f);
-            st.localScale = Vector3.one * h * 0.11f * tw;
-        }
-        orbit.localRotation = Quaternion.Inverse(holder.transform.localRotation);   // 물건이 돌아도 별은 제 박자로 돔
-        // 반짝 튀는 별빛
-        if (Time.time > giftFxNext)
-        {
-            giftFxNext = Time.time + 0.16f;
+            giftFxNext = Time.time + 0.18f;
             float sc = holder.transform.lossyScale.y;
-            var cols = def.id.Contains("snow") || def.id.Contains("ice") ? new[] { Color.white, new Color(0.7f, 0.88f, 1f) }
-                     : def.id.Contains("heart") || def.id.Contains("balloon") || def.id.Contains("bouquet") ? new[] { new Color(1f, 0.6f, 0.75f), Color.white }
-                     : FxGold;
-            var off = UnityEngine.Random.insideUnitCircle * h * 0.55f;
-            var p = holder.transform.position + new Vector3(off.x, UnityEngine.Random.Range(0.15f, 1.05f) * h, off.y) * sc;
-            FxBurst("star", p, 1, 0.05f * sc, h * 0.075f * sc, cols, 0.9f, 0f);
+            var cols = def.id.Contains("ice") ? new[] { Color.white, new Color(0.7f, 0.88f, 1f) } : FxGold;
+            var off = UnityEngine.Random.insideUnitCircle * h * 0.5f;
+            var p = holder.transform.position + new Vector3(off.x, UnityEngine.Random.Range(0.3f, 1.05f) * h, off.y) * sc;
+            FxBurst("star", p, 1, 0.04f * sc, h * 0.07f * sc, cols, 0.8f, 0f);
         }
-        // 별·보석·얼음·트리 같은 것은 숨 쉬듯 빛남 (glow 동작은 따로 처리)
-        if (GlowItems.Contains(def.id) && def.anim != "glow") SetEmitAll(holder, 0.12f + 0.22f * (0.5f + 0.5f * Mathf.Sin(t * 2.6f)));
+        if ((def.id == "ice_sculpture" || def.id == "p_crown" || def.id == "p_ring") && def.anim != "glow") SetEmitAll(holder, 0.1f + 0.2f * Mathf.Pow(0.5f + 0.5f * Mathf.Sin(t * 2.6f), 3f));
     }
 
     readonly MaterialPropertyBlock giftMpb = new MaterialPropertyBlock();

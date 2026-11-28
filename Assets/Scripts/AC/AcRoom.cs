@@ -1262,7 +1262,8 @@ public partial class AcRoom : MonoBehaviour
     }
 
     static readonly Dictionary<string, string> EmoteText = new Dictionary<string, string>
-        { { "wave", "안녕!" }, { "heart", "♥" }, { "cheer", "메리 크리스마스!" }, { "highfive", "하이파이브!" }, { "gift", "선물이에요!" } };
+        { { "wave", "안녕!" }, { "heart", "♥" }, { "cheer", "메리 크리스마스!" }, { "highfive", "하이파이브!" }, { "gift", "선물이에요!" },
+          { "clap", "짝짝짝!" }, { "dance", "신난다~" }, { "bow", "고마워요" }, { "jump", "야호!" } };
 
     GUIStyle sTagFancy, sTagFancyMe;
     void Tag(Vector3 pos, string name, bool isMe, string chat, double chatT, string emote, double emoteT, int qp = 0)
