@@ -566,17 +566,18 @@ public class AcCharacter : MonoBehaviour
     }
 
     // 팔을 번쩍 들 때 손이 큰 머리 속으로 파묻히지 않게: 머리 위쪽으로 향하면 옆으로 벌려(머리 옆에서 멈춤) 줌
-    void ArmsClearHead() { ClearArm(armL, -1f); ClearArm(armR, 1f); }
+    void ArmsClearHead() { if (santa) return; ClearArm(armL, -1f); ClearArm(armR, 1f); }   // 산타는 머리가 작아서 그대로
     static void ClearArm(Transform arm, float side)
     {
         if (!arm) return;
         var d = arm.localRotation * Vector3.down;            // 손이 향하는 방향 (몸 기준: x 옆, y 위, z 앞)
-        if (d.y < 0.2f) return;                               // 어깨보다 조금 위까지는 그대로
+        if (d.y < 0.05f) return;                              // 어깨 높이 아래는 그대로
         if (d.z >= 0.75f) return;                             // 앞으로 내민 팔(선물 들기 등)은 그대로
-        // 머리가 커서 팔을 머리 위로 올리면 손이 머리에 파묻힘 → 옆으로 벌린 채 어깨 살짝 위(약 20~30°)에서 멈춤
-        float up = Mathf.Clamp01((d.y - 0.2f) / 0.8f);         // 원래 얼마나 들었는지 (흔들기 움직임은 조금 남김)
-        float ny = 0.2f + 0.3f * up;
-        float nz = Mathf.Clamp(d.z, 0f, 0.3f);
+        // 머리가 어깨보다 훨씬 커서, 팔을 조금만 들어도 정면에서 손이 볼·머리 속에 파묻혀 보임
+        // → 어깨 높이 근처까지만 들고(최대 약 12°), 옆과 살짝 앞으로 뻗어 손이 머리 밖에 보이게 (11-28)
+        float up = Mathf.Clamp01((d.y - 0.05f) / 0.95f);
+        float ny = 0.02f + 0.2f * up;
+        float nz = 0.38f;
         float nx = Mathf.Sqrt(Mathf.Max(0f, 1f - ny * ny - nz * nz));
         arm.localRotation = Quaternion.FromToRotation(Vector3.down, new Vector3(nx * side, ny, nz));
     }

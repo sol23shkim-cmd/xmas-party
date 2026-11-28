@@ -35,7 +35,6 @@ public partial class AcRoom
         new GiftItem("p_chick", "아기 병아리", 0, 0.24f, "hop"),
         new GiftItem("teddy_bear", "곰 인형", 0, 0.4f, "hop"),
         new GiftItem("reindeer_plush", "루돌프 인형", 0, 0.45f, "sway"),
-        new GiftItem("gingerbread_man", "진저브레드맨", 0, 0.45f, "hop"),
         new GiftItem("snowman_small", "꼬마 눈사람", 0, 0.42f, "sway"),
         new GiftItem("p_bouquet", "꽃다발", 1, 0.5f, "bloom"),
         new GiftItem("p_crown", "반짝 왕관", 1, 0.22f, "spin"),
@@ -62,6 +61,7 @@ public partial class AcRoom
         new GiftItem("cocoa_mug", "코코아", 3, 0.22f, "bob"),
         new GiftItem("cookie_plate", "쿠키와 우유", 3, 0.2f, "bob"),
         new GiftItem("candy_cane_big", "지팡이 사탕", 3, 0.45f, "spin"),
+        new GiftItem("gingerbread_man", "진저브레드맨", 3, 0.45f, "hop"),
         new GiftItem("gingerbread_woman", "진저브레드 아가씨", 3, 0.45f, "hop"),
     };
     static GiftItem GiftItemById(string id) => GiftItems.FirstOrDefault(g => g.id == id) ?? GiftItems[8];
@@ -999,6 +999,53 @@ public partial class AcRoom
         tr.localPosition = basePos + Vector3.up * y;
         tr.localRotation = Quaternion.Euler(0, yaw, rz);
         tr.localScale = new Vector3(1 / Mathf.Sqrt(sy), sy, 1 / Mathf.Sqrt(sy));
+        GiftFx(holder, def, t);
+    }
+
+    // ===== 선물은 모두 특별하게 (11-28): 둘레를 도는 작은 별 3개 + 반짝 튀는 별빛 + 별·보석류는 은은하게 빛남 =====
+    static readonly HashSet<string> GlowItems = new HashSet<string> { "star_lantern", "p_starwand", "ice_sculpture", "p_minitree", "p_crown", "p_ring", "snow_globe", "p_rainbow" };
+    float giftFxNext;
+    static Mesh orbitStarMesh;
+    void GiftFx(GameObject holder, GiftItem def, float t)
+    {
+        if (!holder) return;
+        float h = Mathf.Max(0.16f, def.h);
+        var orbit = holder.transform.Find("gift_orbit");
+        if (orbit == null)
+        {
+            orbit = new GameObject("gift_orbit").transform; orbit.SetParent(holder.transform, false);
+            if (orbitStarMesh == null) { var sb = new AcPB { detail = 1.4f }; sb.Star(Vector3.zero, Vector3.forward, Vector3.up, 0.5f, 0.22f, 0.12f, new Color(1f, 0.86f, 0.35f)); orbitStarMesh = sb.M("orbit_star"); }
+            for (int k = 0; k < 3; k++)
+            {
+                var st = ProcObj("orbit_star", orbitStarMesh, orbit, 1f, false).transform;
+                st.localScale = Vector3.one * h * 0.11f;
+            }
+        }
+        float R = Mathf.Max(0.16f, h * 0.62f);
+        for (int k = 0; k < orbit.childCount; k++)
+        {
+            float a = t * 1.1f + k * Mathf.PI * 2f / 3f;
+            var st = orbit.GetChild(k);
+            st.localPosition = new Vector3(Mathf.Cos(a) * R, h * (0.45f + 0.12f * Mathf.Sin(t * 2.1f + k * 2f)), Mathf.Sin(a) * R);
+            st.localRotation = Quaternion.Euler(0, -a * Mathf.Rad2Deg + t * 90f, 0);
+            float tw = 0.75f + 0.25f * Mathf.Sin(t * 5f + k * 1.7f);
+            st.localScale = Vector3.one * h * 0.11f * tw;
+        }
+        orbit.localRotation = Quaternion.Inverse(holder.transform.localRotation);   // 물건이 돌아도 별은 제 박자로 돔
+        // 반짝 튀는 별빛
+        if (Time.time > giftFxNext)
+        {
+            giftFxNext = Time.time + 0.16f;
+            float sc = holder.transform.lossyScale.y;
+            var cols = def.id.Contains("snow") || def.id.Contains("ice") ? new[] { Color.white, new Color(0.7f, 0.88f, 1f) }
+                     : def.id.Contains("heart") || def.id.Contains("balloon") || def.id.Contains("bouquet") ? new[] { new Color(1f, 0.6f, 0.75f), Color.white }
+                     : FxGold;
+            var off = UnityEngine.Random.insideUnitCircle * h * 0.55f;
+            var p = holder.transform.position + new Vector3(off.x, UnityEngine.Random.Range(0.15f, 1.05f) * h, off.y) * sc;
+            FxBurst("star", p, 1, 0.05f * sc, h * 0.075f * sc, cols, 0.9f, 0f);
+        }
+        // 별·보석·얼음·트리 같은 것은 숨 쉬듯 빛남 (glow 동작은 따로 처리)
+        if (GlowItems.Contains(def.id) && def.anim != "glow") SetEmitAll(holder, 0.12f + 0.22f * (0.5f + 0.5f * Mathf.Sin(t * 2.6f)));
     }
 
     readonly MaterialPropertyBlock giftMpb = new MaterialPropertyBlock();
